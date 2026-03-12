@@ -1,0 +1,1005 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>鳴潮矩陣編隊工具</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <style>
+        /* 基礎全域設定 */
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #1e1e24; color: #f5f5f5; padding: 20px; max-width: 1300px; margin: auto; box-sizing: border-box; }
+        *, *::before, *::after { box-sizing: inherit; }
+        h2 { border-bottom: 2px solid #d4af37; padding-bottom: 10px; margin-bottom: 15px; display: inline-block; color: #fff; word-break: break-word; }
+        
+        .panel { background: #2b2b36; padding: 20px; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.5); margin-bottom: 20px; }
+        .container { display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-start; }
+        
+        /* 左側狀態面板 */
+        .pool-panel { flex: 1; min-width: 280px; max-height: 80vh; overflow-y: auto; position: sticky; top: 20px; }
+        
+        /* 右側隊伍面板 */
+        .team-panel { flex: 2; min-width: 0; width: 100%; }
+        
+        /* 角色勾選區塊樣式 */
+        .checkbox-group { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 15px; }
+        .checkbox-item { background: #3f3f4e; padding: 8px 12px; border-radius: 5px; cursor: pointer; user-select: none; display: flex; align-items: center; gap: 6px; border: 1px solid #555; transition: 0.2s; font-size: 0.95em; }
+        .checkbox-item:hover { background: #4f4f60; }
+        input[type="checkbox"] { cursor: pointer; transform: scale(1.2); }
+        
+        /* 表格區塊保護 */
+        .table-responsive { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; border-radius: 5px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; min-width: 500px; }
+        th, td { border: 1px solid #444; padding: 12px 8px; text-align: center; }
+        th { background-color: #3f3f4e; color: #d4af37; white-space: nowrap; }
+        
+        /* 下拉選單 */
+        select { width: 100%; padding: 10px 5px; background: #1e1e24; color: #fff; border: 1px solid #555; border-radius: 5px; outline: none; font-size: 1em; cursor: pointer; min-height: 44px; }
+        .error { border: 2px solid #ff4d4d !important; background-color: #4a1c1c !important; color: #ff9999 !important; }
+        option.recommended { color: #d4af37; font-weight: bold; background-color: #3f3f4e; }
+        
+        .char-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px dashed #444; font-size: 0.95em; }
+        .char-row:last-child { border-bottom: none; }
+        .count-badge { background: #4caf50; padding: 4px 8px; border-radius: 12px; font-weight: bold; font-size: 0.85em; white-space: nowrap; }
+        .count-empty { background: #ff4d4d; color: white; }
+        
+        .type-title { color: #d4af37; margin-top: 15px; margin-bottom: 10px; font-size: 1.1em; font-weight: bold; border-bottom: 1px solid #555; padding-bottom: 5px; position: sticky; top: 0; background: #2b2b36; z-index: 10; }
+        
+        /* 按鈕與標題佈局 */
+        .header-actions { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
+        .header-actions h3 { margin: 0; }
+        .btn-reset { background-color: #d9534f; color: white; border: none; padding: 10px 20px; border-radius: 5px; font-size: 1em; cursor: pointer; font-weight: bold; transition: 0.2s; white-space: nowrap; }
+        .btn-reset:hover { background-color: #c9302c; }
+        .btn-apply { background-color: #4caf50; color: white; border: none; padding: 10px 15px; border-radius: 5px; font-size: 1em; cursor: pointer; font-weight: bold; transition: 0.2s; white-space: nowrap; }
+        .btn-apply:hover { background-color: #45a049; }
+        .btn-export { background-color: #3498db; color: white; border: none; padding: 10px 15px; border-radius: 5px; font-size: 1em; cursor: pointer; font-weight: bold; transition: 0.2s; white-space: nowrap; }
+        .btn-export:hover { background-color: #2980b9; }
+
+        .preset-box { background: #3f3f4e; padding: 12px; border-radius: 5px; margin-bottom: 15px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; border: 1px solid #555; }
+        .preset-box label { font-weight: bold; color: #d4af37; white-space: nowrap; }
+        .preset-box select { flex: 1; min-width: 250px; width: auto; }
+
+        /* 滾動條樣式 */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #1e1e24; }
+        ::-webkit-scrollbar-thumb { background: #555; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #777; }
+
+        @media (max-width: 768px) {
+            body { padding: 10px; }
+            h2 { font-size: 1.4em; }
+            .container { flex-direction: column; }
+            .pool-panel { width: 100%; position: static; max-height: 250px; }
+            .team-panel { width: 100%; }
+            .checkbox-item { width: calc(50% - 5px); justify-content: flex-start; }
+            td { padding: 8px 4px; }
+        }
+    </style>
+</head>
+<body>
+
+    <h2>鳴潮矩陣編隊工具 v4.5.1 (客製化排軸修復版)</h2>
+
+    <details style="background: #2b2b36; padding: 10px 15px; border-radius: 8px; border: 1px solid #444; margin-bottom: 20px; cursor: pointer;">
+        <summary style="color: #d4af37; font-weight: bold; outline: none;">📜 點此查看版本更新日誌 (v4.5.1)</summary>
+        <div style="margin-top: 10px; font-size: 0.95em; color: #ccc; line-height: 1.6;">
+            - 🐞 <strong>緊急修復 (v4.5.1)</strong>：修復了底層陣列命名衝突導致整個網頁當機空白的嚴重 Bug。<br>
+            - 🛡️ <strong>骨幹回歸</strong>：採用最穩定的 4.3.1 核心框架進行升級，保證操作極速流暢無卡頓。<br>
+            - 🔓 <strong>一號位解禁</strong>：解除了一號位只能看見推薦主C的限制，現在所有角色皆可自由選取。<br>
+            - 🎯 <strong>專屬排軸資料庫</strong>：新增「配置實戰排軸」面板。系統會隱藏你未擁有的隊伍，並允許你精確勾選自己會打的排軸，下拉選單將依據你的選擇提供最真實的期望值。<br>
+            - 💾 <strong>實用工具</strong>：補回自動存檔 (LocalStorage) 與 📷 一鍵圖片匯出功能。<br>
+        </div>
+    </details>
+    
+    <div class="panel">
+        <details open>
+            <summary style="font-size: 1.17em; font-weight: bold; color: #fff; cursor: pointer; outline: none; border-bottom: 2px solid #d4af37; padding-bottom: 10px; user-select: none;">
+                1. 勾選擁有的角色
+            </summary>
+            <div style="margin-top: 15px;">
+                <div class="header-actions" style="margin-bottom: 10px;">
+                    <button id="roster-switch" class="btn-reset" onclick="rosterCheckboxButton()">🗑️ 清空角色勾選</button>
+                </div>
+                <div id="roster-setup"></div>
+            </div>
+        </details>
+    </div>
+
+    <div class="panel">
+        <details>
+            <summary style="font-size: 1.17em; font-weight: bold; color: #fff; cursor: pointer; outline: none; border-bottom: 2px solid #d4af37; padding-bottom: 10px; user-select: none;">
+                2. 配置實戰排軸 (僅顯示可組建的隊伍)
+            </summary>
+            <div style="margin-top: 15px; font-size: 0.9em; color: #aaa; margin-bottom: 15px; line-height: 1.5;">
+                💡 這裡只會顯示您「已擁有全部成員」的隊伍。請取消勾選您不會打的排軸（例如極限軸）。<br>
+                下方的編隊選單將會自動排除您取消勾選的排軸，為您推薦最符合您實戰能力的 DPS！
+            </div>
+            <div id="rotation-setup" style="max-height: 400px; overflow-y: auto; padding-right: 10px;"></div>
+        </details>
+    </div>
+
+    <div class="container">
+        <div class="panel pool-panel">
+            <h3>3. 剩餘可用次數</h3>
+            <div id="tracker"></div>
+        </div>
+
+        <div class="panel team-panel">
+            <div class="header-actions" style="margin-bottom: 10px;">
+                <h3>4. 隊伍編排 (極限 16 關)</h3>
+                <div style="display: flex; gap: 10px;">
+                    <button class="btn-export" onclick="exportImage()">📷 匯出完成隊伍圖片</button>
+                    <button class="btn-reset" onclick="resetTeams()">🗑️ 清空隊伍重設</button>
+                </div>
+            </div>
+
+            <div class="preset-box">
+                <label>🔥 世代隊伍快速填入：</label>
+                <select id="preset-select"></select>
+                <button class="btn-apply" onclick="applyPreset()">➕ 填入下一組空位</button>
+            </div>
+
+            <div class="table-responsive">
+                <table>
+                    <thead>
+                        <tr>
+                            <th width="10%">關卡</th>
+                            <th width="30%">位置 1 (主輸出)</th>
+                            <th width="30%">位置 2 (副C/輔助)</th>
+                            <th width="30%">位置 3 (生存/輔助)</th>
+                        </tr>
+                    </thead>
+                    <tbody id="team-board">
+                        </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+<script>
+    const charData = {
+        "白芷": { max: 2, type: "生存位 (可用 2 次)" },
+        "維里奈": { max: 2, type: "生存位 (可用 2 次)" },
+        "守岸人": { max: 2, type: "生存位 (可用 2 次)" },
+        "卜靈": { max: 2, type: "生存位 (可用 2 次)" },
+        "莫寧": { max: 2, type: "生存位 (可用 2 次)" },
+        "漂泊者": { max: 1, type: "一般角色 (可用 1 次)" },
+        "今汐": { max: 1, type: "一般角色 (可用 1 次)" },
+        "長離": { max: 1, type: "一般角色 (可用 1 次)" },
+        "忌炎": { max: 1, type: "一般角色 (可用 1 次)" },
+        "相里要": { max: 1, type: "一般角色 (可用 1 次)" },
+        "椿": { max: 1, type: "一般角色 (可用 1 次)" },
+        "折枝": { max: 1, type: "一般角色 (可用 1 次)" },
+        "吟霖": { max: 1, type: "一般角色 (可用 1 次)" },
+        "卡卡羅": { max: 1, type: "一般角色 (可用 1 次)" },
+        "鑒心": { max: 1, type: "一般角色 (可用 1 次)" },
+        "凌陽": { max: 1, type: "一般角色 (可用 1 次)" },
+        "弗洛洛": { max: 1, type: "一般角色 (可用 1 次)" },
+        "坎特蕾拉": { max: 1, type: "一般角色 (可用 1 次)" },
+        "陸·赫斯": { max: 1, type: "一般角色 (可用 1 次)" },
+        "琳奈": { max: 1, type: "一般角色 (可用 1 次)" },
+        "千咲": { max: 1, type: "一般角色 (可用 1 次)" },
+        "贊妮": { max: 1, type: "一般角色 (可用 1 次)" },
+        "菲比": { max: 1, type: "一般角色 (可用 1 次)" },
+        "仇遠": { max: 1, type: "一般角色 (可用 1 次)" },
+        "尤諾": { max: 1, type: "一般角色 (可用 1 次)" },
+        "卡提希婭": { max: 1, type: "一般角色 (可用 1 次)" },
+        "夏空": { max: 1, type: "一般角色 (可用 1 次)" },
+        "奧古斯塔": { max: 1, type: "一般角色 (可用 1 次)" },
+        "愛彌斯": { max: 1, type: "一般角色 (可用 1 次)" },
+        "嘉貝莉娜": { max: 1, type: "一般角色 (可用 1 次)" },
+        "露帕": { max: 1, type: "一般角色 (可用 1 次)" },
+        "布蘭特": { max: 1, type: "一般角色 (可用 1 次)" },
+        "珂萊塔": { max: 1, type: "一般角色 (可用 1 次)" },
+        "洛可可": { max: 1, type: "一般角色 (可用 1 次)" },
+        "丹瑾": { max: 1, type: "一般角色 (可用 1 次)" },
+        "桃祈": { max: 1, type: "一般角色 (可用 1 次)" },
+        "燈燈": { max: 1, type: "一般角色 (可用 1 次)" },
+        "秋水": { max: 1, type: "一般角色 (可用 1 次)" },
+        "秧秧": { max: 1, type: "一般角色 (可用 1 次)" },
+        "淵武": { max: 1, type: "一般角色 (可用 1 次)" },
+        "莫特斐": { max: 1, type: "一般角色 (可用 1 次)" },
+        "安可": { max: 1, type: "一般角色 (可用 1 次)" },
+        "熾霞": { max: 1, type: "一般角色 (可用 1 次)" },
+        "釉瑚": { max: 1, type: "一般角色 (可用 1 次)" },
+        "散華": { max: 1, type: "一般角色 (可用 1 次)" }
+    };
+
+    // 🏆 結合實戰排軸(rot)與難度(diff)的完整資料庫
+    const dpsData = [
+        // --- 一代隊 (gen: 1) ---
+        {c1:"椿", c2:"散華", c3:"守岸人", dps:5.59, rot:"常規", diff:"🟩", gen:1}, 
+        {c1:"椿", c2:"洛可可", c3:"守岸人", dps:6.35, rot:"常規", diff:"⭐", gen:1}, 
+        {c1:"椿", c2:"洛可可", c3:"守岸人", dps:5.95, rot:"常規", diff:"🔵", gen:1}, 
+        {c1:"漂泊者", c2:"琳奈", c3:"守岸人", dps:7.10, rot:"錯亂2min軸", diff:"⭐", gen:1}, 
+        {c1:"漂泊者", c2:"琳奈", c3:"守岸人", dps:6.77, rot:"錯輪", diff:"🔵", gen:1}, 
+        {c1:"漂泊者", c2:"琳奈", c3:"守岸人", dps:5.48, rot:"常規", diff:"🟩", gen:1}, 
+        {c1:"漂泊者", c2:"散華", c3:"守岸人", dps:6.16, rot:"錯輪", diff:"🔵", gen:1}, 
+        {c1:"漂泊者", c2:"散華", c3:"守岸人", dps:5.40, rot:"常規", diff:"🟩", gen:1}, 
+        {c1:"漂泊者", c2:"洛可可", c3:"守岸人", dps:6.48, rot:"常規", diff:"🔵", gen:1}, 
+        {c1:"漂泊者", c2:"洛可可", c3:"守岸人", dps:5.60, rot:"常規", diff:"🟩", gen:1}, 
+        {c1:"今汐", c2:"坎特蕾拉", c3:"守岸人", dps:6.07, rot:"常規", diff:"🔵", gen:1}, 
+        {c1:"今汐", c2:"折枝", c3:"守岸人", dps:6.38, rot:"常規", diff:"⭐", gen:1}, 
+        {c1:"今汐", c2:"折枝", c3:"守岸人", dps:5.85, rot:"常規", diff:"🔵", gen:1}, 
+        {c1:"今汐", c2:"折枝", c3:"卜靈", dps:5.77, rot:"常規", diff:"🔵", gen:1}, 
+        {c1:"今汐", c2:"吟霖", c3:"守岸人", dps:6.45, rot:"錯輪", diff:"⭐", gen:1}, 
+        {c1:"今汐", c2:"吟霖", c3:"守岸人", dps:5.73, rot:"常規", diff:"🔵", gen:1}, 
+        {c1:"安可", c2:"露帕", c3:"莫寧", dps:6.47, rot:"常規上限", diff:"🔵", gen:1}, 
+        {c1:"安可", c2:"露帕", c3:"守岸人", dps:6.25, rot:"6鏈安可", diff:"🔵", gen:1}, 
+        {c1:"安可", c2:"露帕", c3:"守岸人", dps:5.79, rot:"常規", diff:"🔵", gen:1}, 
+        {c1:"安可", c2:"散華", c3:"守岸人", dps:5.50, rot:"錯輪", diff:"🔵", gen:1}, 
+        {c1:"安可", c2:"散華", c3:"守岸人", dps:5.00, rot:"常規", diff:"🟩", gen:1}, 
+        {c1:"長離", c2:"露帕", c3:"莫寧", dps:7.20, rot:"極限", diff:"⭐", gen:1}, 
+        {c1:"長離", c2:"露帕", c3:"莫寧", dps:6.90, rot:"錯輪", diff:"⭐", gen:1}, 
+        {c1:"長離", c2:"露帕", c3:"莫寧", dps:6.40, rot:"常規", diff:"🔵", gen:1}, 
+        {c1:"長離", c2:"露帕", c3:"守岸人", dps:6.01, rot:"7離火", diff:"⭐", gen:1}, 
+        {c1:"長離", c2:"露帕", c3:"守岸人", dps:5.83, rot:"6離火", diff:"🔵", gen:1}, 
+        {c1:"長離", c2:"露帕", c3:"守岸人", dps:5.63, rot:"5離火", diff:"🟩", gen:1}, 
+        {c1:"長離", c2:"散華", c3:"守岸人", dps:4.81, rot:"錯輪3延", diff:"🔵", gen:1}, 
+        {c1:"長離", c2:"散華", c3:"守岸人", dps:4.20, rot:"常規", diff:"🟩", gen:1}, 
+        {c1:"忌炎", c2:"夏空", c3:"守岸人", dps:7.81, rot:"龍切", diff:"⭐", gen:1}, 
+        {c1:"忌炎", c2:"夏空", c3:"守岸人", dps:6.79, rot:"常規", diff:"⭐", gen:1}, 
+        {c1:"忌炎", c2:"夏空", c3:"尤諾", dps:6.55, rot:"常規", diff:"🔵", gen:1}, 
+        {c1:"忌炎", c2:"莫特斐", c3:"守岸人", dps:5.85, rot:"常規", diff:"⭐", gen:1}, 
+        {c1:"忌炎", c2:"莫特斐", c3:"守岸人", dps:5.60, rot:"常規", diff:"🔵", gen:1}, 
+        {c1:"相里要", c2:"琳奈", c3:"守岸人", dps:6.28, rot:"常規", diff:"🔵", gen:1}, 
+        {c1:"相里要", c2:"吟霖", c3:"守岸人", dps:5.25, rot:"常規", diff:"🔵", gen:1}, 
+        {c1:"相里要", c2:"散華", c3:"守岸人", dps:4.58, rot:"錯輪3變", diff:"🔵", gen:1}, 
+        {c1:"卡卡羅", c2:"琳奈", c3:"守岸人", dps:7.74, rot:"6鏈卡1Z4死告", diff:"⚠️", gen:1}, 
+        {c1:"卡卡羅", c2:"琳奈", c3:"守岸人", dps:7.53, rot:"6鏈卡4死告", diff:"⭐", gen:1}, 
+        {c1:"卡卡羅", c2:"琳奈", c3:"守岸人", dps:7.20, rot:"6鏈卡3死告", diff:"🔵", gen:1}, 
+        {c1:"卡卡羅", c2:"琳奈", c3:"守岸人", dps:6.40, rot:"4死告", diff:"⭐", gen:1}, 
+        {c1:"卡卡羅", c2:"琳奈", c3:"守岸人", dps:6.10, rot:"常規", diff:"🔵", gen:1}, 
+        {c1:"卡卡羅", c2:"琳奈", c3:"守岸人", dps:5.80, rot:"3Z2死告", diff:"🟩", gen:1}, 
+        {c1:"卡卡羅", c2:"吟霖", c3:"守岸人", dps:6.10, rot:"6鏈卡4死告", diff:"⭐", gen:1}, 
+        {c1:"卡卡羅", c2:"吟霖", c3:"守岸人", dps:5.72, rot:"6鏈卡3死告", diff:"🔵", gen:1}, 
+        {c1:"卡卡羅", c2:"吟霖", c3:"守岸人", dps:5.07, rot:"4死告", diff:"⭐", gen:1}, 
+        {c1:"卡卡羅", c2:"吟霖", c3:"守岸人", dps:4.65, rot:"常規", diff:"🔵", gen:1}, 
+        {c1:"卡卡羅", c2:"散華", c3:"守岸人", dps:4.13, rot:"常規", diff:"🔵", gen:1}, 
+        {c1:"凌陽", c2:"琳奈", c3:"守岸人", dps:5.18, rot:"常規", diff:"🔵", gen:1}, 
+        {c1:"凌陽", c2:"折枝", c3:"守岸人", dps:5.08, rot:"6鏈豹", diff:"🔵", gen:1}, 
+        {c1:"凌陽", c2:"折枝", c3:"守岸人", dps:4.32, rot:"常規", diff:"🔵", gen:1},
+
+        // --- 二代隊 (gen: 2) ---
+        {c1:"弗洛洛", c2:"坎特蕾拉", c3:"莫寧", dps:9.02, rot:"1鏈莫", diff:"🔵", gen:2}, 
+        {c1:"弗洛洛", c2:"坎特蕾拉", c3:"莫寧", dps:8.57, rot:"常規", diff:"🔵", gen:2}, 
+        {c1:"弗洛洛", c2:"嘉貝莉娜", c3:"仇遠", dps:8.55, rot:"極限", diff:"⭐", gen:2}, 
+        {c1:"弗洛洛", c2:"坎特蕾拉", c3:"守岸人", dps:8.00, rot:"常規", diff:"🔵", gen:2}, 
+        {c1:"弗洛洛", c2:"坎特蕾拉", c3:"仇遠", dps:7.96, rot:"常規", diff:"🔵", gen:2}, 
+        {c1:"弗洛洛", c2:"坎特蕾拉", c3:"洛可可", dps:7.51, rot:"常規", diff:"🔵", gen:2}, 
+        {c1:"弗洛洛", c2:"仇遠", c3:"守岸人", dps:7.86, rot:"常規", diff:"🔵", gen:2}, 
+        {c1:"弗洛洛", c2:"卜靈", c3:"守岸人", dps:5.56, rot:"常規", diff:"🔵", gen:2}, 
+        {c1:"弗洛洛", c2:"燈燈", c3:"守岸人", dps:5.56, rot:"常規", diff:"🔵", gen:2}, 
+        {c1:"坎特蕾拉", c2:"散華", c3:"守岸人", dps:5.73, rot:"常規", diff:"🔵", gen:2}, 
+        {c1:"坎特蕾拉", c2:"散華", c3:"守岸人", dps:5.37, rot:"錯輪", diff:"🔵", gen:2}, 
+        {c1:"千咲", c2:"琳奈", c3:"守岸人", dps:6.40, rot:"常規", diff:"🔵", gen:2}, 
+        {c1:"千咲", c2:"洛可可", c3:"守岸人", dps:4.51, rot:"常規", diff:"🔵", gen:2}, 
+        {c1:"贊妮", c2:"菲比", c3:"漂泊者", dps:9.15, rot:"極限", diff:"⭐", gen:2}, 
+        {c1:"贊妮", c2:"菲比", c3:"漂泊者", dps:8.39, rot:"常規", diff:"🔵", gen:2}, 
+        {c1:"贊妮", c2:"菲比", c3:"千咲", dps:8.34, rot:"奶套千", diff:"🔵", gen:2}, 
+        {c1:"贊妮", c2:"菲比", c3:"守岸人", dps:7.95, rot:"常規", diff:"🔵", gen:2}, 
+        {c1:"贊妮", c2:"菲比", c3:"守岸人", dps:7.18, rot:"基礎", diff:"🟩", gen:2}, 
+        {c1:"贊妮", c2:"漂泊者", c3:"守岸人", dps:4.78, rot:"常規", diff:"🔵", gen:2}, 
+        {c1:"菲比", c2:"漂泊者", c3:"琳奈", dps:6.52, rot:"常規", diff:"🔵", gen:2}, 
+        {c1:"菲比", c2:"漂泊者", c3:"守岸人", dps:5.16, rot:"常規", diff:"🔵", gen:2}, 
+        {c1:"嘉貝莉娜", c2:"露帕", c3:"莫寧", dps:8.56, rot:"極限", diff:"⭐", gen:2}, 
+        {c1:"嘉貝莉娜", c2:"露帕", c3:"莫寧", dps:7.84, rot:"常規", diff:"🔵", gen:2}, 
+        {c1:"嘉貝莉娜", c2:"琳奈", c3:"守岸人", dps:8.26, rot:"常規", diff:"🔵", gen:2}, 
+        {c1:"嘉貝莉娜", c2:"露帕", c3:"布蘭特", dps:9.15, rot:"雙錨錯延", diff:"⚠️", gen:2}, 
+        {c1:"嘉貝莉娜", c2:"露帕", c3:"布蘭特", dps:8.80, rot:"雙錨縮軸改", diff:"⭐", gen:2}, 
+        {c1:"嘉貝莉娜", c2:"露帕", c3:"布蘭特", dps:8.31, rot:"單錨改", diff:"⚠️", gen:2}, 
+        {c1:"嘉貝莉娜", c2:"露帕", c3:"布蘭特", dps:7.67, rot:"常規", diff:"🔵", gen:2}, 
+        {c1:"嘉貝莉娜", c2:"仇遠", c3:"守岸人", dps:8.68, rot:"4旋踢", diff:"⚠️", gen:2}, 
+        {c1:"嘉貝莉娜", c2:"仇遠", c3:"守岸人", dps:8.11, rot:"極限", diff:"⭐", gen:2}, 
+        {c1:"嘉貝莉娜", c2:"仇遠", c3:"守岸人", dps:7.77, rot:"常規", diff:"🔵", gen:2}, 
+        {c1:"嘉貝莉娜", c2:"露帕", c3:"守岸人", dps:8.02, rot:"極限", diff:"⭐", gen:2}, 
+        {c1:"嘉貝莉娜", c2:"露帕", c3:"守岸人", dps:7.35, rot:"常規", diff:"🔵", gen:2}, 
+        {c1:"嘉貝莉娜", c2:"露帕", c3:"長離", dps:7.67, rot:"極限", diff:"⭐", gen:2}, 
+        {c1:"嘉貝莉娜", c2:"露帕", c3:"長離", dps:6.72, rot:"常規", diff:"🔵", gen:2}, 
+        {c1:"嘉貝莉娜", c2:"莫特斐", c3:"守岸人", dps:5.73, rot:"常規", diff:"🔵", gen:2}, 
+        {c1:"布蘭特", c2:"露帕", c3:"莫寧", dps:8.35, rot:"常規", diff:"🔵", gen:2}, 
+        {c1:"布蘭特", c2:"露帕", c3:"莫寧", dps:7.53, rot:"常規下限", diff:"🔵", gen:2}, 
+        {c1:"布蘭特", c2:"露帕", c3:"莫寧", dps:7.20, rot:"基礎", diff:"🟩", gen:2}, 
+        {c1:"布蘭特", c2:"露帕", c3:"長離", dps:7.74, rot:"雙錨縮軸", diff:"⭐", gen:2}, 
+        {c1:"布蘭特", c2:"露帕", c3:"長離", dps:7.57, rot:"極限", diff:"⭐", gen:2}, 
+        {c1:"布蘭特", c2:"露帕", c3:"長離", dps:7.00, rot:"單錨", diff:"🔵", gen:2}, 
+        {c1:"布蘭特", c2:"露帕", c3:"守岸人", dps:7.73, rot:"改軸", diff:"🔵", gen:2}, 
+        {c1:"布蘭特", c2:"散華", c3:"守岸人", dps:5.43, rot:"常規", diff:"🔵", gen:2}, 
+        {c1:"露帕", c2:"琳奈", c3:"守岸人", dps:5.68, rot:"常規", diff:"🔵", gen:2}, 
+        {c1:"卡提希婭", c2:"夏空", c3:"千咲", dps:11.00, rot:"劍切", diff:"⚠️", gen:2}, 
+        {c1:"卡提希婭", c2:"夏空", c3:"千咲", dps:9.72, rot:"極限", diff:"⭐", gen:2}, 
+        {c1:"卡提希婭", c2:"夏空", c3:"千咲", dps:9.01, rot:"常規", diff:"🔵", gen:2}, 
+        {c1:"卡提希婭", c2:"夏空", c3:"漂泊者", dps:9.30, rot:"劍切", diff:"⭐", gen:2}, 
+        {c1:"卡提希婭", c2:"夏空", c3:"漂泊者", dps:8.47, rot:"雙下", diff:"⭐", gen:2}, 
+        {c1:"卡提希婭", c2:"夏空", c3:"漂泊者", dps:8.20, rot:"常規", diff:"🔵", gen:2}, 
+        {c1:"卡提希婭", c2:"散華", c3:"漂泊者", dps:6.39, rot:"常規", diff:"🔵", gen:2}, 
+        {c1:"卡提希婭", c2:"漂泊者", c3:"卜靈", dps:6.39, rot:"常規", diff:"🔵", gen:2}, 
+        {c1:"尤諾", c2:"琳奈", c3:"夏空", dps:8.67, rot:"常規", diff:"🔵", gen:2}, 
+        {c1:"尤諾", c2:"琳奈", c3:"守岸人", dps:9.20, rot:"極限", diff:"⭐", gen:2}, 
+        {c1:"尤諾", c2:"琳奈", c3:"守岸人", dps:8.41, rot:"常規", diff:"🔵", gen:2}, 
+        {c1:"尤諾", c2:"琳奈", c3:"莫寧", dps:8.47, rot:"極限", diff:"⭐", gen:2}, 
+        {c1:"尤諾", c2:"琳奈", c3:"莫寧", dps:8.10, rot:"常規", diff:"🔵", gen:2}, 
+        {c1:"尤諾", c2:"琳奈", c3:"守岸人", dps:7.90, rot:"基礎", diff:"🟩", gen:2}, 
+        {c1:"尤諾", c2:"夏空", c3:"守岸人", dps:7.92, rot:"極限", diff:"⭐", gen:2}, 
+        {c1:"尤諾", c2:"夏空", c3:"守岸人", dps:7.45, rot:"常規", diff:"🔵", gen:2}, 
+        {c1:"尤諾", c2:"散華", c3:"守岸人", dps:5.03, rot:"常規", diff:"🔵", gen:2}, 
+        {c1:"夏空", c2:"千咲", c3:"守岸人", dps:7.64, rot:"極限", diff:"⭐", gen:2}, 
+        {c1:"夏空", c2:"千咲", c3:"守岸人", dps:7.38, rot:"常規", diff:"🔵", gen:2}, 
+        {c1:"夏空", c2:"散華", c3:"守岸人", dps:6.23, rot:"錯輪", diff:"🔵", gen:2}, 
+        {c1:"夏空", c2:"散華", c3:"守岸人", dps:5.53, rot:"基礎", diff:"🟩", gen:2}, 
+        {c1:"仇遠", c2:"弗洛洛", c3:"守岸人", dps:8.34, rot:"仇3鏈", diff:"🔵", gen:2}, 
+        {c1:"仇遠", c2:"夏空", c3:"守岸人", dps:5.65, rot:"夏雙延", diff:"🔵", gen:2}, 
+        {c1:"仇遠", c2:"夏空", c3:"守岸人", dps:5.54, rot:"仇雙延", diff:"🔵", gen:2}, 
+        {c1:"仇遠", c2:"莫特斐", c3:"守岸人", dps:5.25, rot:"常規", diff:"🔵", gen:2}, 
+        {c1:"奧古斯塔", c2:"尤諾", c3:"琳奈", dps:8.50, rot:"2旋1升", diff:"🔵", gen:2}, 
+        {c1:"奧古斯塔", c2:"尤諾", c3:"守岸人", dps:9.05, rot:"2旋4升", diff:"⭐", gen:2}, 
+        {c1:"奧古斯塔", c2:"尤諾", c3:"守岸人", dps:8.79, rot:"2旋3升", diff:"⭐", gen:2}, 
+        {c1:"奧古斯塔", c2:"尤諾", c3:"守岸人", dps:8.28, rot:"2旋1升", diff:"🔵", gen:2}, 
+        {c1:"奧古斯塔", c2:"尤諾", c3:"守岸人", dps:7.67, rot:"2旋", diff:"🟩", gen:2}, 
+        {c1:"奧古斯塔", c2:"莫特斐", c3:"守岸人", dps:7.35, rot:"4旋1升", diff:"⭐", gen:2}, 
+        {c1:"奧古斯塔", c2:"莫特斐", c3:"守岸人", dps:7.00, rot:"3旋1升", diff:"🔵", gen:2}, 
+        {c1:"珂萊塔", c2:"琳奈", c3:"莫寧", dps:6.98, rot:"常規", diff:"🔵", gen:2}, 
+        {c1:"珂萊塔", c2:"琳奈", c3:"守岸人", dps:7.08, rot:"常規", diff:"🔵", gen:2}, 
+        {c1:"珂萊塔", c2:"布蘭特", c3:"守岸人", dps:6.71, rot:"極限", diff:"⭐", gen:2}, 
+        {c1:"珂萊塔", c2:"折枝", c3:"守岸人", dps:6.45, rot:"常規", diff:"🔵", gen:2}, 
+        {c1:"珂萊塔", c2:"燈燈", c3:"守岸人", dps:6.17, rot:"常規", diff:"🔵", gen:2}, 
+        {c1:"珂萊塔", c2:"卜靈", c3:"守岸人", dps:6.17, rot:"常規", diff:"🔵", gen:2}, 
+        {c1:"珂萊塔", c2:"散華", c3:"守岸人", dps:5.53, rot:"錯輪3變", diff:"🔵", gen:2},
+
+        // --- 三代隊 (gen: 3) ---
+        {c1:"陸·赫斯", c2:"琳奈", c3:"莫寧", dps:8.55, rot:"1鏈莫", diff:"🔵", gen:3}, 
+        {c1:"陸·赫斯", c2:"琳奈", c3:"守岸人", dps:8.37, rot:"常規", diff:"🔵", gen:3}, 
+        {c1:"陸·赫斯", c2:"散華", c3:"莫寧", dps:6.32, rot:"1鏈莫", diff:"🔵", gen:3}, 
+        {c1:"陸·赫斯", c2:"散華", c3:"守岸人", dps:6.19, rot:"常規", diff:"🔵", gen:3}, 
+        {c1:"陸·赫斯", c2:"散華", c3:"維里奈", dps:5.33, rot:"常規", diff:"🔵", gen:3}, 
+        {c1:"琳奈", c2:"散華", c3:"守岸人", dps:5.46, rot:"極限", diff:"⭐", gen:3}, 
+        {c1:"琳奈", c2:"散華", c3:"守岸人", dps:4.30, rot:"常規", diff:"🔵", gen:3}, 
+        {c1:"愛彌斯", c2:"琳奈", c3:"莫寧", dps:10.50, rot:"雙處", diff:"⭐", gen:3}, 
+        {c1:"愛彌斯", c2:"琳奈", c3:"莫寧", dps:9.50, rot:"常規", diff:"🔵", gen:3}, 
+        {c1:"愛彌斯", c2:"弗洛洛", c3:"莫寧", dps:9.04, rot:"1鏈莫", diff:"🔵", gen:3}, 
+        {c1:"愛彌斯", c2:"琳奈", c3:"守岸人", dps:8.35, rot:"常規", diff:"🔵", gen:3}, 
+        {c1:"愛彌斯", c2:"琳奈", c3:"千咲", dps:8.10, rot:"常規", diff:"🔵", gen:3}, 
+        {c1:"愛彌斯", c2:"露帕", c3:"莫寧", dps:8.70, rot:"常規", diff:"🔵", gen:3}, 
+        {c1:"愛彌斯", c2:"露帕", c3:"千咲", dps:7.89, rot:"極限", diff:"⭐", gen:3}, 
+        {c1:"愛彌斯", c2:"千咲", c3:"莫寧", dps:7.68, rot:"轉聚暴", diff:"🔵", gen:3}, 
+        {c1:"愛彌斯", c2:"千咲", c3:"莫寧", dps:7.28, rot:"常規", diff:"🔵", gen:3}, 
+        {c1:"愛彌斯", c2:"露帕", c3:"嘉貝莉娜", dps:8.62, rot:"常規", diff:"🔵", gen:3}, 
+        {c1:"愛彌斯", c2:"露帕", c3:"布蘭特", dps:8.56, rot:"常規", diff:"🔵", gen:3}, 
+        {c1:"愛彌斯", c2:"露帕", c3:"長離", dps:7.76, rot:"常規", diff:"🔵", gen:3}, 
+        {c1:"愛彌斯", c2:"長離", c3:"莫寧", dps:7.04, rot:"極限", diff:"⭐", gen:3}, 
+        {c1:"愛彌斯", c2:"長離", c3:"莫寧", dps:6.11, rot:"常規", diff:"🔵", gen:3}, 
+        {c1:"愛彌斯", c2:"露帕", c3:"守岸人", dps:7.48, rot:"常規", diff:"🔵", gen:3}, 
+        {c1:"愛彌斯", c2:"散華", c3:"守岸人", dps:5.07, rot:"常規", diff:"🔵", gen:3}
+    ];
+
+    // 為每筆資料建立唯一ID
+    dpsData.forEach((d, i) => d.id = 'rot_' + i);
+
+    let isReset = true;
+    let ownedCharacters = new Set(Object.keys(charData));
+    
+    // 預設將所有排軸皆納入選中名單
+    let checkedRotations = new Set(dpsData.map(d => d.id));
+
+    // 負責生成「世代隊伍快速填入」的選單
+    function renderPresets() {
+        const presetSelect = document.getElementById('preset-select');
+        if (!presetSelect) return;
+
+        // 計算當前在 checkedRotations 中活躍的最高 DPS 隊伍
+        const activeDps = dpsData.filter(d => checkedRotations.has(d.id));
+        let presetMap = new Map();
+        activeDps.forEach(d => {
+            let key = `${d.c1}_${d.c2}_${d.c3}`;
+            if (!presetMap.has(key) || d.dps > presetMap.get(key).dps) {
+                presetMap.set(key, { ...d });
+            }
+        });
+
+        const presetTeams = [];
+        for (let d of presetMap.values()) {
+            presetTeams.push({ name: `${d.c1} + ${d.c2} + ${d.c3} (最大DPS: ${d.dps.toFixed(2)}w)`, chars: [d.c1, d.c2, d.c3], dps: d.dps, gen: d.gen });
+        }
+        presetTeams.sort((a,b) => {
+            if (a.chars[0] !== b.chars[0]) return a.chars[0].localeCompare(b.chars[0], 'zh-TW');
+            return b.dps - a.dps;
+        });
+
+        let oldVal = presetSelect.value;
+        let html = '<option value="">-- 選擇推薦配隊 --</option>';
+        let gen1 = [], gen2 = [], gen3 = [];
+        
+        presetTeams.forEach((team, index) => {
+            // 4.5.1 改動：隱藏未擁有的預設隊伍
+            if (ownedCharacters.has(team.chars[0]) && ownedCharacters.has(team.chars[1]) && ownedCharacters.has(team.chars[2])) {
+                let opt = `<option value="${team.chars.join(',')}">${team.name}</option>`;
+                if (team.gen === 1) gen1.push(opt);
+                else if (team.gen === 2) gen2.push(opt);
+                else gen3.push(opt);
+            }
+        });
+        
+        if(gen1.length > 0) html += `<optgroup label="🥇 一代隊伍">${gen1.join('')}</optgroup>`;
+        if(gen2.length > 0) html += `<optgroup label="🥈 二代隊伍">${gen2.join('')}</optgroup>`;
+        if(gen3.length > 0) html += `<optgroup label="🥉 三代隊伍">${gen3.join('')}</optgroup>`;
+        
+        presetSelect.innerHTML = html;
+        if (oldVal && presetSelect.querySelector(`option[value="${oldVal}"]`)) {
+            presetSelect.value = oldVal;
+        }
+    }
+
+    function renderCheckboxes() {
+        const container = document.getElementById('roster-setup');
+        if (!container) return;
+        container.innerHTML = '';
+        const groups = {};
+        for (let name in charData) {
+            let type = charData[name].type;
+            if (!groups[type]) groups[type] = [];
+            groups[type].push(name);
+        }
+        for (let type in groups) {
+            let typeDiv = document.createElement('div');
+            typeDiv.innerHTML = `<div class="type-title">${type}</div><div class="checkbox-group"></div>`;
+            container.appendChild(typeDiv);
+            const groupContainer = typeDiv.querySelector('.checkbox-group');
+            groups[type].forEach(name => {
+                let label = document.createElement('label');
+                label.className = 'checkbox-item';
+                let isChecked = ownedCharacters.has(name) ? 'checked' : '';
+                label.innerHTML = `<input type="checkbox" value="${name}" ${isChecked} onchange="updateOwnedCharacters()"> ${name}`;
+                groupContainer.appendChild(label);
+            });
+        }
+    }
+
+    // 核心新功能：渲染排軸勾選列表
+    function renderRotations() {
+        const container = document.getElementById('rotation-setup');
+        if (!container) return;
+
+        // 僅篩選出「三隻角色皆已擁有」的有效隊伍
+        const validTeams = dpsData.filter(d => 
+            ownedCharacters.has(d.c1) && ownedCharacters.has(d.c2) && ownedCharacters.has(d.c3)
+        );
+
+        if(validTeams.length === 0) {
+            container.innerHTML = '<p style="color:#aaa;">目前沒有可組建的完整隊伍，請先在上方勾選角色。</p>';
+            return;
+        }
+
+        // 分組整理：主C -> 隊伍 -> 具體排軸
+        const groups = {};
+        validTeams.forEach(d => {
+            if(!groups[d.c1]) groups[d.c1] = {};
+            const teamKey = `${d.c2} / ${d.c3}`;
+            if(!groups[d.c1][teamKey]) groups[d.c1][teamKey] = [];
+            groups[d.c1][teamKey].push(d);
+        });
+
+        let html = '';
+        for(let c1 in groups) {
+            html += `<div style="margin-bottom: 15px; padding: 12px; background: #2b2b36; border-radius: 5px; border-left: 3px solid #d4af37;">`;
+            html += `<h4 style="color: #d4af37; margin-top: 0; margin-bottom: 10px; font-size: 1.1em;">🎯 主輸出：${c1}</h4>`;
+            
+            for(let teamKey in groups[c1]) {
+                html += `<div style="margin-bottom: 8px; display: flex; flex-wrap: wrap; align-items: center; gap: 10px;">`;
+                html += `<span style="font-weight: bold; color: #fff; min-width: 140px;">配 ${teamKey}</span>`;
+                
+                // 照 DPS 由高到低排
+                groups[c1][teamKey].sort((a,b) => b.dps - a.dps).forEach(d => {
+                    let isChecked = checkedRotations.has(d.id) ? 'checked' : '';
+                    html += `<label style="cursor: pointer; color: #ccc; font-size: 0.9em; white-space: nowrap; display: flex; align-items: center; gap: 4px; background: #1e1e24; padding: 4px 8px; border-radius: 4px; border: 1px solid #444;">
+                                <input type="checkbox" value="${d.id}" ${isChecked} onchange="updateRotationState()"> 
+                                ${d.diff} ${d.dps.toFixed(2)}w (${d.rot})
+                             </label>`;
+                });
+                html += `</div>`;
+            }
+            html += `</div>`;
+        }
+        container.innerHTML = html;
+    }
+
+    const stages = 16; 
+    function initBoard() {
+        const board = document.getElementById('team-board');
+        if(!board) return;
+        for (let i = 1; i <= stages; i++) {
+            let tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>第 ${i} 關</td>
+                <td><select id="s${i}-p1" name="stage${i}-pos1" class="char-select" onchange="updateTracker()"></select></td>
+                <td><select id="s${i}-p2" name="stage${i}-pos2" class="char-select" onchange="updateTracker()"></select></td>
+                <td><select id="s${i}-p3" name="stage${i}-pos3" class="char-select" onchange="updateTracker()"></select></td>
+            `;
+            board.appendChild(tr);
+        }
+    }
+
+    function buildOptionsHTML(slotType, v1, v2, v3, currentValRaw, usedCounts, teamUsedChars) {
+        let defaultText = slotType === 1 ? '-- 主輸出 --' : (slotType === 2 ? '-- 副C/輔助 --' : '-- 生存/輔助 --');
+        let html = `<option value="">${defaultText}</option>`;
+        
+        let recommendedMap = new Map(); 
+        
+        let hasFilterContext = false;
+        if (slotType === 1 && (v2 || v3)) hasFilterContext = true;
+        if (slotType === 2 && (v1 || v3)) hasFilterContext = true;
+        if (slotType === 3 && (v1 || v2)) hasFilterContext = true;
+
+        // 僅計算被使用者「勾選/保留」的排軸資料
+        const activeDps = dpsData.filter(d => 
+            checkedRotations.has(d.id) &&
+            ownedCharacters.has(d.c1) && 
+            ownedCharacters.has(d.c2) && 
+            ownedCharacters.has(d.c3)
+        );
+
+        if (hasFilterContext) {
+            activeDps.forEach(d => {
+                let match = true;
+                if (slotType === 1 && v2 && d.c2 !== v2) match = false;
+                if (slotType === 1 && v3 && d.c3 !== v3) match = false;
+                if (slotType === 2 && v1 && d.c1 !== v1) match = false;
+                if (slotType === 2 && v3 && d.c3 !== v3) match = false;
+                if (slotType === 3 && v1 && d.c1 !== v1) match = false;
+                if (slotType === 3 && v2 && d.c2 !== v2) match = false;
+                
+                if (match) {
+                    let targetChar = slotType === 1 ? d.c1 : (slotType === 2 ? d.c2 : d.c3);
+                    let existing = recommendedMap.get(targetChar);
+                    // 根據使用者在上方資料庫的勾選，只顯示勾選的最高期望值
+                    if (!existing || d.dps > existing.dps) {
+                        recommendedMap.set(targetChar, { dps: d.dps });
+                    }
+                }
+            });
+        } else {
+            // 無過濾條件，列出預設可任此位置的角色
+            if (slotType === 1) {
+                // v4.5.1 一號位無關聯時，只顯示存在於資料庫主C位的角色為推薦
+                const slot1ValidSet = new Set(dpsData.map(d => d.c1));
+                for (let name of slot1ValidSet) {
+                    if (ownedCharacters.has(name)) {
+                        recommendedMap.set(name, { dps: 0 });
+                    }
+                }
+            } else {
+                activeDps.forEach(d => {
+                    let targetChar = slotType === 1 ? d.c1 : (slotType === 2 ? d.c2 : d.c3);
+                    if (!recommendedMap.has(targetChar)) {
+                        recommendedMap.set(targetChar, { dps: 0 });
+                    }
+                });
+            }
+        }
+
+        let finalRecommended = [];
+        for (let [name, data] of recommendedMap.entries()) {
+            let text = `⭐ ${name}`;
+            if (data.dps > 0) text += ` (最高 ${data.dps.toFixed(2)}w)`;
+            finalRecommended.push({ name: name, dps: data.dps, rawValue: name, text: text });
+        }
+
+        if (hasFilterContext) {
+            finalRecommended.sort((a, b) => b.dps - a.dps);
+        } else {
+            finalRecommended.sort((a, b) => a.name.localeCompare(b.name, 'zh-TW'));
+        }
+
+        let recSet = new Set(finalRecommended.map(x => x.name));
+        let others = [];
+        
+        for (let name of ownedCharacters) {
+            if (!recSet.has(name)) {
+                // v4.5.1: 一號位全解禁，所有的角色都會出現在 other
+                others.push(name);
+            }
+        }
+
+        let optGroupLabel = "";
+        if (slotType === 1) optGroupLabel = hasFilterContext ? "🔥 適配主輸出 (依DPS排序)" : "🎯 推薦主輸出";
+        else if (slotType === 2) optGroupLabel = hasFilterContext ? "🔥 適配副C/輔助 (依DPS排序)" : "⚔️ 推薦副C/輔助";
+        else if (slotType === 3) optGroupLabel = hasFilterContext ? "🔥 適配生存/輔助 (依DPS排序)" : "🛡️ 推薦生存/輔助";
+
+        if (finalRecommended.length > 0) {
+            html += `<optgroup label="${optGroupLabel}">`;
+            let currentValName = currentValRaw ? currentValRaw.split('|')[0] : "";
+            finalRecommended.forEach(item => {
+                let disabled = "";
+                let maxCount = charData[item.name] ? charData[item.name].max : 1;
+                let used = usedCounts[item.name] || 0;
+                let isGloballyExhausted = (used >= maxCount && currentValName !== item.name);
+                let isLocallyUsed = teamUsedChars.has(item.name) && currentValName !== item.name;
+                if (isGloballyExhausted || isLocallyUsed) disabled = ' disabled hidden ';
+                html += `<option value="${item.rawValue}" class="recommended" ${disabled}>${item.text}</option>`;
+            });
+            html += '</optgroup>';
+        }
+
+        if (others.length > 0) {
+            html += '<optgroup label="🔸 其他角色">';
+            others.sort((a,b) => a.localeCompare(b, 'zh-TW'));
+            let currentValName = currentValRaw ? currentValRaw.split('|')[0] : "";
+            others.forEach(name => {
+                let disabled = "";
+                let maxCount = charData[name] ? charData[name].max : 1;
+                let used = usedCounts[name] || 0;
+                let isGloballyExhausted = (used >= maxCount && currentValName !== name);
+                let isLocallyUsed = teamUsedChars.has(name) && currentValName !== name;
+                if (isGloballyExhausted || isLocallyUsed) disabled = ' disabled hidden ';
+                html += `<option value="${name}" ${disabled}>${name}</option>`;
+            });
+            html += '</optgroup>';
+        }
+
+        return html;
+    }
+
+    function applyPreset() {
+        const presetIndex = document.getElementById('preset-select').value;
+        if (presetIndex === "") {
+            alert("請先在下拉選單中選擇一個配隊！");
+            return;
+        }
+
+        // 我們將 select 的 value 設為了 characters 的 string 組合
+        const teamChars = presetIndex.split(',');
+        const rows = document.querySelectorAll('#team-board tr');
+        let applied = false;
+
+        for (let i = 0; i < rows.length; i++) {
+            let selects = rows[i].querySelectorAll('.char-select');
+            if (!selects[0].value && !selects[1].value && !selects[2].value) {
+                selects[0].innerHTML = `<option value="${teamChars[0]}">${teamChars[0]}</option>`;
+                selects[0].value = teamChars[0];
+                selects[1].innerHTML = `<option value="${teamChars[1]}">${teamChars[1]}</option>`;
+                selects[1].value = teamChars[1];
+                selects[2].innerHTML = `<option value="${teamChars[2]}">${teamChars[2]}</option>`;
+                selects[2].value = teamChars[2];
+                
+                selects[0].removeAttribute('data-last-html');
+                selects[1].removeAttribute('data-last-html');
+                selects[2].removeAttribute('data-last-html');
+                
+                applied = true;
+                break;
+            }
+        }
+
+        if (!applied) alert("沒有完全空白的隊伍欄位了！請先清空部分隊伍。");
+        updateTracker();
+    }
+
+    // 原生 4.3.1 全選切換邏輯
+    function rosterCheckboxButton() {
+        let button = document.getElementById('roster-switch');
+        let allCheckboxes = document.querySelectorAll('#roster-setup input[type="checkbox"]');
+        if (isReset) {     
+            button.classList.remove('btn-reset');
+            button.classList.add('btn-apply');
+            button.innerText = "➕ 勾選所有角色";
+            allCheckboxes.forEach(checkbox => { checkbox.checked = false; });
+            ownedCharacters.clear();
+        } else {
+            button.classList.remove('btn-apply');
+            button.classList.add('btn-reset');
+            button.innerText = "🗑️ 清空角色勾選";
+            allCheckboxes.forEach(checkbox => { checkbox.checked = true; });
+            ownedCharacters.clear();
+            allCheckboxes.forEach(cb => ownedCharacters.add(cb.value));
+        }
+        isReset = !isReset;
+        
+        // 切換完背包，需要重新繪製可用的排軸表
+        renderRotations();
+        updateTracker();
+    }
+
+    function updateOwnedCharacters() {
+        const checkboxes = document.querySelectorAll('#roster-setup input[type="checkbox"]');
+        ownedCharacters.clear();
+        checkboxes.forEach(cb => {
+            if (cb.checked) ownedCharacters.add(cb.value);
+        });
+        
+        // 依照 4.3.1 的連動設計校正按鈕狀態
+        let button = document.getElementById('roster-switch');
+        if (ownedCharacters.size === 0) {
+            isReset = true;
+            button.classList.remove('btn-reset');
+            button.classList.add('btn-apply');
+            button.innerText = "➕ 勾選所有角色";
+        } else {
+            isReset = false;
+            button.classList.remove('btn-apply');
+            button.classList.add('btn-reset');
+            button.innerText = "🗑️ 清空角色勾選";
+        }
+        
+        // 角色改變時，連動刷新排軸面板
+        renderRotations();
+        updateTracker();
+    }
+
+    // 處理排軸勾選框變化
+    function updateRotationState() {
+        const checkboxes = document.querySelectorAll('#rotation-setup input[type="checkbox"]');
+        checkedRotations.clear();
+        checkboxes.forEach(cb => {
+            if (cb.checked) checkedRotations.add(cb.value);
+        });
+        updateTracker();
+    }
+
+    function saveData() {
+        try {
+            const rosterArr = Array.from(ownedCharacters);
+            localStorage.setItem('ww_roster', JSON.stringify(rosterArr));
+
+            const rotationsArr = Array.from(checkedRotations);
+            localStorage.setItem('ww_rotations', JSON.stringify(rotationsArr));
+
+            const savedTeams = [];
+            for (let i = 1; i <= stages; i++) {
+                let s1 = document.getElementById(`s${i}-p1`) ? document.getElementById(`s${i}-p1`).value : "";
+                let s2 = document.getElementById(`s${i}-p2`) ? document.getElementById(`s${i}-p2`).value : "";
+                let s3 = document.getElementById(`s${i}-p3`) ? document.getElementById(`s${i}-p3`).value : "";
+                savedTeams.push([s1, s2, s3]);
+            }
+            localStorage.setItem('ww_teams', JSON.stringify(savedTeams));
+        } catch(e) {}
+    }
+
+    // 原生 4.3.1 安全追蹤機制
+    function updateTracker() {
+        renderPresets();
+
+        let usedCounts = {};
+        for (let name in charData) usedCounts[name] = 0;
+
+        const allSelects = document.querySelectorAll('.char-select');
+        allSelects.forEach(select => {
+            select.classList.remove('error'); 
+            if (select.value) {
+                let realName = select.value.split('|')[0];
+                if (usedCounts[realName] !== undefined) usedCounts[realName]++;
+            }
+        });
+
+        const rows = document.querySelectorAll('#team-board tr');
+        rows.forEach(row => {
+            let s1 = row.querySelector('.char-select[name$="-pos1"]');
+            let s2 = row.querySelector('.char-select[name$="-pos2"]');
+            let s3 = row.querySelector('.char-select[name$="-pos3"]');
+
+            let rawV1 = s1 ? s1.value : "", rawV2 = s2 ? s2.value : "", rawV3 = s3 ? s3.value : "";
+            let v1 = rawV1 ? rawV1.split('|')[0] : "";
+            let v2 = rawV2 ? rawV2.split('|')[0] : "";
+            let v3 = rawV3 ? rawV3.split('|')[0] : "";
+
+            // 如果背包裡已經沒有這個角色，自動清空該格子
+            if (v1 && (!ownedCharacters.has(v1))) { v1 = ""; rawV1 = ""; if(s1) s1.value = ""; }
+            if (v2 && (!ownedCharacters.has(v2))) { v2 = ""; rawV2 = ""; if(s2) s2.value = ""; }
+            if (v3 && (!ownedCharacters.has(v3))) { v3 = ""; rawV3 = ""; if(s3) s3.value = ""; }
+
+            let teamUsedChars = new Set([v1, v2, v3].filter(x => x));
+
+            function safeUpdateHTML(selectObj, htmlStr, rawVal) {
+                if (!selectObj) return;
+                if (selectObj.getAttribute('data-last-html') !== htmlStr) {
+                    selectObj.innerHTML = htmlStr;
+                    selectObj.value = rawVal;
+                    selectObj.setAttribute('data-last-html', htmlStr);
+                }
+            }
+
+            safeUpdateHTML(s1, buildOptionsHTML(1, v1, v2, v3, rawV1, usedCounts, teamUsedChars), rawV1);
+            safeUpdateHTML(s2, buildOptionsHTML(2, v1, v2, v3, rawV2, usedCounts, teamUsedChars), rawV2);
+            safeUpdateHTML(s3, buildOptionsHTML(3, v1, v2, v3, rawV3, usedCounts, teamUsedChars), rawV3);
+
+            [s1, s2, s3].forEach(sel => {
+                if (sel && sel.value) {
+                    let rName = sel.value.split('|')[0];
+                    if (usedCounts[rName] > (charData[rName] ? charData[rName].max : 1)) {
+                        sel.classList.add('error');
+                    }
+                }
+            });
+        });
+
+        renderTracker(usedCounts);
+        saveData();
+    }
+
+    function renderTracker(usedCounts) {
+        const tracker = document.getElementById('tracker');
+        if (!tracker) return;
+        tracker.innerHTML = '';
+        
+        if (ownedCharacters.size === 0) {
+            tracker.innerHTML = '<div style="color: #aaa; font-style: italic; margin-top: 10px;">尚未勾選角色</div>';
+            return;
+        }
+
+        const groups = {};
+        for (let name of ownedCharacters) {
+            if (!charData[name]) continue; 
+            let type = charData[name].type;
+            if (!groups[type]) groups[type] = [];
+            groups[type].push(name);
+        }
+
+        for (let type in groups) {
+            let typeDiv = document.createElement('div');
+            typeDiv.innerHTML = `<div class="type-title">${type}</div>`;
+            groups[type].forEach(name => {
+                let max = charData[name].max;
+                let remain = max - (usedCounts[name] || 0);
+                let badgeClass = remain <= 0 ? 'count-empty' : 'count-badge';
+                let displayRemain = remain < 0 ? '超用!' : (remain === 0 ? '耗盡' : remain);
+                
+                typeDiv.innerHTML += `
+                    <div class="char-row">
+                        <span>${name}</span>
+                        <span class="count-badge ${badgeClass}">剩餘: ${displayRemain}</span>
+                    </div>
+                `;
+            });
+            tracker.appendChild(typeDiv);
+        }
+    }
+
+    function resetTeams() {
+        if (!confirm("確定要清空所有已排好的隊伍嗎？")) return;
+        document.querySelectorAll('.char-select').forEach(select => {
+            select.value = "";
+            select.removeAttribute('data-last-html');
+        });
+        updateTracker();
+    }
+
+    function exportImage() {
+        const completedTeams = [];
+        for (let i = 1; i <= stages; i++) {
+            const s1 = document.getElementById(`s${i}-p1`).value;
+            const s2 = document.getElementById(`s${i}-p2`).value;
+            const s3 = document.getElementById(`s${i}-p3`).value;
+            
+            if (s1 && s2 && s3) {
+                completedTeams.push({ stage: i, chars: [s1.split('|')[0], s2.split('|')[0], s3.split('|')[0]] });
+            }
+        }
+
+        if (completedTeams.length === 0) {
+            alert("目前沒有任何一組排滿 3 人的完整隊伍，無法匯出！");
+            return;
+        }
+
+        const exportContainer = document.createElement('div');
+        exportContainer.style.position = 'absolute';
+        exportContainer.style.left = '-9999px'; 
+        exportContainer.style.background = '#1e1e24';
+        exportContainer.style.color = '#fff';
+        exportContainer.style.padding = '30px';
+        exportContainer.style.borderRadius = '15px';
+        exportContainer.style.fontFamily = "'Segoe UI', sans-serif";
+        exportContainer.style.width = '800px';
+
+        let exportHTML = `
+            <h2 style="color: #d4af37; border-bottom: 2px solid #d4af37; padding-bottom: 10px; text-align: center; margin-top: 0;">鳴潮矩陣編隊 - 實戰排班表</h2>
+            <table style="width: 100%; border-collapse: collapse; margin-top: 20px; text-align: center; font-size: 1.1em;">
+                <thead>
+                    <tr style="background-color: #3f3f4e; color: #d4af37;">
+                        <th style="border: 1px solid #555; padding: 15px;">關卡</th>
+                        <th style="border: 1px solid #555; padding: 15px;">主輸出</th>
+                        <th style="border: 1px solid #555; padding: 15px;">副C/輔助</th>
+                        <th style="border: 1px solid #555; padding: 15px;">生存/輔助</th>
+                    </tr>
+                </thead>
+                <tbody>
+        `;
+
+        completedTeams.forEach(t => {
+            exportHTML += `
+                <tr>
+                    <td style="border: 1px solid #555; padding: 15px; font-weight: bold; color: #4caf50;">第 ${t.stage} 關</td>
+                    <td style="border: 1px solid #555; padding: 15px;">${t.chars[0]}</td>
+                    <td style="border: 1px solid #555; padding: 15px;">${t.chars[1]}</td>
+                    <td style="border: 1px solid #555; padding: 15px;">${t.chars[2]}</td>
+                </tr>
+            `;
+        });
+
+        exportHTML += `
+                </tbody>
+            </table>
+            <div style="margin-top: 20px; text-align: right; color: #888; font-size: 0.9em;">生成時間：${new Date().toLocaleString()}</div>
+        `;
+
+        exportContainer.innerHTML = exportHTML;
+        document.body.appendChild(exportContainer);
+
+        html2canvas(exportContainer, { backgroundColor: '#1e1e24', scale: 2 }).then(canvas => {
+            const link = document.createElement('a');
+            link.download = '鳴潮矩陣完成隊伍.png';
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+            document.body.removeChild(exportContainer);
+        }).catch(err => {
+            console.error("圖片匯出失敗", err);
+            alert("匯出圖片時發生錯誤！");
+            document.body.removeChild(exportContainer);
+        });
+    }
+
+    function initializeApp() {
+        try {
+            const savedRoster = localStorage.getItem('ww_roster');
+            if (savedRoster) {
+                let parsed = JSON.parse(savedRoster);
+                if (Array.isArray(parsed)) {
+                    ownedCharacters.clear();
+                    parsed.forEach(name => {
+                        if (charData[name]) ownedCharacters.add(name);
+                    });
+                }
+            }
+        } catch(e) {}
+
+        try {
+            const savedRotations = localStorage.getItem('ww_rotations');
+            if (savedRotations) {
+                let parsed = JSON.parse(savedRotations);
+                if (Array.isArray(parsed)) {
+                    checkedRotations = new Set(parsed);
+                }
+            }
+        } catch(e) {}
+
+        renderCheckboxes();
+        renderRotations();
+        initBoard();
+
+        let button = document.getElementById('roster-switch');
+        if (ownedCharacters.size === 0) {
+            isReset = true;
+            button.classList.remove('btn-reset');
+            button.classList.add('btn-apply');
+            button.innerText = "➕ 勾選所有角色";
+        } else {
+            isReset = false;
+            button.classList.remove('btn-apply');
+            button.classList.add('btn-reset');
+            button.innerText = "🗑️ 清空角色勾選";
+        }
+
+        try {
+            const savedTeams = localStorage.getItem('ww_teams');
+            if (savedTeams) {
+                const parsedTeams = JSON.parse(savedTeams);
+                for (let i = 1; i <= stages; i++) {
+                    if (parsedTeams[i-1]) {
+                        const rowSelects = document.querySelectorAll(`#team-board tr:nth-child(${i}) select`);
+                        if(rowSelects.length === 3) {
+                            // 預先填入假資料，再由 updateTracker 校正
+                            rowSelects[0].innerHTML = `<option value="${parsedTeams[i-1][0]}"></option>`;
+                            rowSelects[0].value = parsedTeams[i-1][0];
+                            rowSelects[1].innerHTML = `<option value="${parsedTeams[i-1][1]}"></option>`;
+                            rowSelects[1].value = parsedTeams[i-1][1];
+                            rowSelects[2].innerHTML = `<option value="${parsedTeams[i-1][2]}"></option>`;
+                            rowSelects[2].value = parsedTeams[i-1][2];
+                        }
+                    }
+                }
+            }
+        } catch(e) {}
+
+        updateTracker(); 
+    }
+
+    initializeApp();
+</script>
+</body>
+</html>
