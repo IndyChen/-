@@ -1,4 +1,4 @@
-# 🌊 鳴潮矩陣編隊工具 (Wuthering Waves Matrix Team Builder)
+# 🌊 鳴潮矩陣編隊工具 (Wuthering Waves Doubled Pawns Matrix Team Builder)
 
 ![Version](https://img.shields.io/badge/version-v4.6.2-blue.svg)
 ![Platform](https://img.shields.io/badge/platform-Web_Browser-success.svg)
