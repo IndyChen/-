@@ -5,7 +5,7 @@
 ![Tech Stack](https://img.shields.io/badge/tech-HTML_|_CSS_|_JS-orange.svg)
 ![License](https://img.shields.io/badge/license-CC_BY--NC--SA_4.0-green.svg)
 
-專為《鳴潮》(Wuthering Waves)「矩陣疊兵」模式設計的純前端開源排班與 DPS 計算輔助工具。幫助玩家在深厚的角色池中，精準分配耐力、過濾實戰排軸，並輕鬆完成極限 16 隊的最佳化編排！
+專為《鳴潮》(Wuthering Waves)「矩陣疊兵」模式設計的純前端開源編隊與 DPS 計算輔助工具。幫助玩家在深厚的角色池中，精準分配耐力、過濾實戰排軸，並輕鬆完成極限 16 隊的最佳化編排！
 
 🌐 **[https://indychen.github.io/DPM-Team-Builder/]**
 
