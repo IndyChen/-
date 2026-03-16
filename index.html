@@ -147,24 +147,58 @@
 
     <div id="page1" class="page-content active">
         
-        <details style="background: #2b2b36; padding: 10px 15px; border-radius: 8px; border: 1px solid #444; margin-bottom: 20px; cursor: pointer;">
-            <summary style="color: #d4af37; font-weight: bold; outline: none;">📜 點此查看版本更新說明 (當前: v4.7.4)</summary>
-            <div style="margin-top: 10px; font-size: 0.95em; color: #ccc; line-height: 1.6; border-top: 1px dashed #555; padding-top: 10px;">
-                <strong style="color:#cf00ff;">【v4.7.4 無損洗牌與防呆升級版】</strong><br>
-                - 🔄 <strong>無損實戰洗牌</strong>：完全記憶表單隊員，推算真實 DPS 後無損重排，絕不覆寫或清空原隊伍！<br>
-                - 🎯 <strong>防呆選單與血量鎖定</strong>：終點王改為下拉選單，殘血輸入強制鎖定 0.01% ~ 100% 防呆修正。<br>
-                - 🔙 <strong>一鍵重設預設 DPS</strong>：新增按鈕可快速清除分數覆寫，復原排軸的系統預設值。<br>
-                - 🗂️ <strong>雙檔分離與分頁 UI</strong>：將畫面與邏輯徹底分離，大幅提升效能與介面清爽度。<br>
-                <br>
-                <strong style="color:#888;">【v4.7.0 ~ 4.7.3 近期版本更新概略】</strong><br>
-                <span style="color:#777;">
-                - (4.7.3) 實裝實戰反推最佳化、序列王血量代數反解引擎與大數據貢獻問卷。<br>
-                - (4.7.2) 實裝「動態壓軸」一鍵編制邏輯。<br>
-                - (4.7.1) 新增「內建軸穩定性計算器」，支援實測耗時統計分析。<br>
-                - (4.7.0) 實裝「手法折損全局與微調拉桿」及無預設 DPS 自訂覆寫功能。<br>
-                </span>
-            </div>
-        </details>
+        <div style="display: flex; gap: 20px; flex-wrap: wrap;">
+            <details open style="flex: 1; min-width: 300px; background: #1e2b24; padding: 10px 15px; border-radius: 8px; border: 1px solid #2e5c3e; margin-bottom: 20px; cursor: pointer;">
+                <summary style="color: #4caf50; font-weight: bold; outline: none; font-size: 1.1em;">📖 歡迎使用！點此查看「頁面操作指南」與「未來展望」</summary>
+                <div style="margin-top: 15px; font-size: 0.95em; color: #ddd; line-height: 1.6; border-top: 1px dashed #2e5c3e; padding-top: 15px;">
+                    <strong style="color: #fff; font-size: 1.05em;">【當前頁面：角色與排軸設定】</strong><br>
+                    <ul style="margin: 5px 0 10px 20px; padding: 0; color: #ccc;">
+                        <li style="margin-bottom: 5px;"><strong>選擇角色：</strong>請在下方勾選您目前擁有的角色，系統會自動計算您可用的組隊次數。</li>
+                        <li style="margin-bottom: 5px;"><strong>篩選排軸難度：</strong>根據您的手法，勾選您有把握的排軸難度 (如🟩輪椅、⭐進階)。系統只會顯示您可以組建的隊伍。</li>
+                        <li style="margin-bottom: 5px;"><strong>微調穩定性：</strong>若您的手法容易失誤，可以透過拉桿微調「全局」或「各難度」的達成率，系統將自動折算您的實戰傷害下限。</li>
+                    </ul>
+
+                    <strong style="color: #00ffaa; font-size: 1.05em;">【下一頁預告：矩陣編隊與實戰推演】</strong><br>
+                    <ul style="margin: 5px 0 10px 20px; padding: 0; color: #ccc;">
+                        <li style="margin-bottom: 5px;">完成設定後，點擊右下角按鈕前往下一頁。</li>
+                        <li style="margin-bottom: 5px;">您可以在該頁面進行<strong>「一鍵自動編隊」</strong>，或是手動排兵布陣。</li>
+                        <li>該頁面亦提供硬核的<strong>「實戰分數反推與無損洗牌重排」</strong>功能，幫助您找出最優的出戰順序。</li>
+                    </ul>
+                    
+                    <div style="background: rgba(255, 170, 0, 0.1); border-left: 4px solid #ffaa00; padding: 12px; margin-top: 20px; border-radius: 4px;">
+                        <strong style="color: #ffaa00; font-size: 1.1em;">🚧 開發者備註 & 下期預告 (v4.8 展望)：</strong><br>
+                        <div style="margin-top: 5px; color: #ddd;">
+                            因目前系統尚缺乏精確的「動態傷害曲線」數據，當前版本的一鍵編制與實戰重排，是採用相對傻瓜式的「平滑均傷」演算法。<br><br>
+                            我們深知實戰中「爆發前置」與「平滑出傷」在殘血收尾時的巨大差異。因此，我們將在下個大版本 (v4.8) 嘗試實裝：<br>
+                            1. <strong>【自訂各軸傷害折線】</strong>：允許您自訂排軸的傷害模型（例如：按照每秒產生多少百分比的「累加曲線」去拉動，或是設定「第幾秒會產生幾 % 的總傷」的爆發模型）。<br>
+                            2. <strong>【自訂循環次數】</strong>：讓傷害與耗時計算以完整的 Rotation 循環為單位。<br>
+                            這將讓編隊與殘血推演的精準度產生質的飛躍，敬請期待！
+                        </div>
+                    </div>
+                </div>
+            </details>
+
+            <details style="flex: 1; min-width: 300px; background: #2b2b36; padding: 10px 15px; border-radius: 8px; border: 1px solid #444; margin-bottom: 20px; cursor: pointer;">
+                <summary style="color: #d4af37; font-weight: bold; outline: none; font-size: 1.1em;">📜 點此查看版本更新說明 (當前: v4.7.4)</summary>
+                <div style="margin-top: 15px; font-size: 0.95em; color: #ccc; line-height: 1.6; border-top: 1px dashed #555; padding-top: 15px;">
+                    <strong style="color:#cf00ff; font-size: 1.05em;">【v4.7.4 無損洗牌與防呆升級版】</strong><br>
+                    <ul style="margin: 5px 0 10px 20px; padding: 0;">
+                        <li>🔄 <strong>無損實戰洗牌</strong>：完全記憶表單隊員，推算真實 DPS 後無損重排，絕不覆寫或清空原隊伍！</li>
+                        <li>🎯 <strong>防呆選單與血量鎖定</strong>：終點王改為下拉選單，殘血輸入強制鎖定 0.01% ~ 100% 防呆修正。</li>
+                        <li>🔙 <strong>一鍵重設預設 DPS</strong>：新增按鈕可快速清除分數覆寫，復原排軸的系統預設值。</li>
+                        <li>🗂️ <strong>雙檔分離與分頁 UI</strong>：將畫面與邏輯徹底分離，大幅提升效能與介面清爽度。</li>
+                    </ul>
+                    <br>
+                    <strong style="color:#888;">【v4.7.0 ~ 4.7.3 近期版本更新概略】</strong><br>
+                    <div style="color:#777; margin-top: 5px;">
+                        - (4.7.3) 實裝實戰反推最佳化、序列王血量代數反解引擎與大數據貢獻問卷。<br>
+                        - (4.7.2) 實裝「動態壓軸」一鍵編制邏輯。<br>
+                        - (4.7.1) 新增「內建軸穩定性計算器」，支援實測耗時統計分析。<br>
+                        - (4.7.0) 實裝「手法折損全局與微調拉桿」及無預設 DPS 自訂覆寫功能。
+                    </div>
+                </div>
+            </details>
+        </div>
 
         <div class="panel">
             <details open>
@@ -215,34 +249,34 @@
                             <span id="skill-display" style="color: #cf00ff; font-weight: bold; font-size: 1.2em;">100%</span>
                         </div>
                     </div>
-                    <input type="range" id="skill-slider" min="50" max="100" value="100" style="width: 100%; margin: 10px 0;" oninput="updateMasterSkill()">
+                    <input type="range" id="skill-slider" min="50" max="100" value="100" style="width: calc(100% - 20px); margin: 10px 10px;" oninput="updateMasterSkill()">
                     
                     <details style="margin-top: 10px; width: 100%;">
                         <summary style="color: #aaa; cursor: pointer; font-size: 0.9em; outline: none;">⚙️ 依排軸難度微調各別穩定性 (點擊展開)</summary>
                         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; margin-top: 10px; padding: 15px; background: #1e1e24; border-radius: 8px; border: 1px solid #444;">
                             <div style="display: flex; align-items: center; gap: 10px;">
                                 <span style="width: 70px; color: #d32f2f; font-weight: bold;">⚠️ 極難:</span>
-                                <input type="range" id="slider-diff-4" min="0" max="100" value="100" style="flex: 1;" oninput="updateSubSkill('⚠️', 'slider-diff-4', 'val-diff-4')">
+                                <input type="range" id="slider-diff-4" min="0" max="100" value="100" style="flex: 1; margin: 0 10px;" oninput="updateSubSkill('⚠️', 'slider-diff-4', 'val-diff-4')">
                                 <span id="val-diff-4" style="width: 45px; text-align: right; color: #fff; font-weight: bold;">100%</span>
                             </div>
                             <div style="display: flex; align-items: center; gap: 10px;">
                                 <span style="width: 70px; color: #ffb300; font-weight: bold;">⭐ 進階:</span>
-                                <input type="range" id="slider-diff-3" min="0" max="100" value="100" style="flex: 1;" oninput="updateSubSkill('⭐', 'slider-diff-3', 'val-diff-3')">
+                                <input type="range" id="slider-diff-3" min="0" max="100" value="100" style="flex: 1; margin: 0 10px;" oninput="updateSubSkill('⭐', 'slider-diff-3', 'val-diff-3')">
                                 <span id="val-diff-3" style="width: 45px; text-align: right; color: #fff; font-weight: bold;">100%</span>
                             </div>
                             <div style="display: flex; align-items: center; gap: 10px;">
                                 <span style="width: 70px; color: #2196f3; font-weight: bold;">🔵 中等:</span>
-                                <input type="range" id="slider-diff-2" min="0" max="100" value="100" style="flex: 1;" oninput="updateSubSkill('🔵', 'slider-diff-2', 'val-diff-2')">
+                                <input type="range" id="slider-diff-2" min="0" max="100" value="100" style="flex: 1; margin: 0 10px;" oninput="updateSubSkill('🔵', 'slider-diff-2', 'val-diff-2')">
                                 <span id="val-diff-2" style="width: 45px; text-align: right; color: #fff; font-weight: bold;">100%</span>
                             </div>
                             <div style="display: flex; align-items: center; gap: 10px;">
                                 <span style="width: 70px; color: #4caf50; font-weight: bold;">🟩 輪椅:</span>
-                                <input type="range" id="slider-diff-1" min="0" max="100" value="100" style="flex: 1;" oninput="updateSubSkill('🟩', 'slider-diff-1', 'val-diff-1')">
+                                <input type="range" id="slider-diff-1" min="0" max="100" value="100" style="flex: 1; margin: 0 10px;" oninput="updateSubSkill('🟩', 'slider-diff-1', 'val-diff-1')">
                                 <span id="val-diff-1" style="width: 45px; text-align: right; color: #fff; font-weight: bold;">100%</span>
                             </div>
                             <div style="display: flex; align-items: center; gap: 10px;">
                                 <span style="width: 70px; color: #8e44ad; font-weight: bold;">🧩 非主流:</span>
-                                <input type="range" id="slider-diff-5" min="0" max="100" value="100" style="flex: 1;" oninput="updateSubSkill('🧩', 'slider-diff-5', 'val-diff-5')">
+                                <input type="range" id="slider-diff-5" min="0" max="100" value="100" style="flex: 1; margin: 0 10px;" oninput="updateSubSkill('🧩', 'slider-diff-5', 'val-diff-5')">
                                 <span id="val-diff-5" style="width: 45px; text-align: right; color: #fff; font-weight: bold;">100%</span>
                             </div>
                         </div>
@@ -258,12 +292,22 @@
     </div>
 
     <div id="page2" class="page-content">
-        <details style="background: #1e2b24; padding: 10px 15px; border-radius: 8px; border: 1px solid #2e5c3e; margin-bottom: 20px; cursor: pointer;">
-            <summary style="color: #4caf50; font-weight: bold; outline: none;">📖 點此查看核心功能使用說明</summary>
-            <div style="margin-top: 10px; font-size: 0.95em; color: #ccc; line-height: 1.6; border-top: 1px dashed #2e5c3e; padding-top: 10px;">
-                <strong>【無損實戰洗牌】</strong>：填寫分數並點擊反推後，系統會<strong>完全記憶您表單上的隊員</strong>，推算真實 DPS 後從第一隊開始往下無損重排，不會清空您組好的配隊！<br>
-                <strong>【終點王防呆選單】</strong>：殘血反推的終點王 (R) 與 (序號) 已改為下拉選單，杜絕格式錯誤。<br>
-                <strong>【一鍵重設預設 DPS】</strong>：在每一隊的選單下方有<strong>「🔄 重設預設 DPS」</strong>按鈕，方便您在反推覆寫後快速復原排軸的系統預設值。
+        
+        <details open style="background: #1e2b24; padding: 10px 15px; border-radius: 8px; border: 1px solid #2e5c3e; margin-bottom: 20px; cursor: pointer;">
+            <summary style="color: #4caf50; font-weight: bold; outline: none; font-size: 1.1em;">📖 點此查看「實戰編隊與推演功能」操作指南</summary>
+            <div style="margin-top: 15px; font-size: 0.95em; color: #ddd; line-height: 1.6; border-top: 1px dashed #2e5c3e; padding-top: 15px;">
+                <strong style="color: #fff; font-size: 1.05em;">【第一步：一鍵理論編隊】</strong><br>
+                如果您只是想知道手邊的角色能組出什麼最高分的隊伍，請直接點擊表格上方的<strong>「🔥 一鍵編制 (理論推演)」</strong>。系統會自動幫您配好隊伍。<br><br>
+                
+                <strong style="color: #00ffaa; font-size: 1.05em;">【第二步：實戰反推與無損洗牌 (進階功能)】</strong><br>
+                <ul style="margin: 5px 0 10px 20px; padding: 0; color: #ccc;">
+                    <li style="margin-bottom: 5px;">請先按照您在遊戲中實際出戰的順序，將隊伍排在表格上。</li>
+                    <li style="margin-bottom: 5px;">在表格內的<strong>「實戰得分」</strong>欄位，填入該隊打完結算的總分。</li>
+                    <li style="margin-bottom: 5px;">勾選該隊伍遭遇抗性的是第幾隻王 `[1] [2] [3] [4]`（若有）。</li>
+                    <li style="margin-bottom: 5px;"><strong>殘血推演與代數校正：</strong>若該隊伍沒把王打死，請在「🎯終:」下拉選單選擇終點王 (如 R2-2)，並在「🩸剩:」輸入剩餘血量 %。系統會自動將其加入代數校正池。</li>
+                    <li style="margin-bottom: 5px;">最後，點擊 <strong>「🔄 依實戰得分反推與無損重排」</strong>。系統會精準扣除轉場動畫延遲與抗性干擾，推算真實 DPS。<strong>最重要的是：系統會「完全記憶」您表單上的隊伍成員，並依據算出的真實 DPS，為您無損地重新排序最佳出戰順序！</strong></li>
+                    <li>若想還原實戰反推造成的分數覆寫，可點擊該隊伍選單下方的「🔄 重設預設 DPS」。</li>
+                </ul>
             </div>
         </details>
 
