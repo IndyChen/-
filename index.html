@@ -111,7 +111,7 @@
 <body>
 
     <button id="lang-toggle" onclick="toggleLang()">简 / 繁</button>
-    <h2>鳴潮矩陣編隊工具 <span style="font-size: 0.5em; color: #cf00ff;">v4.7.1</span></h2>
+    <h2>鳴潮矩陣編隊工具 <span style="font-size: 0.5em; color: #cf00ff;">v4.7.2</span></h2>
     
     <div class="data-source" style="display: flex; flex-wrap: wrap; align-items: center; gap: 15px;">
         <span>📊 數據庫設計與邏輯：AI架構 / 數據提供：QuichilOvO、南邊 / 整理：Kolton / 流量統計：Google Analytics</span>
@@ -121,32 +121,31 @@
     </div>
 
 <details style="background: #1e2b24; padding: 10px 15px; border-radius: 8px; border: 1px solid #2e5c3e; margin-bottom: 10px; cursor: pointer;">
-    <summary style="color: #4caf50; font-weight: bold; outline: none;">📖 點此查看 v4.7.1 工具使用說明 (新手必讀)</summary>
+    <summary style="color: #4caf50; font-weight: bold; outline: none;">📖 點此查看 v4.7.2 工具使用說明 (新手必讀)</summary>
     <div style="margin-top: 10px; font-size: 0.95em; color: #ccc; line-height: 1.6; border-top: 1px dashed #2e5c3e; padding-top: 10px;">
         <strong>【第一步：勾選角色】</strong> 在上方清單點選你擁有的角色，解鎖相關排軸。<br>
         <strong>【第二步：設定排軸與穩定性】</strong> 
         <ul style="margin: 5px 0 10px 20px; padding: 0;">
-            <li>勾選你會打的排軸，系統才能用它們來組隊。</li>
+            <li>勾選你會打的排軸，系統才能用它們來智能組隊。</li>
             <li>使用<strong>「全局操作達成率」</strong>拉桿，或點擊<strong>「⏱️ 內建軸穩定性計算器」</strong>，科學計算你的實戰折損。</li>
-            <li>想自訂傷害？點擊列表排軸旁的 <strong>[數值]</strong> 即可直接覆寫專屬 DPS 與穩定性！</li>
+            <li>想自訂傷害？點擊列表排軸旁的 <strong>[數值]</strong> (包含無預設的排軸) 即可直接覆寫專屬 DPS 與穩定性！</li>
         </ul>
-        <strong>【第三步：智能一鍵編隊】</strong> 在右下方點擊 <strong>「🔥 一鍵編制」</strong>，系統將依據折損後的「真實保底 DPS」執行貪婪演算，為你配置容錯率最高、極限傷害壓軸的最優爬塔陣容！
+        <strong>【第三步：智能一鍵編隊】</strong> 在右下方點擊 <strong>「🔥 一鍵編制」</strong>，系統將依據折損後的「真實保底 DPS」執行貪婪演算，並<strong>自動從你當前能組出的最大隊伍數開始往回排</strong>，為你配置容錯率最高、極限傷害壓軸的最優爬塔陣容！
     </div>
 </details>
 
 <details style="background: #2b2b36; padding: 10px 15px; border-radius: 8px; border: 1px solid #444; margin-bottom: 20px; cursor: pointer;">
-    <summary style="color: #d4af37; font-weight: bold; outline: none;">📜 點此查看版本更新說明 (當前: v4.7.1)</summary>
+    <summary style="color: #d4af37; font-weight: bold; outline: none;">📜 點此查看版本更新說明 (當前: v4.7.2)</summary>
     <div style="margin-top: 10px; font-size: 0.95em; color: #ccc; line-height: 1.6; border-top: 1px dashed #555; padding-top: 10px;">
-        <strong style="color:#cf00ff;">【v4.7.1 最新更新】</strong><br>
-        - ⏱️ <strong>內建軸穩定性計算器 (New)</strong>：可輸入你實測的多次「啟動軸+循環軸」耗時，自動執行標準差與擬合率檢測，並一鍵套用評分至全局！<br>
-        - 📖 <strong>動態使用說明</strong>：新增與版本同步的新手引導區塊。<br>
-        - 📜 <strong>歷史更新封存</strong>：優化更新日誌排版，保留過往改版歷程。<br>
+        <strong style="color:#cf00ff;">【v4.7.2 最新更新】</strong><br>
+        - ⚙️ <strong>動態壓軸修正</strong>：一鍵編制現在會偵測玩家角色池「當前最多可編制隊伍數」，並從該實際上限位置往回排，不再固定從第 16 隊開始。<br>
         <br>
-        <strong style="color:#888;">【v4.7.0 歷史更新概略】</strong><br>
+        <strong style="color:#888;">【v4.7.0 ~ 4.7.1 近期版本更新概略】</strong><br>
         <span style="color:#777;">
-        - 新增「一鍵編制」演算法，自動依據保底 DPS 貪婪配置並壓軸。<br>
-        - 新增手法折損拉桿，智能計算失誤對不同難度排軸的 DPS 懲罰。<br>
-        - 支援無預設 DPS 自訂覆寫與隊伍總 DPS 範圍估算。<br>
+        - 新增<strong>「內建軸穩定性計算器」</strong>，支援實測耗時統計分析與一鍵套用評分。<br>
+        - 實裝<strong>「一鍵編制」</strong>貪婪演算法，自動依據保底 DPS 智能排隊並壓軸。<br>
+        - 新增<strong>「手法折損全局與微調拉桿」</strong>，可動態計算失誤對不同難度排軸的 DPS 懲罰。<br>
+        - 支援無預設 DPS 自訂覆寫與當前編隊總 DPS 範圍估算功能。<br>
         </span>
     </div>
 </details>
@@ -256,7 +255,7 @@
                     <div style="display: flex; gap: 15px; flex-wrap: wrap; align-items: flex-start; background: #3f3f4e; padding: 12px; border-radius: 8px; border: 1px solid #555;">
                         <div style="display: flex; flex-direction: column; gap: 6px;">
                             <button class="btn-apply" onclick="autoBuildMaxDpsTeams()" style="background: #cf00ff; box-shadow: 0 0 10px rgba(207,0,255,0.4); padding: 10px 20px;">🔥 一鍵編制</button>
-                            <span style="color: #aaa; font-size: 0.75em; max-width: 250px;">*自動依據手法折損保底，高DPS壓軸，尚未針對矩陣最佳化（如抗性，殘血之利用，各軸的出傷速度分配)</span>
+                            <span style="color: #aaa; font-size: 0.75em; max-width: 250px;">*自動依據手法折損保底，高DPS壓軸，尚未針對矩陣最佳化（如抗性、殘血之利用，各軸的出傷分配曲線等）進行優化。 </span>
                         </div>
                         <button class="btn-reset" onclick="resetTeams()" style="height: fit-content; padding: 10px 15px;">🗑️ 重設編制</button>
                     </div>
@@ -1228,7 +1227,10 @@
         document.querySelectorAll('.char-select').forEach(s => {s.value=""; s.removeAttribute('data-last-html');}); 
         
         let rows = document.querySelectorAll('#team-board tr');
-        let startIndex = 16 - finalOptimizedTeams.length;
+        
+        // 🌟 核心修改：偵測當前角色池最大可編制隊伍數，動態決定壓軸位置
+        let maxPossibleTeams = getMaxTeams({});
+        let startIndex = Math.max(0, maxPossibleTeams - finalOptimizedTeams.length);
         
         finalOptimizedTeams.forEach((tData, index) => {
             let rowIdx = startIndex + index;
@@ -1244,7 +1246,7 @@
         });
 
         updateTracker();
-        alert(t(`✅ 一鍵配置完成！共組建 ${finalOptimizedTeams.length} 隊，最高 DPS 陣容已壓軸配置。`));
+        alert(t(`✅ 一鍵配置完成！共組建 ${finalOptimizedTeams.length} 隊，最高 DPS 陣容已完美壓軸。`));
     }
 
     function applyPreset() {
@@ -1344,7 +1346,6 @@
             checkedRotations = new Set(dpsData.map(d => d.id));
         }
 
-        // 初始化拉桿與顯示
         document.getElementById('skill-slider').value = 100;
         updateMasterSkill();
         
