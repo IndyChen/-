@@ -3,14 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>鳴潮矩陣編隊工具 </title>
+    <title>鳴潮矩陣編隊工具</title>
     
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-FYW9EX8V5G"></script>
     <script>
       window.dataLayer = window.dataLayer || [];
       function gtag(){dataLayer.push(arguments);}
       gtag('js', new Date());
-
       gtag('config', 'G-FYW9EX8V5G');
     </script>
     
@@ -92,6 +91,11 @@
         #lang-toggle { position: absolute; top: 25px; right: 25px; background: #d4af37; color: #1e1e24; border: none; padding: 10px 22px; border-radius: 8px; font-weight: bold; font-size: 1.1em; cursor: pointer; transition: 0.2s; box-shadow: 0 4px 8px rgba(0,0,0,0.4); z-index: 100; }
         #lang-toggle:hover { filter: brightness(1.1); transform: scale(1.05); }
 
+        /* 滑桿樣式 */
+        input[type="range"] { -webkit-appearance: none; appearance: none; background: transparent; cursor: pointer; }
+        input[type="range"]::-webkit-slider-runnable-track { background: #444; height: 6px; border-radius: 3px; }
+        input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; margin-top: -6px; background-color: #cf00ff; height: 18px; width: 18px; border-radius: 50%; box-shadow: 0 0 10px rgba(207,0,255,0.8); }
+
         ::-webkit-scrollbar { width: 8px; height: 8px; }
         ::-webkit-scrollbar-track { background: #1e1e24; }
         ::-webkit-scrollbar-thumb { background: #555; border-radius: 4px; }
@@ -107,17 +111,22 @@
 <body>
 
     <button id="lang-toggle" onclick="toggleLang()">简 / 繁</button>
-    <h2>鳴潮矩陣編隊工具 v4.6.4</h2>
-    <div class="data-source">
-    📊 數據庫設計與邏輯：AI架構 / 數據提供：QuichilOvO、南邊 / 整理：Kolton / 流量統計：Google Analytics
-</div>
+    <h2>鳴潮矩陣編隊工具 v4.7.0</h2>
+    
+    <div class="data-source" style="display: flex; flex-wrap: wrap; align-items: center; gap: 15px;">
+        <span>📊 數據庫設計與邏輯：AI架構 / 數據提供：QuichilOvO、南邊 / 整理：Kolton / 流量統計：Google Analytics</span>
+        <a href="https://github.com/IndyChen/DPM-Team-Builder/issues" target="_blank" style="display: inline-block; background: #333; color: #fff; text-decoration: none; padding: 4px 10px; border-radius: 5px; border: 1px solid #555; font-size: 0.9em; transition: 0.2s;">
+            🐛 報錯與意見回饋 (GitHub Issues)
+        </a>
+    </div>
 
 <details style="background: #2b2b36; padding: 10px 15px; border-radius: 8px; border: 1px solid #444; margin-bottom: 20px; cursor: pointer;">
-    <summary style="color: #d4af37; font-weight: bold; outline: none;">📜 點此查看版本說明 (v4.6.4 公測版)</summary>
+    <summary style="color: #d4af37; font-weight: bold; outline: none;">📜 點此查看版本說明 (v4.7.0 實戰手法折損連動版)</summary>
     <div style="margin-top: 10px; font-size: 0.95em; color: #ccc; line-height: 1.6;">
-        - 🛠️ <strong>介面字串優化</strong>：更新「屬性篩選」、「世代標籤」與「主輸出 (1號位)」等標籤名稱，使操作語意更直覺。<br>
-        - 🛡️ <strong>主輸出過濾鎖定</strong>：強化連動機制，點選屬性後，快速填入選單將可篩出該屬性角色為主輸出的配隊。<br>
-        - 🌍 <strong>繁簡切換 (i18n)</strong>：實裝字典映射翻譯技術，提供即時繁簡切換功能。<br>
+        - 🔥 <strong>DPS 最佳化編隊</strong>：新增「一鍵編制」功能，自動貪婪配置最高DPS並壓軸置底。<br>
+        - 🎯 <strong>手法穩定性折損</strong>：新增全局與分級拉桿，動態計算失誤對不同難度排軸的 DPS 懲罰。<br>
+        - ✍️ <strong>檢測報告與無預設 DPS 自訂</strong>：點擊排軸旁邊的數值（包含0傷害無預設軸），可直接輸入「實測 DPS」與「穩定性 %」，系統將本機記憶並依此最佳化排隊。<br>
+        - 📈 <strong>隊伍總 DPS 估算</strong>：自動加總計算當前表單內隊伍的【失誤保底總傷 ~ 完美極限總傷】範圍。<br>
     </div>
 </details>
     
@@ -161,6 +170,50 @@
                 </div>
                 <input type="text" id="rot-search" placeholder="🔍 搜尋排軸角色..." oninput="filterRotations()" style="padding: 8px 12px; border-radius: 5px; border: 1px solid #555; background: #1e1e24; color: #fff; flex: 1; outline: none; max-width: 250px;">
             </div>
+
+            <div style="margin-bottom: 15px; width: 100%; display: flex; flex-direction: column; background: #2b2b36; padding: 15px 20px; border-radius: 8px; border: 1px solid #555; box-shadow: inset 0 2px 5px rgba(0,0,0,0.3);">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <span style="color: #d4af37; font-weight: bold; font-size: 1.1em;">🎯 全局操作達成率 (自動依難度換算折損)</span>
+                    <span id="skill-display" style="color: #cf00ff; font-weight: bold; font-size: 1.2em; text-shadow: 0 0 5px rgba(207,0,255,0.5);">100%</span>
+                </div>
+                <input type="range" id="skill-slider" min="50" max="100" value="100" style="width: 100%; margin: 10px 0;" oninput="updateMasterSkill()">
+                
+                <details style="margin-top: 10px; width: 100%;">
+                    <summary style="color: #aaa; cursor: pointer; font-size: 0.9em; outline: none; user-select: none;">⚙️ 依排軸難度微調個別穩定性 (點擊展開)</summary>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; margin-top: 10px; padding: 15px; background: #1e1e24; border-radius: 8px; border: 1px solid #444;">
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <span style="width: 70px; color: #d32f2f; font-weight: bold;">⚠️ 極難:</span>
+                            <input type="range" id="slider-diff-4" min="0" max="100" value="100" style="flex: 1;" oninput="updateSubSkill('⚠️', 'slider-diff-4', 'val-diff-4')">
+                            <span id="val-diff-4" style="width: 45px; text-align: right; color: #fff; font-weight: bold;">100%</span>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <span style="width: 70px; color: #ffb300; font-weight: bold;">⭐ 進階:</span>
+                            <input type="range" id="slider-diff-3" min="0" max="100" value="100" style="flex: 1;" oninput="updateSubSkill('⭐', 'slider-diff-3', 'val-diff-3')">
+                            <span id="val-diff-3" style="width: 45px; text-align: right; color: #fff; font-weight: bold;">100%</span>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <span style="width: 70px; color: #2196f3; font-weight: bold;">🔵 中等:</span>
+                            <input type="range" id="slider-diff-2" min="0" max="100" value="100" style="flex: 1;" oninput="updateSubSkill('🔵', 'slider-diff-2', 'val-diff-2')">
+                            <span id="val-diff-2" style="width: 45px; text-align: right; color: #fff; font-weight: bold;">100%</span>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <span style="width: 70px; color: #4caf50; font-weight: bold;">🟩 輪椅:</span>
+                            <input type="range" id="slider-diff-1" min="0" max="100" value="100" style="flex: 1;" oninput="updateSubSkill('🟩', 'slider-diff-1', 'val-diff-1')">
+                            <span id="val-diff-1" style="width: 45px; text-align: right; color: #fff; font-weight: bold;">100%</span>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <span style="width: 70px; color: #8e44ad; font-weight: bold;">🧩 非主流:</span>
+                            <input type="range" id="slider-diff-5" min="0" max="100" value="100" style="flex: 1;" oninput="updateSubSkill('🧩', 'slider-diff-5', 'val-diff-5')">
+                            <span id="val-diff-5" style="width: 45px; text-align: right; color: #fff; font-weight: bold;">100%</span>
+                        </div>
+                    </div>
+                </details>
+
+                <span style="color: #aaa; font-size: 0.85em; margin-top: 15px; line-height: 1.4;">
+                    * 您可以點擊下方列表各排軸的數值，直接填入您在「檢測報告」中測出的真實 DPS 與穩定性。包含無預設數值的排軸也可自訂。
+                </span>
+            </div>
+
             <div id="rotation-setup" style="max-height: 400px; overflow-y: auto; padding-right: 10px;"></div>
         </details>
     </div>
@@ -171,13 +224,25 @@
             <div id="tracker"></div>
         </div>
         <div class="panel team-panel">
-            <div class="header-actions" style="margin-bottom: 10px;">
-                <h3>4. 隊伍編排 (極限上限16隊)</h3>
-                <div style="display: flex; gap: 10px;">
-                    <button class="btn-export" onclick="exportImage()">📷 匯出圖片</button>
-                    <button class="btn-reset" onclick="resetTeams()">🗑️ 清空重設</button>
+            
+            <div class="header-actions" style="margin-bottom: 15px; flex-direction: column; align-items: flex-start; gap: 15px;">
+                <h3 style="margin: 0; width: 100%;">4. 隊伍編排 (極限上限16隊)</h3>
+                
+                <div style="display: flex; flex-wrap: wrap; gap: 15px; width: 100%; align-items: flex-start;">
+                    <div style="display: flex; gap: 15px; flex-wrap: wrap; align-items: flex-start; background: #3f3f4e; padding: 12px; border-radius: 8px; border: 1px solid #555;">
+                        <div style="display: flex; flex-direction: column; gap: 6px;">
+                            <button class="btn-apply" onclick="autoBuildMaxDpsTeams()" style="background: #cf00ff; box-shadow: 0 0 10px rgba(207,0,255,0.4); padding: 10px 20px;">🔥 一鍵編制</button>
+                            <span style="color: #aaa; font-size: 0.75em; max-width: 250px;">*自動依據手法折損保底，高DPS壓軸，尚未針對矩陣最佳化（如抗性，殘血之利用，各軸的出傷速度分配）</span>
+                        </div>
+                        <button class="btn-reset" onclick="resetTeams()" style="height: fit-content; padding: 10px 15px;">🗑️ 重設編制</button>
+                    </div>
+                    
+                    <div style="flex-grow: 1;"></div>
+                    
+                    <button class="btn-export" onclick="exportImage()" style="height: fit-content; padding: 10px 20px; align-self: flex-start;">📷 截圖分享</button>
                 </div>
             </div>
+
             <div class="preset-box">
                 <div class="preset-filters">
                     <span style="color:#d4af37; font-weight:bold; margin-right:5px;">🔍 主輸出篩選：</span>
@@ -198,11 +263,39 @@
                     <button class="btn-apply" onclick="applyPreset()">➕ 填入下一空位</button>
                 </div>
             </div>
+
+            <div style="background:#2b2b36; padding:15px; border-radius:8px; margin-bottom:15px; border:1px solid #444; box-shadow: inset 0 2px 5px rgba(0,0,0,0.3);">
+                <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap: wrap; gap: 10px;">
+                    <span style="color:#d4af37; font-weight:bold; font-size:1.1em;">⚔️ 當前編隊總 DPS 範圍估算：</span>
+                    <span id="total-dps-range" style="color:#cf00ff; font-weight:bold; font-size:1.2em; text-shadow:0 0 5px rgba(207,0,255,0.5);">0.00w ~ 0.00w</span>
+                </div>
+                <div style="color:#aaa; font-size:0.85em; margin-top:5px;">*依據手法穩定性折損，顯示當前表單內隊伍的【失誤保底下限 ~ 完美理論極限】總和。</div>
+            </div>
+
             <div class="table-responsive">
                 <table>
                     <thead><tr><th width="10%">隊伍</th><th width="30%">位置 1 (主C)</th><th width="30%">位置 2 (副C)</th><th width="30%">位置 3 (生存)</th></tr></thead>
                     <tbody id="team-board"></tbody>
                 </table>
+            </div>
+        </div>
+    </div>
+
+    <div id="stats-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:1000; align-items:center; justify-content:center;">
+        <div style="background:#2b2b36; padding:25px; border-radius:10px; border:1px solid #d4af37; width:320px; box-shadow: 0 0 20px rgba(0,0,0,0.8);">
+            <h3 style="margin-top:0; color:#d4af37; font-size:1.2em; text-align:center;">📊 填寫檢測報告數據</h3>
+            <p id="stats-modal-rot" style="color:#aaa; font-size:0.9em; text-align:center; margin-bottom: 20px; border-bottom: 1px dashed #555; padding-bottom: 10px;"></p>
+            <label style="display:block; margin-bottom:10px; font-weight:bold;">⚔️ 真實 DPS (萬): 
+                <input type="number" id="stats-dps" step="0.01" style="width:100%; padding:8px; background:#1e1e24; color:#fff; border:1px solid #555; border-radius:4px; margin-top:5px;" placeholder="例如: 10.85">
+            </label>
+            <label style="display:block; margin-bottom:20px; font-weight:bold;">⚖️ 穩定性 (%): 
+                <input type="number" id="stats-stab" min="0" max="100" style="width:100%; padding:8px; background:#1e1e24; color:#fff; border:1px solid #555; border-radius:4px; margin-top:5px;" placeholder="例如: 95">
+                <div style="font-size:0.8em; color:#888; margin-top:4px; font-weight:normal;">*決定該排軸的實戰保底傷害下限</div>
+            </label>
+            <div style="display:flex; justify-content:space-between; gap: 10px;">
+                <button onclick="closeStatsModal()" style="flex:1; padding:8px; background:#555; color:#fff; border:none; border-radius:4px; cursor:pointer;">取消</button>
+                <button onclick="clearStatsModal()" style="flex:1; padding:8px; background:#d9534f; color:#fff; border:none; border-radius:4px; cursor:pointer;">清除自訂</button>
+                <button onclick="saveStatsModal()" style="flex:1; padding:8px; background:#4caf50; color:#fff; border:none; border-radius:4px; cursor:pointer; font-weight:bold;">儲存</button>
             </div>
         </div>
     </div>
@@ -276,7 +369,7 @@
         "陸·赫斯": { max: 1, rarity: 5, gen: 3, type: "一般角色 (可用 1 次)" }, "愛彌斯": { max: 1, rarity: 5, gen: 3, type: "一般角色 (可用 1 次)" },
         "西格莉卡": { max: 1, rarity: 5, gen: 3, type: "一般角色 (可用 1 次)" }
     };
-    // 🎯 角色屬性對照表 (用於過濾)
+    
     const charAttrMap = {
         "凌陽": "冷凝", "散華": "冷凝", "白芷": "冷凝", "折枝": "冷凝", "釉瑚": "冷凝", "珂萊塔": "冷凝",
         "熾霞": "熱熔", "安可": "熱熔", "莫特斐": "熱熔", "長離": "熱熔", "布蘭特": "熱熔", "露帕": "熱熔", "嘉貝莉娜": "熱熔", "莫寧": "熱熔", "愛彌斯": "熱熔",
@@ -535,6 +628,132 @@
         updateTracker();
     }
 
+    // 🎯 依據難度的各自穩定性設定
+    let diffStability = { '⚠️': 100, '⭐': 100, '🔵': 100, '🟩': 100, '🧩': 100 };
+
+    function updateMasterSkill() {
+        let val = parseInt(document.getElementById('skill-slider').value);
+        document.getElementById('skill-display').innerText = val + '%';
+        
+        diffStability['⚠️'] = Math.max(0, 100 - (100 - val) * 1.8);
+        diffStability['⭐'] = Math.max(0, 100 - (100 - val) * 1.4);
+        diffStability['🔵'] = Math.max(0, 100 - (100 - val) * 1.1);
+        diffStability['🟩'] = Math.max(0, 100 - (100 - val) * 0.8);
+        diffStability['🧩'] = Math.max(0, 100 - (100 - val) * 1.0);
+
+        document.getElementById('slider-diff-4').value = diffStability['⚠️'];
+        document.getElementById('val-diff-4').innerText = diffStability['⚠️'].toFixed(0) + '%';
+        
+        document.getElementById('slider-diff-3').value = diffStability['⭐'];
+        document.getElementById('val-diff-3').innerText = diffStability['⭐'].toFixed(0) + '%';
+        
+        document.getElementById('slider-diff-2').value = diffStability['🔵'];
+        document.getElementById('val-diff-2').innerText = diffStability['🔵'].toFixed(0) + '%';
+        
+        document.getElementById('slider-diff-1').value = diffStability['🟩'];
+        document.getElementById('val-diff-1').innerText = diffStability['🟩'].toFixed(0) + '%';
+
+        document.getElementById('slider-diff-5').value = diffStability['🧩'];
+        document.getElementById('val-diff-5').innerText = diffStability['🧩'].toFixed(0) + '%';
+
+        renderRotations();
+        updateTracker();
+    }
+
+    function updateSubSkill(diffKey, sliderId, valId) {
+        let val = parseInt(document.getElementById(sliderId).value);
+        diffStability[diffKey] = val;
+        document.getElementById(valId).innerText = val + '%';
+        
+        renderRotations();
+        updateTracker();
+    }
+
+    // 🎯 實戰數據與穩定性記憶 Modal 系統
+    let customStatsMap = {};
+    let currentEditRotId = null;
+
+    try {
+        let stored = localStorage.getItem('ww_custom_stats');
+        if (stored) customStatsMap = JSON.parse(stored);
+    } catch(e) {}
+
+    function getRotDpsRange(d) {
+        if (customStatsMap[d.id]) {
+            let s = customStatsMap[d.id];
+            let max = s.dps;
+            let min = max * (s.stability / 100);
+            return { min: Math.max(0, min), max: max, isCustom: true };
+        } else {
+            let max = d.dps;
+            if (max === 0) return { min: 0, max: 0, isCustom: false };
+
+            let diffKey = '🧩';
+            if (d.diff.includes('⚠️')) diffKey = '⚠️';
+            else if (d.diff.includes('⭐')) diffKey = '⭐';
+            else if (d.diff.includes('🔵')) diffKey = '🔵';
+            else if (d.diff.includes('🟩')) diffKey = '🟩';
+
+            let stab = diffStability[diffKey] !== undefined ? diffStability[diffKey] : 100;
+            let min = max * (stab / 100);
+            return { min: Math.max(0, min), max: max, isCustom: false };
+        }
+    }
+
+    function openStatsModal(e, rotId) {
+        e.preventDefault(); e.stopPropagation();
+        currentEditRotId = rotId;
+        let d = dpsData.find(x => x.id === rotId);
+        document.getElementById('stats-modal-rot').innerText = `${t(d.c1)} + ${t(d.c2)} + ${t(d.c3)} (${t(d.rot)})`;
+        
+        let stats = customStatsMap[rotId];
+        if (stats) {
+            document.getElementById('stats-dps').value = stats.dps;
+            document.getElementById('stats-stab').value = stats.stability;
+        } else {
+            document.getElementById('stats-dps').value = d.dps > 0 ? d.dps : '';
+            
+            let diffKey = '🧩';
+            if (d.diff.includes('⚠️')) diffKey = '⚠️';
+            else if (d.diff.includes('⭐')) diffKey = '⭐';
+            else if (d.diff.includes('🔵')) diffKey = '🔵';
+            else if (d.diff.includes('🟩')) diffKey = '🟩';
+            
+            document.getElementById('stats-stab').value = diffStability[diffKey].toFixed(0);
+        }
+        document.getElementById('stats-modal').style.display = 'flex';
+    }
+
+    function closeStatsModal() {
+        document.getElementById('stats-modal').style.display = 'none';
+        currentEditRotId = null;
+    }
+
+    function clearStatsModal() {
+        if (currentEditRotId) {
+            delete customStatsMap[currentEditRotId];
+            try { localStorage.setItem('ww_custom_stats', JSON.stringify(customStatsMap)); } catch(e) {}
+            renderRotations();
+            updateTracker();
+        }
+        closeStatsModal();
+    }
+
+    function saveStatsModal() {
+        let dpsVal = parseFloat(document.getElementById('stats-dps').value);
+        let stabVal = parseFloat(document.getElementById('stats-stab').value);
+        if (isNaN(dpsVal) || isNaN(stabVal)) {
+            alert(t("請輸入有效的數字！")); return;
+        }
+        if (currentEditRotId) {
+            customStatsMap[currentEditRotId] = { dps: dpsVal, stability: Math.min(100, Math.max(0, stabVal)) };
+            try { localStorage.setItem('ww_custom_stats', JSON.stringify(customStatsMap)); } catch(e) {}
+            renderRotations();
+            updateTracker();
+        }
+        closeStatsModal();
+    }
+
     function renderRotations() {
         const container = document.getElementById('rotation-setup');
         const valid = dpsData.filter(d => isOwned(d.c1) && isOwned(d.c2) && isOwned(d.c3));
@@ -544,9 +763,19 @@
         let html = '';
         for(let c1 in groups) {
             html += `<div style="margin-bottom:15px; padding:12px; background:#1e1e24; border-radius:5px; border-left: 3px solid #d4af37;"><strong style="color: #d4af37;">🎯 ${t("主輸出")}：${t(c1)}</strong><div style="display:flex; flex-wrap:wrap; gap:10px; margin-top:8px;">`;
-            groups[c1].sort((a,b)=>b.dps-a.dps).forEach(d => {
-                let dpsStr = d.dps > 0 ? `${d.dps.toFixed(2)}w ` : ''; 
-                html += `<label style="background:#2b2b36; padding:6px 10px; border-radius:4px; font-size:0.9em; cursor:pointer; border: 1px solid #444;"><input type="checkbox" value="${d.id}" ${checkedRotations.has(d.id)?'checked':''} onchange="updateRotationState()"> ${d.diff} ${dpsStr}${t(d.c2)} / ${t(d.c3)} (${t(d.rot)})</label>`;
+            
+            groups[c1].sort((a,b) => getRotDpsRange(b).min - getRotDpsRange(a).min).forEach(d => {
+                let r = getRotDpsRange(d);
+                let dpsStr = (r.max > 0 || r.isCustom) ? `[${r.min.toFixed(2)}~${r.max.toFixed(2)}w]` : t('[無預設/點擊自訂]'); 
+                let colorStyle = r.isCustom ? 'color: #00ffaa; text-decoration: underline; text-decoration-style: dashed;' : (r.min < r.max ? 'color: #ffaa00;' : 'color: #fff;');
+                if(r.max === 0 && !r.isCustom) colorStyle = 'color: #888; text-decoration: underline; text-decoration-style: dashed;';
+                
+                html += `<div style="background:#2b2b36; padding:6px 10px; border-radius:4px; font-size:0.9em; border: 1px solid #444; display:inline-flex; align-items:center; gap:5px;">
+                            <input type="checkbox" id="chk_${d.id}" value="${d.id}" ${checkedRotations.has(d.id)?'checked':''} onchange="updateRotationState()">
+                            <label for="chk_${d.id}" style="cursor:pointer; margin:0;">${d.diff}</label>
+                            <span onclick="openStatsModal(event, '${d.id}')" style="cursor:pointer; font-weight:bold; ${colorStyle}; padding:0 4px;" title="${t('點擊輸入檢測報告數據')}">${dpsStr}</span>
+                            <label for="chk_${d.id}" style="cursor:pointer; margin:0;">${t(d.c2)} / ${t(d.c3)} (${t(d.rot)})</label>
+                        </div>`;
             });
             html += `</div></div>`;
         }
@@ -557,19 +786,20 @@
     function filterRotations() {
         let q = document.getElementById('rot-search').value.toLowerCase();
         let qTrad = q;
-        document.querySelectorAll('#rotation-setup label').forEach(l => {
-            let matches = l.innerText.toLowerCase().includes(qTrad) || l.innerText.toLowerCase().includes(q);
-            l.style.display = matches ? 'inline-block' : 'none';
+        document.querySelectorAll('#rotation-setup input[type="checkbox"]').forEach(i => {
+            let container = i.closest('div');
+            let matches = container.innerText.toLowerCase().includes(qTrad) || container.innerText.toLowerCase().includes(q);
+            container.style.display = matches ? 'inline-flex' : 'none';
         });
         document.querySelectorAll('#rotation-setup > div').forEach(group => {
-            let hasVis = Array.from(group.querySelectorAll('label')).some(l => l.style.display !== 'none');
+            let hasVis = Array.from(group.querySelectorAll('div > div')).some(l => l.style.display !== 'none');
             group.style.display = hasVis ? 'block' : 'none';
         });
         syncRotBtnState();
     }
 
     function toggleAllRotations() {
-        const visibleBoxes = Array.from(document.querySelectorAll('#rotation-setup label')).filter(l => l.style.display !== 'none').map(l => l.querySelector('input'));
+        const visibleBoxes = Array.from(document.querySelectorAll('#rotation-setup input[type="checkbox"]')).filter(i => i.closest('div').style.display !== 'none');
         if(!visibleBoxes.length) return;
         const anyChecked = visibleBoxes.some(i => i.checked);
         visibleBoxes.forEach(i => i.checked = !anyChecked);
@@ -577,7 +807,7 @@
     }
 
     function toggleDifficulty(diff) {
-        const visibleBoxes = Array.from(document.querySelectorAll('#rotation-setup label')).filter(l => l.style.display !== 'none' && l.innerText.includes(diff)).map(l => l.querySelector('input'));
+        const visibleBoxes = Array.from(document.querySelectorAll('#rotation-setup input[type="checkbox"]')).filter(i => i.closest('div').style.display !== 'none' && i.closest('div').innerText.includes(diff));
         if(!visibleBoxes.length) return;
         const allChecked = visibleBoxes.every(i => i.checked);
         visibleBoxes.forEach(i => i.checked = !allChecked);
@@ -587,7 +817,7 @@
     function syncRotBtnState() {
         const btn = document.getElementById('rot-all-btn');
         if (!btn) return;
-        const visibleBoxes = Array.from(document.querySelectorAll('#rotation-setup label')).filter(l => l.style.display !== 'none').map(l => l.querySelector('input'));
+        const visibleBoxes = Array.from(document.querySelectorAll('#rotation-setup input[type="checkbox"]')).filter(i => i.closest('div').style.display !== 'none');
         
         if (visibleBoxes.length > 0) {
             let noneChecked = visibleBoxes.every(i => !i.checked);
@@ -603,7 +833,7 @@
         diffMap.forEach(d => {
             const diffBtn = document.getElementById(`btn-diff-${d.id}`);
             if (diffBtn) {
-                const diffBoxes = visibleBoxes.filter(i => i.parentNode.innerText.includes(d.symbol));
+                const diffBoxes = visibleBoxes.filter(i => i.closest('div').innerText.includes(d.symbol));
                 if (diffBoxes.length > 0) {
                     const anyChecked = diffBoxes.some(i => i.checked);
                     diffBtn.classList.toggle(`active-diff-${d.id}`, anyChecked);
@@ -687,7 +917,8 @@
                     let data = recs.get(target);
                     if (isBuildable) {
                         data.buildable = true;
-                        if (d.dps > data.maxDPS) data.maxDPS = d.dps;
+                        let r = getRotDpsRange(d); 
+                        if (r.min > data.maxDPS) data.maxDPS = r.min;
                     }
                 }
             }
@@ -700,7 +931,7 @@
                 let isEx = u >= m && getBase(curRaw)!==b;
                 if(slotType==1 && isEx) return; 
                 
-                let dpsStr = (data.buildable && data.maxDPS > 0) ? `(${t('最高')} ${data.maxDPS.toFixed(2)}w)` : '';
+                let dpsStr = (data.buildable && data.maxDPS > 0) ? `(${t('保底')} ${data.maxDPS.toFixed(2)}w)` : '';
                 let tag = isEx ? ` 🛑[${t('耗盡')}]` : teamBases.has(b) && getBase(curRaw)!==b ? ` 🛑[${t('在隊')}]` : "";
                 html += `<option value="${name}" ${tag?"disabled":""}>⭐ ${t(name)} ${dpsStr}${tag}</option>`;
             });
@@ -798,30 +1029,109 @@
         const ps = document.getElementById('preset-select');
         let ph = `<option value="">-- ${t("選擇推薦配隊")} --</option>`;
         
-        // 🎯 嚴格修正：底層資料比對完全不受 i18n 繁簡切換影響
         dpsData.filter(d => {
-            // 先過濾掉沒勾選或角色不完整的排軸
             if (!checkedRotations.has(d.id) || !isOwned(d.c1) || !isOwned(d.c2) || !isOwned(d.c3)) return false;
-            
-            // 取得該排軸主C(c1)的真實屬性
             let mainAttr = charAttrMap[d.c1] || "未知";
-            
-            // 如果玩家有勾選屬性按鈕，且該主C的屬性不在勾選清單內，則排除
             if (activePresetAttrs.size > 0 && !activePresetAttrs.has(mainAttr)) return false;
-            
-            // 如果玩家有勾選世代按鈕，且該排軸的世代不在勾選清單內，則排除
             if (activePresetGens.size > 0 && !activePresetGens.has(d.gen.toString())) return false;
-
             return true;
         }).forEach(d => {
-            let dpsStr = d.dps > 0 ? `${d.dps.toFixed(2)}w` : t('無DPS');
-            // 輸出時再進行繁簡翻譯
+            let r = getRotDpsRange(d);
+            let dpsStr = (r.max > 0 || r.isCustom) ? `${r.min.toFixed(2)}~${r.max.toFixed(2)}w` : t('無DPS');
             ph += `<option value="${d.c1},${d.c2},${d.c3}">${t(d.c1)} + ${t(d.c2)} + ${t(d.c3)} (${dpsStr})</option>`;
         });
         
         ps.innerHTML = ph;
-        renderRotations();
+
+        // 📊 計算當前隊伍的總 DPS 範圍估算
+        let totalMinDps = 0;
+        let totalMaxDps = 0;
+
+        document.querySelectorAll('#team-board tr').forEach(row => {
+            let ss = row.querySelectorAll('select');
+            let c1 = ss[0].value, c2 = ss[1].value, c3 = ss[2].value;
+            if (c1 && c2 && c3) {
+                let possibleRots = dpsData.filter(d => 
+                    d.c1 === c1 && d.c2 === c2 && d.c3 === c3 && checkedRotations.has(d.id)
+                );
+                if (possibleRots.length > 0) {
+                    possibleRots.sort((a,b) => getRotDpsRange(b).min - getRotDpsRange(a).min);
+                    let bestRot = possibleRots[0];
+                    let r = getRotDpsRange(bestRot);
+                    totalMinDps += r.min; 
+                    totalMaxDps += r.max; 
+                }
+            }
+        });
+
+        document.getElementById('total-dps-range').innerText = `${totalMinDps.toFixed(2)}w ~ ${totalMaxDps.toFixed(2)}w`;
+
         saveData();
+    }
+
+    function autoBuildMaxDpsTeams() {
+        if(!confirm(t("將會清空當前編隊並自動生成極限陣容，確定執行？"))) return;
+        
+        let validTeams = dpsData.filter(d => 
+            checkedRotations.has(d.id) && 
+            isOwned(d.c1) && isOwned(d.c2) && isOwned(d.c3)
+        );
+
+        // 依據 保底 DPS (Min DPS) 由高到低排序，確保貪婪演算法拿的是下限最穩的隊伍
+        validTeams.sort((a, b) => getRotDpsRange(b).min - getRotDpsRange(a).min);
+
+        let charUsageCount = {};
+        for(let n in charData) charUsageCount[n] = 0;
+        
+        let finalOptimizedTeams = [];
+
+        for (let team of validTeams) {
+            let b1 = getBase(team.c1);
+            let b2 = getBase(team.c2);
+            let b3 = getBase(team.c3);
+            
+            let max1 = charData[b1]?.max || 1;
+            let max2 = charData[b2]?.max || 1;
+            let max3 = charData[b3]?.max || 1;
+
+            let u1 = charUsageCount[b1] || 0;
+            let u2 = charUsageCount[b2] || 0;
+            let u3 = charUsageCount[b3] || 0;
+
+            if (u1 < max1 && u2 < max2 && u3 < max3) {
+                if (b1 === b2 || b1 === b3 || b2 === b3) continue;
+
+                finalOptimizedTeams.push(team);
+                charUsageCount[b1] = u1 + 1;
+                charUsageCount[b2] = u2 + 1;
+                charUsageCount[b3] = u3 + 1;
+            }
+
+            if (finalOptimizedTeams.length >= 16) break;
+        }
+
+        finalOptimizedTeams.reverse();
+
+        document.querySelectorAll('.char-select').forEach(s => {s.value=""; s.removeAttribute('data-last-html');}); 
+        
+        let rows = document.querySelectorAll('#team-board tr');
+        let startIndex = 16 - finalOptimizedTeams.length;
+        
+        finalOptimizedTeams.forEach((tData, index) => {
+            let rowIdx = startIndex + index;
+            if(rows[rowIdx]) {
+                let ss = rows[rowIdx].querySelectorAll('select');
+                ss[0].innerHTML = `<option value="${tData.c1}">${tData.c1}</option>`;
+                ss[1].innerHTML = `<option value="${tData.c2}">${tData.c2}</option>`;
+                ss[2].innerHTML = `<option value="${tData.c3}">${tData.c3}</option>`;
+                ss[0].value = tData.c1;
+                ss[1].value = tData.c2;
+                ss[2].value = tData.c3;
+            }
+        });
+
+        updateTracker();
+        alert(t(`✅ 一鍵配置完成！共組建 ${finalOptimizedTeams.length} 隊，最高 DPS 陣容已壓軸配置。`));
     }
 
     function applyPreset() {
@@ -921,6 +1231,10 @@
             checkedRotations = new Set(dpsData.map(d => d.id));
         }
 
+        // 初始化拉桿與顯示
+        document.getElementById('skill-slider').value = 100;
+        updateMasterSkill();
+        
         renderCheckboxes();
         
         try {
