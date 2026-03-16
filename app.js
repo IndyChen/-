@@ -1,4 +1,4 @@
-// --- 1. 介面與翻譯引擎 ---
+// --- 1. 介面與高容量翻譯引擎 ---
 function switchTab(pageId, btnElement) {
     document.querySelectorAll('.page-content').forEach(p => p.classList.remove('active'));
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
@@ -6,14 +6,49 @@ function switchTab(pageId, btnElement) {
     btnElement.classList.add('active');
 }
 
-const dict = {
-    "鳴":"鸣","陣":"阵","編":"编","隊":"队","實":"实","戰":"战","排":"排","軸":"轴","剩":"剩","餘":"余","數":"数","推":"推","薦":"荐","設":"设","匯":"汇","圖":"图","輸":"输","輔":"辅","輪":"轮","進":"进","階":"阶","極":"极","難":"难","導":"导","電":"电","氣":"气","動":"动","滅":"灭","尋":"寻","擁":"拥","隱":"隐","盡":"尽","屬":"属","語":"语","換":"换","陽":"阳","華":"华","鑒":"鉴","熾":"炽","離":"离","淵":"渊","萊":"莱","蘭":"兰","蕾":"蕾","贊":"赞","婭":"娅","奧":"奥","諾":"诺","貝":"贝","莉":"莉","遠":"远","靈":"灵","寧":"宁","陸":"陆","愛":"爱","彌":"弥","錯":"错","亂":"乱","鏈":"链","單":"单","雙":"双","劍":"剑","處":"处","轉":"转","適":"适","論":"论","確":"确","滿":"满","濾":"滤","這":"这","還":"还","沒":"没","湊":"凑","齊":"齐","頂":"顶","級":"级","資":"资","訊":"讯","擾":"扰","顯":"显","創":"创","應":"应","說":"说","漏":"漏","洞":"洞","修":"修","復":"复","產":"产","無":"无","縫":"缝","預":"预","測":"测","標":"标","籤":"签","視":"视","覺":"觉","強":"强","過":"过","與":"与","從":"从","為":"为","僅":"仅","網":"网","頁":"页","紀":"记","憶":"忆","類":"类","構":"构","簡":"简","繁":"繁","庫":"库","將":"将","機":"机","環":"环","境":"境","差":"差","異":"异","檢":"检","報":"报","鍵":"键","效":"效","指":"指","腦":"脑","邏":"逻","輯":"辑","據":"据","見":"见","條":"条","件":"件","東":"东","西":"西","問":"问","題":"题","關":"关","麼":"么","嗎":"吗","點":"点","擊":"击","裡":"里","會":"会","態":"态","則":"则","驗":"验","決":"决","劃":"划","結":"结","總":"总","對":"对","於":"于","誤":"误","認":"认","表":"表","伍":"伍","時":"时","間":"间","選":"选","覽":"览","閱":"阅","載":"载","軟":"软","體":"体","閉":"闭","開":"开","啟":"启","發":"发","佈":"布","現":"现","場":"场","試":"试","裝":"装","備":"备","請":"请","擇":"择","更":"更","離":"离","測":"测","準":"准","標":"标","擬":"拟","合":"合","估":"估","算":"算","綜":"综","評":"评","級":"级","執":"执","行":"行","析":"析"
-};
-let isSimp = false;
-function t(str) { if (!isSimp || !str || typeof str !== 'string') return str; return str.split('').map(c => dict[c] || c).join(''); }
-function toggleLang() { isSimp = !isSimp; document.getElementById('lang-toggle').innerText = isSimp ? "繁" : "简"; try { localStorage.setItem('ww_lang', isSimp ? 'zh-CN' : 'zh-TW'); } catch(e){} window.location.reload(); }
+// 建立高容量精準映射庫 (涵蓋遊戲術語、角色名與網頁UI)
+const tradChars = "鳴陣編隊實戰排軸剩餘數推薦設匯圖輸輔輪進階極難導電氣動滅尋擁隱盡屬語換陽華鑒熾離淵萊蘭蕾贊婭奧諾貝莉遠靈寧陸愛彌錯亂鏈單雙劍處轉適論確滿濾這還沒湊齊頂級資訊擾顯創應說漏洞修復產無縫預測標籤視覺強過與從為僅網頁記憶類構簡繁庫將機環境差異檢報鍵效指腦邏輯據見條件東西問題關麼嗎點擊裡會態則驗決劃結總對於誤認表伍時間選覽閱載軟體閉開啟發佈現場試裝備請擇更測準擬合估算綜評執析殘損傷補缺耗傳送遲殺計邊法當前幫貢獻網統維羅安凌散霞秧丹瑾釉瑚桃祈秋特斐燈珂塔洛可菲布坎夏提希露帕弗古尤嘉仇千卜赫格熱熔衍射湮畫純粹減詞彙觀帶領註傻瓜暫乏爆折線模型累循躍敬歷史版址聯號導擊長識";
+const simpChars = "鸣阵编队实战排轴剩余数推荐设汇图输辅轮进阶极难导电气动灭寻拥隐尽属语换阳华鉴炽离渊莱兰蕾赞娅奥诺贝莉远灵宁陆爱弥错乱链单双剑处转适论确满滤这还没凑齐顶级资讯扰显创应说漏洞修复产无缝预测标签视觉强过与从为仅网页记忆类构简繁库将机环境差异检报键效指脑逻辑据见条件东西问题关么吗点击里会态则验决划结总对于误认表伍时间选览阅载软体闭启发布现场试装备请择更测准拟合估算综评执析残损伤补缺耗传送迟杀计边法当前帮贡献网统维罗安凌散霞秧丹瑾釉瑚桃祈秋特斐灯珂塔洛可菲布坎夏提希露帕弗古尤嘉仇千卜赫格热熔衍射湮画纯粹减词汇观带领注傻瓜暂乏爆折线模型累循跃敬历史版址联号导击长识";
 
-// --- 2. 核心資料庫 (保留 4.7.3.1 完整陣容) ---
+const dict = {};
+for (let i = 0; i < tradChars.length; i++) {
+    dict[tradChars[i]] = simpChars[i];
+}
+
+let isSimp = false;
+function t(str) { 
+    if (!isSimp || !str || typeof str !== 'string') return str; 
+    return str.split('').map(c => dict[c] || c).join(''); 
+}
+
+function translateDOM(node) {
+    let walker = document.createTreeWalker(node, NodeFilter.SHOW_TEXT, null, false);
+    let n;
+    while(n = walker.nextNode()) {
+        if (n.parentNode.tagName === 'SCRIPT' || n.parentNode.tagName === 'STYLE') continue;
+        if (n.nodeValue.trim() !== '') {
+            if (n.originalValue === undefined) n.originalValue = n.nodeValue;
+            n.nodeValue = isSimp ? t(n.originalValue) : n.originalValue;
+        }
+    }
+    document.querySelectorAll('input[placeholder], textarea[placeholder]').forEach(el => {
+        if (el.originalPlaceholder === undefined) el.originalPlaceholder = el.placeholder;
+        el.placeholder = isSimp ? t(el.originalPlaceholder) : el.originalPlaceholder;
+    });
+}
+
+function toggleLang() { 
+    isSimp = !isSimp; 
+    document.getElementById('lang-toggle').innerText = isSimp ? "繁" : "简"; 
+    try { localStorage.setItem('ww_lang', isSimp ? 'zh-CN' : 'zh-TW'); } catch(e){} 
+    // 不再刷新頁面，直接動態替換 DOM 內容
+    renderCheckboxes();
+    renderRotations();
+    updateTracker();
+    translateDOM(document.body);
+}
+
+// --- 2. 核心資料庫 ---
 const charData = {
     "漂泊者": { max: 1, rarity: 5, gen: 1, type: "一般角色 (可用 1 次)" }, "維里奈": { max: 2, rarity: 5, gen: 1, type: "生存位 (可用 2 次)" }, 
     "守岸人": { max: 2, rarity: 5, gen: 1, type: "生存位 (可用 2 次)" }, "今汐": { max: 1, rarity: 5, gen: 1, type: "一般角色 (可用 1 次)" }, 
@@ -247,8 +282,9 @@ function resetRowDps(btn) {
     if(possibleRots.length > 0) {
         possibleRots.forEach(r => { delete customStatsMap[r.id]; });
         try { localStorage.setItem('ww_custom_stats', JSON.stringify(customStatsMap)); } catch(e){}
-        row.querySelector('.score-input').value = "";
-        renderRotations(); updateTracker();
+        row.querySelector('.score-input').value = ""; // 清除實戰分數框
+        renderRotations();
+        updateTracker();
         alert(t("🔄 已清除該隊伍排軸的自訂 DPS，恢復系統預設值。"));
     } else {
         alert(t("找不到此組合的排軸資料。"));
