@@ -1,4 +1,4 @@
-// --- 1. 介面與高容量翻譯引擎 ---
+// --- 1. 介面與完美翻譯引擎 ---
 function switchTab(pageId, btnElement) {
     document.querySelectorAll('.page-content').forEach(p => p.classList.remove('active'));
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
@@ -6,14 +6,37 @@ function switchTab(pageId, btnElement) {
     btnElement.classList.add('active');
 }
 
-// 建立高容量精準映射庫 (涵蓋遊戲術語、角色名與網頁UI)
-const tradChars = "鳴陣編隊實戰排軸剩餘數推薦設匯圖輸輔輪進階極難導電氣動滅尋擁隱盡屬語換陽華鑒熾離淵萊蘭蕾贊婭奧諾貝莉遠靈寧陸愛彌錯亂鏈單雙劍處轉適論確滿濾這還沒湊齊頂級資訊擾顯創應說漏洞修復產無縫預測標籤視覺強過與從為僅網頁記憶類構簡繁庫將機環境差異檢報鍵效指腦邏輯據見條件東西問題關麼嗎點擊裡會態則驗決劃結總對於誤認表伍時間選覽閱載軟體閉開啟發佈現場試裝備請擇更測準擬合估算綜評執析殘損傷補缺耗傳送遲殺計邊法當前幫貢獻網統維羅安凌散霞秧丹瑾釉瑚桃祈秋特斐燈珂塔洛可菲布坎夏提希露帕弗古尤嘉仇千卜赫格熱熔衍射湮畫純粹減詞彙觀帶領註傻瓜暫乏爆折線模型累循躍敬歷史版址聯號導擊長識";
-const simpChars = "鸣阵编队实战排轴剩余数推荐设汇图输辅轮进阶极难导电气动灭寻拥隐尽属语换阳华鉴炽离渊莱兰蕾赞娅奥诺贝莉远灵宁陆爱弥错乱链单双剑处转适论确满滤这还没凑齐顶级资讯扰显创应说漏洞修复产无缝预测标签视觉强过与从为仅网页记忆类构简繁库将机环境差异检报键效指脑逻辑据见条件东西问题关么吗点击里会态则验决划结总对于误认表伍时间选览阅载软体闭启发布现场试装备请择更测准拟合估算综评执析残损伤补缺耗传送迟杀计边法当前帮贡献网统维罗安凌散霞秧丹瑾釉瑚桃祈秋特斐灯珂塔洛可菲布坎夏提希露帕弗古尤嘉仇千卜赫格热熔衍射湮画纯粹减词汇观带领注傻瓜暂乏爆折线模型累循跃敬历史版址联号导击长识";
-
-const dict = {};
-for (let i = 0; i < tradChars.length; i++) {
-    dict[tradChars[i]] = simpChars[i];
-}
+// 採用 100% 零誤差的鍵值對映射字典，徹底解決錯位問題
+const dict = {
+    "鳴":"鸣", "陣":"阵", "編":"编", "隊":"队", "實":"实", "戰":"战", "排":"排", "軸":"轴", "剩":"剩", "餘":"余", "數":"数",
+    "據":"据", "庫":"库", "設":"设", "計":"计", "與":"与", "邏":"逻", "輯":"辑", "網":"网", "頁":"页", "圖":"图", "匯":"汇",
+    "輸":"输", "輔":"辅", "輪":"轮", "進":"进", "階":"阶", "極":"极", "難":"难", "導":"导", "電":"电", "氣":"气", "動":"动",
+    "滅":"灭", "尋":"寻", "擁":"拥", "隱":"隐", "盡":"尽", "屬":"属", "語":"语", "換":"换", "陽":"阳", "華":"华", "鑒":"鉴",
+    "熾":"炽", "離":"离", "淵":"渊", "萊":"莱", "蘭":"兰", "蕾":"蕾", "贊":"赞", "婭":"娅", "奧":"奥", "諾":"诺", "貝":"贝",
+    "莉":"莉", "遠":"远", "靈":"灵", "寧":"宁", "陸":"陆", "愛":"爱", "彌":"弥", "錯":"错", "亂":"乱", "鏈":"链", "單":"单",
+    "雙":"双", "劍":"剑", "處":"处", "轉":"转", "適":"适", "論":"论", "確":"确", "滿":"满", "濾":"滤", "這":"这", "還":"还",
+    "沒":"没", "湊":"凑", "齊":"齐", "頂":"顶", "級":"级", "資":"资", "訊":"讯", "擾":"扰", "顯":"显", "創":"创", "應":"应",
+    "說":"说", "漏":"漏", "洞":"洞", "修":"修", "復":"复", "產":"产", "無":"无", "縫":"缝", "預":"预", "測":"测", "標":"标",
+    "籤":"签", "視":"视", "覺":"觉", "強":"强", "過":"过", "從":"从", "為":"为", "僅":"仅", "記":"记", "憶":"忆", "類":"类",
+    "構":"构", "簡":"简", "繁":"繁", "將":"将", "機":"机", "環":"环", "境":"境", "差":"差", "異":"异", "檢":"检", "報":"报",
+    "鍵":"键", "效":"效", "指":"指", "腦":"脑", "見":"见", "條":"条", "件":"件", "東":"东", "西":"西", "問":"问", "題":"题",
+    "關":"关", "麼":"么", "嗎":"吗", "點":"点", "擊":"击", "裡":"里", "會":"会", "態":"态", "則":"则", "驗":"验", "決":"决",
+    "劃":"划", "結":"结", "總":"总", "對":"对", "於":"于", "誤":"误", "認":"认", "表":"表", "伍":"伍", "時":"时", "間":"间",
+    "選":"选", "覽":"览", "閱":"阅", "載":"载", "軟":"软", "體":"体", "閉":"闭", "開":"开", "啟":"启", "發":"发", "佈":"布",
+    "現":"现", "場":"场", "試":"试", "裝":"装", "備":"备", "請":"请", "擇":"择", "更":"更", "準":"准", "擬":"拟", "合":"合",
+    "估":"估", "算":"算", "綜":"综", "評":"评", "執":"执", "行":"行", "析":"析", "殘":"残", "損":"损", "傷":"伤", "補":"补",
+    "缺":"缺", "耗":"耗", "傳":"传", "送":"送", "遲":"迟", "殺":"杀", "邊":"边", "當":"当", "幫":"帮", "貢":"贡", "獻":"献",
+    "統":"统", "維":"维", "羅":"罗", "凌":"凌", "散":"散", "霞":"霞", "秧":"秧", "丹":"丹", "瑾":"瑾", "釉":"釉", "瑚":"瑚",
+    "桃":"桃", "祈":"祈", "秋":"秋", "特":"特", "斐":"斐", "燈":"灯", "珂":"珂", "塔":"塔", "洛":"洛", "菲":"菲", "布":"布",
+    "坎":"坎", "夏":"夏", "提":"提", "希":"希", "露":"露", "帕":"帕", "弗":"弗", "古":"古", "尤":"尤", "嘉":"嘉", "仇":"仇",
+    "千":"千", "卜":"卜", "赫":"赫", "格":"格", "熱":"热", "熔":"熔", "衍":"衍", "射":"射", "湮":"湮", "畫":"画", "純":"纯",
+    "粹":"粹", "減":"减", "詞":"词", "彙":"汇", "觀":"观", "帶":"带", "領":"领", "註":"注", "傻":"傻", "瓜":"瓜", "暫":"暂",
+    "乏":"乏", "爆":"爆", "折":"折", "線":"线", "模":"模", "型":"型", "累":"累", "循":"循", "躍":"跃", "敬":"敬", "歷":"历",
+    "史":"史", "版":"版", "址":"址", "聯":"联", "號":"号", "長":"长", "識":"识", "優":"优", "化":"化", "步":"步", "專":"专",
+    "匯":"汇", "設":"设", "還":"还", "原":"原", "明":"明", "面":"面", "航":"航", "操":"操", "作":"作", "南":"南", "未":"未",
+    "來":"来", "展":"展", "望":"望", "者":"者", "期":"期", "因":"因", "這":"这", "樣":"样", "做":"做", "供":"供", "法":"法",
+    "意":"意", "回":"回", "饋":"馈", "流":"流", "量":"量", "理":"理"
+};
 
 let isSimp = false;
 function t(str) { 
@@ -41,7 +64,6 @@ function toggleLang() {
     isSimp = !isSimp; 
     document.getElementById('lang-toggle').innerText = isSimp ? "繁" : "简"; 
     try { localStorage.setItem('ww_lang', isSimp ? 'zh-CN' : 'zh-TW'); } catch(e){} 
-    // 不再刷新頁面，直接動態替換 DOM 內容
     renderCheckboxes();
     renderRotations();
     updateTracker();
@@ -594,7 +616,7 @@ function renderIndividualHPPanel() {
             if (bossHPHistory[key] && bossHPHistory[key].length >= 3) {
                 let avg = bossHPHistory[key].reduce((a, b) => a + b, 0) / bossHPHistory[key].length;
                 if (Math.abs(avg - getBaseEnvHP(r, i)) / getBaseEnvHP(r, i) > 0.03 && data.isDefault) {
-                    btnHtml = `<button class="btn-calib" onclick="applyCalibratedHP('${key}', ${avg})">⚠️ 套用校正: ${avg.toFixed(1)}W</button>`;
+                    btnHtml = `<button class="btn-calib" onclick="applyCalibratedHP('${key}', ${avg})">⚠️ ${t('套用校正: ')} ${avg.toFixed(1)}W</button>`;
                 }
             }
             html += `<div class="hp-item"><span class="hp-label">${key}</span><input type="number" class="hp-input ${!data.isDefault?'calibrated':''}" id="hp_${key}" value="${data.value.toFixed(2)}" step="10" onchange="manualUpdateHP('${key}')">${btnHtml}</div>`;
@@ -616,7 +638,7 @@ function manualUpdateHP(key) {
 }
 function applyCalibratedHP(key, avgValue) {
     bossHPMap[key] = { value: avgValue, isDefault: false }; try { localStorage.setItem('ww_boss_hp', JSON.stringify(bossHPMap)); } catch(e) {}
-    renderIndividualHPPanel(); updateTracker(); alert(`✅ 已成功校正為平均值：${avgValue.toFixed(2)} 萬！`);
+    renderIndividualHPPanel(); updateTracker(); alert(t(`✅ 已成功校正為平均值：${avgValue.toFixed(2)} 萬！`));
 }
 function resetIndividualHP() { bossHPMap = {}; bossHPHistory = {}; try { localStorage.removeItem('ww_boss_hp'); localStorage.removeItem('ww_boss_hp_history'); } catch(e) {} initBossHPMap(); }
 
@@ -634,7 +656,7 @@ function getEnvSettings() {
 function initBoard() {
     const b = document.getElementById('team-board');
     let rOpts = `<option value="">R?</option>` + Array.from({length:10}, (_,i)=>`<option value="${i+1}">R${i+1}</option>`).join('');
-    let idxOpts = `<option value="">號?</option>` + [1,2,3,4].map(idx=>`<option value="${idx}">${idx}</option>`).join('');
+    let idxOpts = `<option value="">${t("號?")}</option>` + [1,2,3,4].map(idx=>`<option value="${idx}">${idx}</option>`).join('');
     
     for(let i=1; i<=16; i++) {
         let tr = document.createElement('tr');
@@ -643,20 +665,20 @@ function initBoard() {
                         <td><select class="char-select" onchange="updateTracker()"></select></td>
                         <td>
                             <select class="char-select" onchange="updateTracker()"></select>
-                            <button onclick="resetRowDps(this)" class="btn-reset-dps">🔄 重設預設 DPS</button>
+                            <button onclick="resetRowDps(this)" class="btn-reset-dps">🔄 ${t('重設預設 DPS')}</button>
                         </td>
                         <td style="font-size:0.85em; text-align:center;">
                             <input type="number" class="score-input" placeholder="${t('實戰得分')}" title="${t('打完結算給的總分')}"><br>
                             <div style="display:flex; justify-content:center; align-items:center; gap:2px; margin-bottom:4px; background:#1e2b24; padding:3px; border-radius:4px; border:1px solid #00ffaa;">
-                                <span style="color:#00ffaa; font-weight:bold;">🎯終:</span>
+                                <span style="color:#00ffaa; font-weight:bold;">🎯${t('終')}:</span>
                                 <select class="hp-calc-select end-boss-r">${rOpts}</select>
                                 <span style="color:#00ffaa;">-</span>
                                 <select class="hp-calc-select end-boss-idx">${idxOpts}</select>
-                                <span style="color:#00ffaa; margin-left:2px;">🩸剩:</span>
+                                <span style="color:#00ffaa; margin-left:2px;">🩸${t('剩')}:</span>
                                 <input type="number" class="hp-calc-input end-boss-hp" placeholder="%" onblur="clampHpPct(this)">
                             </div>
                             <div class="res-chk-group">
-                                <span style="color:#888;">抗性王:</span>
+                                <span style="color:#888;">${t('抗性王')}:</span>
                                 <label><input type="checkbox" class="res-chk-1" onchange="updateTracker()">[1]</label>
                                 <label><input type="checkbox" class="res-chk-2" onchange="updateTracker()">[2]</label>
                                 <label><input type="checkbox" class="res-chk-3" onchange="updateTracker()">[3]</label>
@@ -746,7 +768,7 @@ function updateTracker() {
                 let resMax = simulate(current_hp_max, current_r_max, current_index_max, dpsRange.max);
                 current_hp_max = resMax.hp; current_r_max = resMax.r; current_index_max = resMax.idx; totalMatrixScoreMax += resMax.dmg * env.scoreRatio;
 
-                resTd.innerHTML = `<div style="line-height:1.4;"><span style="color:#aaa;">下限:</span> <span style="color:#ffaa00;">${resMin.startStr} ➔ ${resMin.endStr}</span><br><span style="color:#aaa;">上限:</span> <span style="color:#00ffaa;">${resMax.startStr} ➔ ${resMax.endStr}</span><br><span style="color:#cf00ff; font-weight:bold;">${Math.floor(resMin.dmg * env.scoreRatio).toLocaleString()} ~ ${Math.floor(resMax.dmg * env.scoreRatio).toLocaleString()} 分</span></div>`;
+                resTd.innerHTML = `<div style="line-height:1.4;"><span style="color:#aaa;">${t("下限")}:</span> <span style="color:#ffaa00;">${resMin.startStr} ➔ ${resMin.endStr}</span><br><span style="color:#aaa;">${t("上限")}:</span> <span style="color:#00ffaa;">${resMax.startStr} ➔ ${resMax.endStr}</span><br><span style="color:#cf00ff; font-weight:bold;">${Math.floor(resMin.dmg * env.scoreRatio).toLocaleString()} ~ ${Math.floor(resMax.dmg * env.scoreRatio).toLocaleString()} ${t("分")}</span></div>`;
             } else { resTd.innerHTML = "-"; }
         } else { resTd.innerHTML = "-"; }
     });
@@ -914,7 +936,7 @@ function exportImage() {
     rows.forEach((r, i) => {
         let ss = r.querySelectorAll('select.char-select'), resTd = r.querySelector('.relay-result'), score = r.querySelector('.score-input').value;
         if(ss[0].value && ss[1].value && ss[2].value) {
-            let resText = resTd.innerText.replace(/\n/g, ' | '), finalScore = score ? `實得分: ${score}` : resText;
+            let resText = resTd.innerText.replace(/\n/g, ' | '), finalScore = score ? `${t('實得分')}: ${score}` : resText;
             completed.push({id: i+1, c1: ss[0].value, c2: ss[1].value, c3: ss[2].value, res: finalScore});
         }
     });
@@ -963,9 +985,9 @@ function initializeApp() {
             document.querySelectorAll('#team-board tr').forEach((r, i) => {
                 if (pt[i]) {
                     let ss = r.querySelectorAll('select.char-select');
-                    if (pt[i][0]) { ss[0].innerHTML = `<option value="${pt[i][0]}">${pt[i][0]}</option>`; ss[0].value = pt[i][0]; }
-                    if (pt[i][1]) { ss[1].innerHTML = `<option value="${pt[i][1]}">${pt[i][1]}</option>`; ss[1].value = pt[i][1]; }
-                    if (pt[i][2]) { ss[2].innerHTML = `<option value="${pt[i][2]}">${pt[i][2]}</option>`; ss[2].value = pt[i][2]; }
+                    if (pt[i][0]) { ss[0].innerHTML = `<option value="${pt[i][0]}">${t(pt[i][0])}</option>`; ss[0].value = pt[i][0]; }
+                    if (pt[i][1]) { ss[1].innerHTML = `<option value="${pt[i][1]}">${t(pt[i][1])}</option>`; ss[1].value = pt[i][1]; }
+                    if (pt[i][2]) { ss[2].innerHTML = `<option value="${pt[i][2]}">${t(pt[i][2])}</option>`; ss[2].value = pt[i][2]; }
                 }
             });
         }
@@ -974,6 +996,7 @@ function initializeApp() {
     updateTracker(); 
     // 預設切換到第一頁
     document.querySelectorAll('.tab-btn')[0].click();
+    translateDOM(document.body);
 }
 
 initializeApp();
