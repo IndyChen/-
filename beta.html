@@ -24,7 +24,7 @@
             --gold: #d4af37;
             --border-glass: rgba(255, 255, 255, 0.08);
         }
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: var(--bg-main); color: #f5f5f5; padding: 15px; max-width: 1550px; margin: auto; box-sizing: border-box; padding-bottom: 90px; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: var(--bg-main); color: #f5f5f5; padding: 15px; max-width: 1550px; margin: auto; box-sizing: border-box; padding-bottom: 90px; overflow-x: hidden; }
         *, *::before, *::after { box-sizing: inherit; }
         h2 { border-bottom: 2px solid var(--gold); padding-bottom: 10px; margin-bottom: 5px; display: inline-block; color: #fff; font-weight: 800; letter-spacing: 1px; }
         .data-source { color: #888; font-size: 0.85em; margin-bottom: 15px; font-style: italic; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
@@ -98,18 +98,18 @@
         
         /* 📱 手機版專屬：App 級人因工學介面 */
         @media (max-width: 768px) {
-            /* 縮小周圍的 Padding，把空間全部留給卡片 */
-            body { padding: 5px; padding-bottom: 100px; /* 留給底部導航的空間 */ }
-            .panel { padding: 12px 10px; margin-bottom: 15px; } 
+            body { padding: 5px; padding-bottom: 100px; overflow-x: hidden; } /* 嚴格禁止橫向捲動 */
+            .panel { padding: 12px 10px; margin-bottom: 15px; box-sizing: border-box; width: 100%; overflow: hidden; } 
 
             h2 { font-size: 1.3em; margin-left: 5px; }
-            .container { flex-direction: column; gap: 10px; }
-            .pool-panel { max-height: none; position: static; }
+            .container { flex-direction: column; gap: 10px; width: 100%; }
+            .pool-panel { max-height: none; position: static; width: 100%; }
+            .team-panel { width: 100%; }
             
-            .header-actions { flex-direction: column; align-items: stretch; gap: 10px; }
+            .header-actions { flex-direction: column; align-items: stretch; gap: 10px; width: 100%; }
             .header-actions > div { display: flex; flex-wrap: wrap; justify-content: space-between; width: 100%; gap: 8px; }
             
-            /* 🚀 底部導航列 (Bottom Navigation) */
+            /* 🚀 底部導航列 */
             .tab-menu { 
                 position: fixed; bottom: 0; left: 0; width: 100%; 
                 background: rgba(20, 20, 25, 0.95); backdrop-filter: blur(20px); 
@@ -124,29 +124,36 @@
                 background: transparent; color: #777;
             }
             .tab-btn.active { color: var(--gold); background: rgba(212, 175, 55, 0.1); }
-            .tab-btn.active::after { display: none; } /* 移除底線 */
+            .tab-btn.active::after { display: none; }
 
-            /* 🎴 卡片式表格 (Card Layout) 修復溢出版 */
-            .table-responsive { overflow-x: hidden; width: 100%; } 
-            table, thead, tbody, th, td, tr { display: block; width: 100%; box-sizing: border-box; }
+            /* 🎴 卡片式表格 (Card Layout) 終極修復溢出版 */
+            .table-responsive { overflow-x: hidden; width: 100%; padding: 0; margin: 0; } 
+            
+            /* 覆寫電腦版表格強制寬度，改為 100% */
+            table { display: block; width: 100% !important; min-width: 0 !important; border-spacing: 0; box-sizing: border-box; }
             thead { display: none; } 
+            tbody { display: block; width: 100%; box-sizing: border-box; }
             
             .draggable-row { 
+                display: block;
                 margin-bottom: 20px; 
                 border: 1px solid var(--neon-green); 
                 border-radius: 12px; 
                 background: rgba(0,0,0,0.4); 
                 overflow: hidden; 
                 box-shadow: 0 8px 20px rgba(0,255,170,0.1);
+                width: 100%;
+                box-sizing: border-box;
             }
             td { 
+                display: block;
                 text-align: left !important; 
                 border: none !important; 
                 border-bottom: 1px solid var(--border-glass) !important; 
-                padding: 12px 10px !important; /* 縮小內距，避免卡片被撐破 */
+                padding: 12px 10px !important; 
                 background: transparent !important;
+                width: 100% !important;
                 box-sizing: border-box;
-                max-width: 100%;
             }
             td:last-child { border-bottom: none !important; }
             
@@ -161,9 +168,9 @@
             td:nth-child(6)::before { color: var(--neon-green); }
             td:nth-child(6) { background: rgba(0, 255, 170, 0.03) !important; }
 
-            /* 縮小字體與允許換行，防止撐破 */
-            .hp-calc-select, .hp-calc-input { font-size: 0.8rem; padding: 4px 2px; }
-            td:nth-child(5) > div:first-of-type { padding: 6px !important; }
+            /* 確保所有輸入框與選擇器不會撐破外框 */
+            .score-input, .char-select, .hp-calc-select, .hp-calc-input { font-size: 0.9rem; max-width: 100%; box-sizing: border-box; }
+            td:nth-child(5) > div { padding: 8px !important; flex-wrap: wrap !important; }
         }
         
         .modal-overlay { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); z-index:2000; align-items:center; justify-content:center; backdrop-filter: blur(5px); }
@@ -176,7 +183,7 @@
         <button class="btn-top" onclick="openDataManager()" style="color:var(--neon-green); border-color:var(--border-glass);">⚙️ 數據備份</button>
     </div>
     
-    <h2>鳴潮矩陣編隊工具 <span style="font-size: 0.5em; color: var(--neon-purple); vertical-align: middle;">v4.8-Beta</span></h2>
+    <h2>鳴潮矩陣編隊工具 <span style="font-size: 0.5em; color: var(--neon-purple); vertical-align: middle;">vBeta</span></h2>
     
     <div class="data-source">
         <span>📊 數據庫與邏輯：AI架構 / 數據提供：QuichilOvO、南邊 / 整理：Kolton</span>
@@ -205,16 +212,16 @@
         <div class="panel">
             <h3 style="color: #fff; margin-top: 0; border-bottom: 1px solid var(--border-glass); padding-bottom: 10px;">1. 勾選擁有的角色</h3>
             <div class="header-actions" style="margin-bottom: 15px;">
-                <div>
+                <div style="display: flex; width: 100%; gap: 10px;">
                     <button id="roster-switch" class="btn-reset" onclick="rosterCheckboxButton()">🗑️ 清空</button>
                     <input type="text" id="char-search" placeholder="🔍 搜尋角色..." oninput="filterCharacters()" style="padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border-glass); background: rgba(0,0,0,0.5); color: #fff; flex: 1; outline: none;">
                 </div>
-                <div style="display: flex; gap: 8px; overflow-x: auto; padding-bottom: 5px;">
+                <div style="display: flex; gap: 8px; overflow-x: auto; padding-bottom: 5px; width: 100%;">
                     <button id="btn-5star" class="btn-filter active-5star" onclick="toggleRarity(5)">🌟 5星</button>
                     <button id="btn-4star" class="btn-filter active-4star" onclick="toggleRarity(4)">⭐ 4星</button>
-                    <button id="btn-g1" class="btn-filter active-gen" onclick="toggleGen(1)">1.X版</button>
-                    <button id="btn-g2" class="btn-filter active-gen" onclick="toggleGen(2)">2.X版</button>
-                    <button id="btn-g3" class="btn-filter active-gen" onclick="toggleGen(3)">3.X版</button>
+                    <button id="btn-g1" class="btn-filter active-gen" onclick="toggleGen(1)">1.X</button>
+                    <button id="btn-g2" class="btn-filter active-gen" onclick="toggleGen(2)">2.X</button>
+                    <button id="btn-g3" class="btn-filter active-gen" onclick="toggleGen(3)">3.X</button>
                 </div>
             </div>
             <div id="roster-setup"></div>
@@ -323,8 +330,6 @@
             </div>
         </div>
     </div>
-    
-    <div id="calc-modal" class="modal-overlay"></div>
     
     <div id="data-manager-modal" class="modal-overlay">
         <div style="background:var(--bg-panel); backdrop-filter:blur(20px); padding:25px; border-radius:16px; border:1px solid var(--neon-green); width:90%; max-width:600px; max-height:80vh; overflow-y:auto;">
