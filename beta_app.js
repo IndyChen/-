@@ -1,6 +1,6 @@
 // ==========================================
 // 鳴潮矩陣編隊工具 - Beta 測試版核心邏輯
-// 獨立檔案：beta_app.js
+// 獨立檔案：betaapp.js (已移除資料庫，純邏輯版)
 // ==========================================
 
 // 確保翻譯字典在初始化時按照字串長度排序 (避免短詞截斷長句)
@@ -113,6 +113,7 @@ function loadCustomRotations() {
 
 function openCustomTeamModal() {
     let m = document.getElementById('custom-team-modal');
+    if(typeof charData === 'undefined') return;
     let charOpts = Object.keys(charData).map(n => `<option value="${n}">${t(n)}</option>`).join('');
     m.innerHTML = `
         <div style="background:#2b2b36; padding:25px; border-radius:10px; border:1px solid #ff9800; width:340px; box-shadow: 0 0 20px rgba(0,0,0,0.8);">
@@ -277,6 +278,7 @@ function toggleGen(g) {
 }
 
 function renderCheckboxes() {
+    if(typeof characterOrder === 'undefined') return;
     const grid = document.getElementById('roster-setup');
     grid.innerHTML = '<div id="roster-grid"></div>';
     const container = document.getElementById('roster-grid');
@@ -364,7 +366,25 @@ function getRotDpsRange(d) {
     }
 }
 
-// Modals
+function resetRowDps(btn) {
+    let row = btn.closest('tr');
+    let ss = row.querySelectorAll('select.char-select');
+    let c1 = ss[0].value, c2 = ss[1].value, c3 = ss[2].value;
+    if (!c1 || !c2 || !c3) return alert(t("請先排滿該隊伍的成員。"));
+    
+    let possibleRots = dpsData.filter(d => d.c1 === c1 && d.c2 === c2 && d.c3 === c3);
+    if(possibleRots.length > 0) {
+        possibleRots.forEach(r => { delete customStatsMap[r.id]; });
+        try { localStorage.setItem('ww_custom_stats', JSON.stringify(customStatsMap)); } catch(e){}
+        row.querySelector('.score-input').value = ""; 
+        renderRotations();
+        updateTracker();
+        alert(t("已清除該隊伍排軸的自訂 DPS，恢復系統預設值。"));
+    } else {
+        alert(t("找不到此組合的排軸資料。"));
+    }
+}
+
 let currentEditRotId = null;
 function openStatsModal(e, rotId) {
     e.preventDefault(); e.stopPropagation(); currentEditRotId = rotId;
@@ -421,7 +441,6 @@ function updateRowNumbers() {
     });
 }
 
-// 🚀 動態注入「雙模式切換按鈕」
 function injectModeToggle() {
     let panel = document.querySelector('.preset-box summary');
     if(panel && !document.getElementById('sim-mode')) {
@@ -566,9 +585,6 @@ function updateTracker() {
     });
     ps.innerHTML = ph;
 
-    // =====================================
-    // 🚀 雙軌推演引擎 (包含手動排刀模式)
-    // =====================================
     let env = getEnvSettings(), current_r_min = 1, current_index_min = 1, current_hp_min = getBossMaxHP(1, 1), current_r_max = 1, current_index_max = 1, current_hp_max = getBossMaxHP(1, 1), totalMatrixScoreMin = 0, totalMatrixScoreMax = 0;
     
     let simMode = document.getElementById('sim-mode') ? document.getElementById('sim-mode').value : 'auto';
@@ -580,8 +596,6 @@ function updateTracker() {
         let chk_res = [row.querySelector('.res-chk-1').checked, row.querySelector('.res-chk-2').checked, row.querySelector('.res-chk-3').checked, row.querySelector('.res-chk-4').checked];
 
         if (c1 && c2 && c3) {
-            
-            // 模式 A：🔥 自動推演
             if (simMode === 'auto') {
                 let possibleRots = dpsData.filter(d => d.c1 === c1 && d.c2 === c2 && d.c3 === c3 && checkedRotations.has(d.id));
                 if (possibleRots.length > 0) {
@@ -610,15 +624,12 @@ function updateTracker() {
                     resTd.innerHTML = `<div style="line-height:1.4;"><span style="color:#aaa;">${t("下限")}:</span> <span style="color:#ffaa00;">${resMin.startStr} ➔ ${resMin.endStr}</span><br><span style="color:#aaa;">${t("上限")}:</span> <span style="color:#00ffaa;">${resMax.startStr} ➔ ${resMax.endStr}</span><br><span style="color:#cf00ff; font-weight:bold;">${Math.floor(resMin.dmg * env.scoreRatio).toLocaleString()} ~ ${Math.floor(resMax.dmg * env.scoreRatio).toLocaleString()} ${t("分")}</span></div>`;
                 } else { resTd.innerHTML = "-"; }
                 
-            } 
-            // 模式 B：🗺️ 手動排刀 (不看DPS，純粹計算設定區間的血量分數)
-            else if (simMode === 'manual') {
+            } else if (simMode === 'manual') {
                 let ebRInt = parseInt(ebR), ebIdxInt = parseInt(ebIdx), ebHpPct = parseFloat(ebHp);
                 if (!isNaN(ebRInt) && !isNaN(ebIdxInt) && !isNaN(ebHpPct)) {
                     let dmg = 0;
                     let temp_r = current_r_min, temp_idx = current_index_min, temp_hp = current_hp_min;
 
-                    // 一路把中間經過的滿血王加總
                     while (temp_r < ebRInt || (temp_r === ebRInt && temp_idx < ebIdxInt)) {
                         dmg += temp_hp;
                         temp_idx++;
@@ -626,7 +637,6 @@ function updateTracker() {
                         temp_hp = getBossMaxHP(temp_r, temp_idx);
                     }
 
-                    // 結算最後一隻王的目標血量
                     let targetRemainingHP = getBossMaxHP(ebRInt, ebIdxInt) * (ebHpPct / 100);
                     if (temp_hp > targetRemainingHP) {
                         dmg += (temp_hp - targetRemainingHP);
@@ -637,7 +647,6 @@ function updateTracker() {
 
                     resTd.innerHTML = `<div style="line-height:1.4;"><span style="color:#00ffaa; font-weight:bold;">🗺️ ${t('排刀區間：')}</span><br><span style="color:#fff;">${startStr} ➔ ${endStr}</span><br><span style="color:#cf00ff; font-weight:bold;">${Math.floor(dmg * env.scoreRatio).toLocaleString()} ${t('分')}</span></div>`;
 
-                    // 將這個區間作為下一隊的起點
                     current_hp_min = targetRemainingHP; current_r_min = ebRInt; current_index_min = ebIdxInt;
                     current_hp_max = targetRemainingHP; current_r_max = ebRInt; current_index_max = ebIdxInt;
                     totalMatrixScoreMin += dmg * env.scoreRatio;
@@ -765,76 +774,44 @@ function renderRotations() {
     container.innerHTML = html;
 }
 
-function initBossHPMap() {
-    let env = { r1_hp: parseFloat(document.getElementById('env-r1').value) || 400.89, r2_hp: parseFloat(document.getElementById('env-r2').value) || 783.56, r3_hp: parseFloat(document.getElementById('env-r3').value) || 1384.9, growth: (parseFloat(document.getElementById('env-growth').value) || 5) / 100 };
-    try {
-        let stored = localStorage.getItem('ww_boss_hp'); if (stored) bossHPMap = JSON.parse(stored);
-        let hist = localStorage.getItem('ww_boss_hp_history'); if (hist) bossHPHistory = JSON.parse(hist);
-    } catch(e) {}
+const debouncedFilterRotations = debounce(() => {
+    let q = document.getElementById('rot-search').value.toLowerCase();
+    document.querySelectorAll('#rotation-setup input[type="checkbox"]').forEach(i => {
+        let container = i.closest('div');
+        container.style.display = container.innerText.toLowerCase().includes(q) ? 'inline-flex' : 'none';
+    });
+    document.querySelectorAll('#rotation-setup > div').forEach(group => { group.style.display = Array.from(group.querySelectorAll('div > div')).some(l => l.style.display !== 'none') ? 'block' : 'none'; });
+}, 150);
 
-    for (let r = 1; r <= 10; r++) {
-        for (let i = 1; i <= 4; i++) {
-            let key = `R${r}-${i}`;
-            if (!bossHPMap[key] || bossHPMap[key].isDefault) {
-                let hp = (r === 1) ? env.r1_hp : (r === 2 && i === 1) ? 546.67 : (r === 2) ? env.r2_hp : (r === 3) ? env.r3_hp : env.r3_hp * (1 + env.growth * ((r - 4) * 4 + i));
-                bossHPMap[key] = { value: hp, isDefault: true };
-            }
-        }
-    }
-    renderIndividualHPPanel();
+function filterRotations() { debouncedFilterRotations(); }
+
+function toggleAllRotations() {
+    const visibleBoxes = Array.from(document.querySelectorAll('#rotation-setup input[type="checkbox"]')).filter(i => i.closest('div').style.display !== 'none');
+    if(!visibleBoxes.length) return;
+    const anyChecked = visibleBoxes.some(i => i.checked);
+    visibleBoxes.forEach(i => i.checked = !anyChecked);
+    updateRotationState();
 }
 
-function renderIndividualHPPanel() {
-    let container = document.getElementById('individual-hp-container');
-    if (!container) return;
-    let html = '';
-    for (let r = 1; r <= 10; r++) {
-        for (let i = 1; i <= 4; i++) {
-            let key = `R${r}-${i}`, data = bossHPMap[key], btnHtml = '';
-            
-            if (bossHPHistory[key] && bossHPHistory[key].length >= 3) {
-                const totalDmg = bossHPHistory[key].reduce((sum, h) => sum + h.dmg, 0);
-                const totalPct = bossHPHistory[key].reduce((sum, h) => sum + h.pct, 0);
-                let avg = totalDmg / totalPct; 
-                
-                if (Math.abs(avg - getBaseEnvHP(r, i)) / getBaseEnvHP(r, i) > 0.03 && data.isDefault) {
-                    btnHtml = `<button class="btn-calib" onclick="applyCalibratedHP('${key}', ${avg})">⚠️ ${t('套用校正')}: ${avg.toFixed(1)}W</button>`;
-                }
-            }
-            html += `<div class="hp-item"><span class="hp-label">${key}</span><input type="number" class="hp-input ${!data.isDefault?'calibrated':''}" id="hp_${key}" value="${data.value.toFixed(2)}" step="10" onchange="manualUpdateHP('${key}')">${btnHtml}</div>`;
-        }
-    }
-    container.innerHTML = html;
+function toggleDifficulty(diff) {
+    const visibleBoxes = Array.from(document.querySelectorAll('#rotation-setup input[type="checkbox"]')).filter(i => i.closest('div').style.display !== 'none' && i.closest('div').innerText.includes(diff));
+    if(!visibleBoxes.length) return;
+    const allChecked = visibleBoxes.every(i => i.checked);
+    visibleBoxes.forEach(i => i.checked = !allChecked);
+    updateRotationState();
 }
 
-function getBaseEnvHP(r, index) {
-    let env = getEnvSettings();
-    if (r === 1) return env.r1_hp; if (r === 2) return index === 1 ? 546.67 : env.r2_hp; if (r === 3) return env.r3_hp;
-    return env.r3_hp * (1 + env.growth * ((r - 4) * 4 + index));
+function updateRotationState() {
+    checkedRotations.clear(); document.querySelectorAll('#rotation-setup input:checked').forEach(i => checkedRotations.add(i.value)); debouncedRenderAndTrack();
 }
 
-function getBossMaxHP(r, index) { return bossHPMap[`R${r}-${index}`] ? bossHPMap[`R${r}-${index}`].value : 400; }
-function manualUpdateHP(key) {
-    let val = parseFloat(document.getElementById(`hp_${key}`).value);
-    if (!isNaN(val) && val > 0) { bossHPMap[key] = { value: val, isDefault: false }; try { localStorage.setItem('ww_boss_hp', JSON.stringify(bossHPMap)); } catch(e) {} renderIndividualHPPanel(); updateTracker(); }
-}
-function applyCalibratedHP(key, avgValue) {
-    bossHPMap[key] = { value: avgValue, isDefault: false }; try { localStorage.setItem('ww_boss_hp', JSON.stringify(bossHPMap)); } catch(e) {}
-    renderIndividualHPPanel(); updateTracker(); alert(t(`已成功校正為平均值`) + `：${avgValue.toFixed(2)} ` + t(`萬`) + `！`);
-}
-function resetIndividualHP() { bossHPMap = {}; bossHPHistory = {}; try { localStorage.removeItem('ww_boss_hp'); localStorage.removeItem('ww_boss_hp_history'); } catch(e) {} initBossHPMap(); }
+let activePresetAttrs = new Set(); let activePresetGens = new Set();
+function togglePresetAttr(attr) { activePresetAttrs.has(attr) ? activePresetAttrs.delete(attr) : activePresetAttrs.add(attr); document.querySelector(`button[data-attr="${attr}"]`).classList.toggle(`active-attr-${attr}`); debouncedRenderAndTrack(); }
+function togglePresetGen(gen) { activePresetGens.has(gen) ? activePresetGens.delete(gen) : activePresetGens.add(gen); document.querySelector(`button[data-gen="${gen}"]`).classList.toggle(`active-gen`); debouncedRenderAndTrack(); }
 
-function getEnvSettings() {
-    return {
-        scoreRatio: parseFloat(document.getElementById('env-ratio').value) || 10,
-        r1_hp: parseFloat(document.getElementById('env-r1').value) || 400.89, r2_hp: parseFloat(document.getElementById('env-r2').value) || 783.56,
-        r3_hp: parseFloat(document.getElementById('env-r3').value) || 1384.9, growth: (parseFloat(document.getElementById('env-growth').value) || 5) / 100,
-        transTime: parseFloat(document.getElementById('env-trans').value) || 1.5, battleTime: parseFloat(document.getElementById('env-time').value) || 120,
-        resPenalty: parseFloat(document.getElementById('env-res').value) || 40
-    };
-}
-
+// ==========================================
 // 實戰反推與演算法優化 (Pooled Estimator)
+// ==========================================
 function reverseInferAndOptimize() {
     initBossHPMap();
     let env = getEnvSettings(), currentTeams = [], rows = document.querySelectorAll('#team-board tr'), start_r = 1, start_idx = 1, start_hp = getBossMaxHP(1, 1);
@@ -914,6 +891,75 @@ function reverseInferAndOptimize() {
     updateTracker();
 }
 
+function initBossHPMap() {
+    let env = { r1_hp: parseFloat(document.getElementById('env-r1').value) || 400.89, r2_hp: parseFloat(document.getElementById('env-r2').value) || 783.56, r3_hp: parseFloat(document.getElementById('env-r3').value) || 1384.9, growth: (parseFloat(document.getElementById('env-growth').value) || 5) / 100 };
+    try {
+        let stored = localStorage.getItem('ww_boss_hp'); if (stored) bossHPMap = JSON.parse(stored);
+        let hist = localStorage.getItem('ww_boss_hp_history'); if (hist) bossHPHistory = JSON.parse(hist);
+    } catch(e) {}
+
+    for (let r = 1; r <= 10; r++) {
+        for (let i = 1; i <= 4; i++) {
+            let key = `R${r}-${i}`;
+            if (!bossHPMap[key] || bossHPMap[key].isDefault) {
+                let hp = (r === 1) ? env.r1_hp : (r === 2 && i === 1) ? 546.67 : (r === 2) ? env.r2_hp : (r === 3) ? env.r3_hp : env.r3_hp * (1 + env.growth * ((r - 4) * 4 + i));
+                bossHPMap[key] = { value: hp, isDefault: true };
+            }
+        }
+    }
+    renderIndividualHPPanel();
+}
+
+function renderIndividualHPPanel() {
+    let container = document.getElementById('individual-hp-container');
+    if (!container) return;
+    let html = '';
+    for (let r = 1; r <= 10; r++) {
+        for (let i = 1; i <= 4; i++) {
+            let key = `R${r}-${i}`, data = bossHPMap[key], btnHtml = '';
+            
+            if (bossHPHistory[key] && bossHPHistory[key].length >= 3) {
+                const totalDmg = bossHPHistory[key].reduce((sum, h) => sum + h.dmg, 0);
+                const totalPct = bossHPHistory[key].reduce((sum, h) => sum + h.pct, 0);
+                let avg = totalDmg / totalPct; 
+                
+                if (Math.abs(avg - getBaseEnvHP(r, i)) / getBaseEnvHP(r, i) > 0.03 && data.isDefault) {
+                    btnHtml = `<button class="btn-calib" onclick="applyCalibratedHP('${key}', ${avg})">⚠️ ${t('套用校正')}: ${avg.toFixed(1)}W</button>`;
+                }
+            }
+            html += `<div class="hp-item"><span class="hp-label">${key}</span><input type="number" class="hp-input ${!data.isDefault?'calibrated':''}" id="hp_${key}" value="${data.value.toFixed(2)}" step="10" onchange="manualUpdateHP('${key}')">${btnHtml}</div>`;
+        }
+    }
+    container.innerHTML = html;
+}
+
+function getBaseEnvHP(r, index) {
+    let env = getEnvSettings();
+    if (r === 1) return env.r1_hp; if (r === 2) return index === 1 ? 546.67 : env.r2_hp; if (r === 3) return env.r3_hp;
+    return env.r3_hp * (1 + env.growth * ((r - 4) * 4 + index));
+}
+
+function getBossMaxHP(r, index) { return bossHPMap[`R${r}-${index}`] ? bossHPMap[`R${r}-${index}`].value : 400; }
+function manualUpdateHP(key) {
+    let val = parseFloat(document.getElementById(`hp_${key}`).value);
+    if (!isNaN(val) && val > 0) { bossHPMap[key] = { value: val, isDefault: false }; try { localStorage.setItem('ww_boss_hp', JSON.stringify(bossHPMap)); } catch(e) {} renderIndividualHPPanel(); updateTracker(); }
+}
+function applyCalibratedHP(key, avgValue) {
+    bossHPMap[key] = { value: avgValue, isDefault: false }; try { localStorage.setItem('ww_boss_hp', JSON.stringify(bossHPMap)); } catch(e) {}
+    renderIndividualHPPanel(); updateTracker(); alert(t(`已成功校正為平均值`) + `：${avgValue.toFixed(2)} ` + t(`萬`) + `！`);
+}
+function resetIndividualHP() { bossHPMap = {}; bossHPHistory = {}; try { localStorage.removeItem('ww_boss_hp'); localStorage.removeItem('ww_boss_hp_history'); } catch(e) {} initBossHPMap(); }
+
+function getEnvSettings() {
+    return {
+        scoreRatio: parseFloat(document.getElementById('env-ratio').value) || 10,
+        r1_hp: parseFloat(document.getElementById('env-r1').value) || 400.89, r2_hp: parseFloat(document.getElementById('env-r2').value) || 783.56,
+        r3_hp: parseFloat(document.getElementById('env-r3').value) || 1384.9, growth: (parseFloat(document.getElementById('env-growth').value) || 5) / 100,
+        transTime: parseFloat(document.getElementById('env-trans').value) || 1.5, battleTime: parseFloat(document.getElementById('env-time').value) || 120,
+        resPenalty: parseFloat(document.getElementById('env-res').value) || 40
+    };
+}
+
 function autoBuildMaxDpsTeams() {
     if(!confirm(t("將清空當前編隊並自動生成極限陣容，確定執行？"))) return;
     let validTeams = dpsData.filter(d => checkedRotations.has(d.id) && isOwned(d.c1) && isOwned(d.c2) && isOwned(d.c3));
@@ -945,6 +991,23 @@ function autoBuildMaxDpsTeams() {
         }
     });
     updateTracker(); alert(t(`一鍵配置完成！共組建 `) + finalOptimizedTeams.length + t(` 隊。`));
+}
+
+function applyPreset() {
+    let val = document.getElementById('preset-select').value; if(!val) return;
+    let cs = val.split(','), rows = document.querySelectorAll('#team-board tr'), applied = false;
+    for(let r of rows) {
+        let ss = r.querySelectorAll('select.char-select');
+        if(!ss[0].value && !ss[1].value && !ss[2].value) { ss[0].value=cs[0]; ss[1].value=cs[1]; ss[2].value=cs[2]; applied = true; break; }
+    }
+    if(!applied) alert(t("沒有空白隊伍了！")); updateTracker();
+}
+
+function resetTeams() { 
+    if(!confirm(t("確定清空編隊表嗎？"))) return;
+    document.querySelectorAll('.char-select, .score-input, .end-boss-hp, .end-boss-r, .end-boss-idx').forEach(el => el.value="");
+    document.querySelectorAll('input[type="checkbox"][class^="res-chk"]').forEach(c => c.checked=false);
+    updateTracker(); 
 }
 
 function saveData() {
@@ -1022,7 +1085,7 @@ function initializeApp() {
     initDpsData();
     loadCustomRotations();
     initBoard();
-    injectModeToggle(); // 🚀 注入雙模式切換開關
+    injectModeToggle(); 
     
     try { isSimp = localStorage.getItem('ww_lang') === 'zh-CN'; } catch(e){}
     if (isSimp) document.getElementById('lang-toggle').innerText = "繁";
