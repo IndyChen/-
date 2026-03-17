@@ -67,6 +67,14 @@ let diffStability = { '⚠️': 100, '⭐': 100, '🔵': 100, '🟩': 100, '🧩
 let bossHPMap = {};
 let bossHPHistory = {};
 let customRotations = [];
+let savedLineups = []; // 🚀 新增：記憶10套實戰編隊
+
+function initSavedLineups() {
+    try {
+        let stored = localStorage.getItem('ww_saved_lineups');
+        if (stored) savedLineups = JSON.parse(stored);
+    } catch(e) {}
+}
 
 function updateToggleButtons() {
     const rBoxes = Array.from(document.querySelectorAll('#roster-setup .checkbox-item')).filter(l => l.style.display !== 'none').map(l => l.querySelector('input'));
@@ -86,15 +94,13 @@ function updateToggleButtons() {
     }
 }
 
-const debouncedRenderAndTrack = debounce(() => { renderRotations(); updateTracker(); updateToggleButtons(); }, 150);
-
-// 🚀 修正：UI 輸入範圍防呆 (100 ~ 0.01)
+// 🚀 修正：防 Infinity，限制輸入數值在 99.99 到 0.00 之間
 function clampHpPct(el) {
     if (el.value === '') return;
     let val = parseFloat(el.value);
     if (isNaN(val)) { el.value = ''; return; }
-    if (val < 0.01) el.value = 0.01;
-    if (val > 100) el.value = 100;
+    if (val < 0) el.value = 0;
+    if (val > 99.99) el.value = 99.99;
 }
 
 function getBase(n) { return ['光主', '暗主', '風主'].includes(n) ? '漂泊者' : n; }
@@ -162,6 +168,7 @@ function saveCustomTeam() {
     document.getElementById('custom-team-modal').style.display = 'none'; debouncedRenderAndTrack(); alert(t('自訂編隊已成功加入。'));
 }
 
+// 🚀 核心更新：數據總管儀表板與卡片化設計
 function openDataManager() {
     let overriddenBossCount = Object.values(bossHPMap).filter(data => !data.isDefault).length;
     let content = document.getElementById('data-manager-content');
@@ -176,8 +183,8 @@ function openDataManager() {
                 <div style="font-size: 0.8em; color: #aaa;">⚔️ 自訂編隊</div>
             </div>
             <div style="flex: 1; background: rgba(207, 0, 255, 0.1); border: 1px solid var(--neon-purple); padding: 10px; border-radius: 8px; text-align: center;">
-                <div style="font-size: 1.5em; font-weight: bold; color: var(--neon-purple);">${overriddenBossCount}</div>
-                <div style="font-size: 0.8em; color: #aaa;">🧮 覆寫王血量</div>
+                <div style="font-size: 1.5em; font-weight: bold; color: var(--neon-purple);">${savedLineups.length}</div>
+                <div style="font-size: 0.8em; color: #aaa;">💾 已記憶編隊</div>
             </div>
         </div>
         <div style="margin-bottom:20px;">
@@ -189,8 +196,8 @@ function openDataManager() {
             </div>
         </div>
         <div style="border-top:1px dashed var(--border-glass); padding-top:15px;">
-            <h4 style="color:var(--gold); margin-top:0;">📝 自訂編隊管理</h4>
-            <div id="dm-teams" style="max-height: 250px; overflow-y: auto; padding-right: 5px;"></div>
+            <h4 style="color:var(--gold); margin-top:0;">📝 自訂編隊庫管理</h4>
+            <div id="dm-teams" style="max-height: 150px; overflow-y: auto; padding-right: 5px;"></div>
         </div>
     `;
     let teamHtml = customRotations.length === 0 ? `<p style="color:#666; text-align:center;">無自訂資料</p>` : customRotations.map((cr, i) => `
@@ -203,11 +210,11 @@ function openDataManager() {
 }
 function closeDataManager() { document.getElementById('data-manager-modal').style.display = 'none'; }
 function generateExportCode() {
-    let data = { roster: [...ownedCharacters], rotations: [...checkedRotations], customStats: customStatsMap, bossHp: bossHPHistory, customTeams: customRotations };
+    let data = { roster: [...ownedCharacters], rotations: [...checkedRotations], customStats: customStatsMap, bossHp: bossHPHistory, customTeams: customRotations, savedLineups: savedLineups };
     document.getElementById('dm-code').value = btoa(encodeURIComponent(JSON.stringify(data))); alert(t('✅ 存檔代碼已產生，請複製保存。'));
 }
 function confirmImportFromCode() {
-    if(confirm(t(`這將會覆寫您目前的 ${customRotations.length} 組自訂隊伍與所有設定，確定執行嗎？`))) {
+    if(confirm(t(`這將會覆寫您目前所有的自訂與記憶隊伍設定，確定執行嗎？`))) {
         importFromCode();
     }
 }
@@ -220,6 +227,7 @@ function importFromCode() {
         if(data.customStats) localStorage.setItem('ww_custom_stats', JSON.stringify(data.customStats));
         if(data.bossHp) localStorage.setItem('ww_boss_hp_history', JSON.stringify(data.bossHp));
         if(data.customTeams) localStorage.setItem('ww_custom_rotations_v2', JSON.stringify(data.customTeams));
+        if(data.savedLineups) localStorage.setItem('ww_saved_lineups', JSON.stringify(data.savedLineups));
         alert(t('✅ 設定已還原！即將重新載入頁面。')); window.location.reload();
     } catch(e) { alert(t('❌ 解析失敗，請確認代碼正確。')); }
 }
@@ -227,6 +235,126 @@ function deleteCustomTeam(index) {
     if(!confirm(t('確定刪除？'))) return; let cr = customRotations.splice(index, 1)[0];
     try { localStorage.setItem('ww_custom_rotations_v2', JSON.stringify(customRotations)); } catch(e){}
     dpsData = dpsData.filter(d => d.id !== 'custom_rot_' + cr.id); debouncedRenderAndTrack(); openDataManager(); 
+}
+
+// 🚀 新增功能：保存當前實戰編隊 10 組
+function saveCurrentLineup() {
+    let teams = [];
+    let totalActualScore = 0;
+    let rows = document.querySelectorAll('#team-board tr');
+    
+    rows.forEach((r) => {
+        if (r.classList.contains('hidden-row')) return;
+        let ss = r.querySelectorAll('select.char-select');
+        let scoreInput = r.querySelector('.score-input').value;
+        let score = parseFloat(scoreInput) || 0;
+        let ebR = r.querySelector('.end-boss-r').value;
+        let ebIdx = r.querySelector('.end-boss-idx').value;
+        let ebHp = r.querySelector('.end-boss-hp').value;
+        
+        let res1 = r.querySelector('.res-chk-1') ? r.querySelector('.res-chk-1').checked : false;
+        let res2 = r.querySelector('.res-chk-2') ? r.querySelector('.res-chk-2').checked : false;
+        let res3 = r.querySelector('.res-chk-3') ? r.querySelector('.res-chk-3').checked : false;
+        let res4 = r.querySelector('.res-chk-4') ? r.querySelector('.res-chk-4').checked : false;
+
+        if (ss[0].value || ss[1].value || ss[2].value) {
+            teams.push({
+                c1: ss[0].value, c2: ss[1].value, c3: ss[2].value,
+                scoreInput: scoreInput, score: score, ebR: ebR, ebIdx: ebIdx, ebHp: ebHp,
+                res: [res1, res2, res3, res4]
+            });
+            totalActualScore += score;
+        }
+    });
+
+    if (teams.length === 0) return alert(t("編隊為空，無法記憶！請先編排隊伍。"));
+
+    let name = prompt(t("請為此實戰編隊輸入記憶名稱："), `${new Date().toLocaleDateString()} 實戰`);
+    if (!name) return;
+
+    let lineup = { id: Date.now(), name: name, totalScore: totalActualScore, teams: teams };
+    savedLineups.unshift(lineup);
+    if (savedLineups.length > 10) savedLineups.pop();
+
+    try { localStorage.setItem('ww_saved_lineups', JSON.stringify(savedLineups)); } catch(e){}
+    alert(t("✅ 實戰編隊已成功記憶！"));
+}
+
+function openLineupModal() {
+    let container = document.getElementById('lineup-list');
+    if (savedLineups.length === 0) {
+        container.innerHTML = `<p style="color:#aaa; text-align:center;">尚無記憶的編隊，請先在沙盤點擊「💾 記憶當前實戰」</p>`;
+    } else {
+        container.innerHTML = savedLineups.map((l, i) => `
+            <div style="background:rgba(0,0,0,0.4); border:1px solid #555; border-radius:8px; padding:12px; margin-bottom:10px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px dashed #444; padding-bottom:8px; margin-bottom:8px;">
+                    <strong style="color:var(--neon-purple); font-size:1.1em;">${l.name}</strong>
+                    <span style="color:#ffaa00; font-weight:bold;">🎯 總分: ${l.totalScore.toLocaleString()}</span>
+                </div>
+                <div style="font-size:0.85em; color:#aaa; margin-bottom:10px;">
+                    ${l.teams.map(t => `<span style="color:#ddd">${t.c1?t.c1:'?'}</span>+${t.c2?t.c2:'?'}+${t.c3?t.c3:'?'}`).join(' | ')}
+                </div>
+                <div style="display:flex; gap:10px;">
+                    <button onclick="loadLineup(${i})" class="btn-action-all" style="flex:1; padding:6px;">📥 載入此編隊</button>
+                    <button onclick="deleteLineup(${i})" class="btn-action-clear" style="padding:6px 12px; background:#555; border:none; box-shadow:none;">❌ 刪除</button>
+                </div>
+            </div>
+        `).join('');
+    }
+    document.getElementById('lineup-modal').style.display = 'flex';
+}
+
+function loadLineup(index) {
+    if(!confirm(t("將清空當前沙盤畫面並載入該記憶編隊，確定？"))) return;
+    let lineup = savedLineups[index];
+    
+    document.querySelectorAll('.char-select, .score-input, .end-boss-r, .end-boss-idx, .end-boss-hp').forEach(el => el.value = ""); 
+    document.querySelectorAll('input[type="checkbox"][class^="res-chk"]').forEach(c => c.checked = false);
+
+    let rows = document.querySelectorAll('#team-board tr');
+    lineup.teams.forEach((tData, i) => {
+        if (rows[i]) {
+            let ss = rows[i].querySelectorAll('select.char-select');
+            
+            if(tData.c1 && ss[0].querySelector(`option[value="${tData.c1}"]`) == null) ss[0].innerHTML += `<option value="${tData.c1}">${tData.c1}</option>`;
+            if(tData.c2 && ss[1].querySelector(`option[value="${tData.c2}"]`) == null) ss[1].innerHTML += `<option value="${tData.c2}">${tData.c2}</option>`;
+            if(tData.c3 && ss[2].querySelector(`option[value="${tData.c3}"]`) == null) ss[2].innerHTML += `<option value="${tData.c3}">${tData.c3}</option>`;
+            
+            if (tData.c1) ss[0].value = tData.c1;
+            if (tData.c2) ss[1].value = tData.c2;
+            if (tData.c3) ss[2].value = tData.c3;
+            
+            rows[i].querySelector('.score-input').value = tData.scoreInput || "";
+            rows[i].querySelector('.end-boss-r').value = tData.ebR || "";
+            rows[i].querySelector('.end-boss-idx').value = tData.ebIdx || "";
+            rows[i].querySelector('.end-boss-hp').value = tData.ebHp || "";
+            if (tData.res) {
+                if(rows[i].querySelector('.res-chk-1')) rows[i].querySelector('.res-chk-1').checked = tData.res[0];
+                if(rows[i].querySelector('.res-chk-2')) rows[i].querySelector('.res-chk-2').checked = tData.res[1];
+                if(rows[i].querySelector('.res-chk-3')) rows[i].querySelector('.res-chk-3').checked = tData.res[2];
+                if(rows[i].querySelector('.res-chk-4')) rows[i].querySelector('.res-chk-4').checked = tData.res[3];
+            }
+        }
+    });
+    document.getElementById('lineup-modal').style.display = 'none';
+    
+    // 動態調整顯示數量以適應載入的隊伍
+    let neededCount = 3;
+    while(neededCount < lineup.teams.length && neededCount < 16) neededCount += 3;
+    if(neededCount > 16) neededCount = 16;
+    if(parseInt(document.getElementById('team-count-select').value) < neededCount) {
+        document.getElementById('team-count-select').value = neededCount;
+    }
+    
+    updateTeamDisplayCount(); 
+    alert(t("✅ 記憶編隊載入成功！"));
+}
+
+function deleteLineup(index) {
+    if(!confirm(t("確定刪除此紀錄？"))) return;
+    savedLineups.splice(index, 1);
+    try { localStorage.setItem('ww_saved_lineups', JSON.stringify(savedLineups)); } catch(e){}
+    openLineupModal();
 }
 
 function toggleRarity(s) { s == 5 ? show5Star = !show5Star : show4Star = !show4Star; document.getElementById(`btn-${s}star`).classList.toggle(`active-${s}star`, s==5?show5Star:show4Star); filterCharacters(); }
@@ -340,7 +468,6 @@ function initBoard() {
     let rOpts = `<option value="">R?</option>` + Array.from({length:10}, (_,i)=>`<option value="${i+1}">R${i+1}</option>`).join('');
     let idxOpts = `<option value="">${t("號?")}</option>` + [1,2,3,4].map(idx=>`<option value="${idx}">${idx}</option>`).join('');
     
-    // 🚀 修正：尾王與 UI 輸入限制
     for(let i=1; i<=16; i++) {
         let tr = document.createElement('tr'); tr.className = 'draggable-row'; tr.draggable = true; 
         tr.innerHTML = `<td>${t("第")} ${i} ${t("隊")}</td>
@@ -348,13 +475,13 @@ function initBoard() {
                         <td data-label="🗡️ ${t('副C')}："><select class="char-select" onchange="updateTracker()"></select></td>
                         <td data-label="🛡️ ${t('生存')}："><select class="char-select" onchange="updateTracker()"></select><button onclick="resetRowDps(this)" class="btn-reset-dps" style="margin-top:5px; padding:4px 8px; border-radius:4px; font-size:0.8em; background:#2b2b36; color:#aaa; border:1px solid #555; cursor:pointer;">🔄 ${t('重設預設')} DPS</button></td>
                         <td data-label="📊 ${t('實戰得分')} / ${t('殘血設定')}：">
-                            <input type="number" class="score-input" placeholder="${t('實戰得分')}"><br>
+                            <input type="number" class="score-input" placeholder="${t('實戰得分')}" oninput="updateTracker()"><br>
                             <div style="display:flex; justify-content:center; align-items:center; gap:4px; flex-wrap:wrap; margin-bottom:2px; background:rgba(0,0,0,0.3); padding:8px; border-radius:6px; border:1px solid var(--neon-green);">
-                                <span>🎯尾王:</span><select class="hp-calc-select end-boss-r">${rOpts}</select>
-                                <span>-</span><select class="hp-calc-select end-boss-idx">${idxOpts}</select>
-                                <span>🩸剩(%):</span><input type="number" class="hp-calc-input end-boss-hp" placeholder="100~0.01" onblur="clampHpPct(this)">
+                                <span>🎯尾王:</span><select class="hp-calc-select end-boss-r" onchange="updateTracker()">${rOpts}</select>
+                                <span>-</span><select class="hp-calc-select end-boss-idx" onchange="updateTracker()">${idxOpts}</select>
+                                <span>🩸剩(%):</span><input type="number" class="hp-calc-input end-boss-hp" placeholder="99~0" onblur="clampHpPct(this)" onchange="updateTracker()">
                             </div>
-                            <div style="font-size:0.7em; color:#888; text-align:center; margin-bottom:6px;">(範圍限制: 100 ~ 0.01%)</div>
+                            <div style="font-size:0.7em; color:#888; text-align:center; margin-bottom:6px;">(範圍限制: 99.99 ~ 0.00%)</div>
                             <div class="res-chk-group" style="flex-wrap: wrap;">
                                 <label><input type="checkbox" class="res-chk-1" onchange="updateTracker()">[1]</label>
                                 <label><input type="checkbox" class="res-chk-2" onchange="updateTracker()">[2]</label>
@@ -378,7 +505,7 @@ function initBoard() {
     b.addEventListener('dragend', e => { if(draggedRow) draggedRow.classList.remove('dragging'); draggedRow = null; updateRowNumbers(); debouncedRenderAndTrack(); });
 }
 
-// 🚀 核心更新：使用 CSS hidden-row 保證隱藏功能穩固
+// 🚀 核心更新：隱藏列防呆與動態數量控制
 function updateTeamDisplayCount() {
     let count = parseInt(document.getElementById('team-count-select').value) || 16;
     try { localStorage.setItem('ww_display_count', count); } catch(e) {}
@@ -392,7 +519,6 @@ function updateTeamDisplayCount() {
         } else {
             if (!row.classList.contains('hidden-row')) {
                 row.classList.add('hidden-row');
-                // ⚠️ 強制清空被隱藏的資料，歸還角色次數
                 let selects = row.querySelectorAll('select.char-select');
                 let hasData = Array.from(selects).some(s => s.value !== "");
                 if (hasData || row.querySelector('.score-input').value !== "") {
@@ -466,14 +592,38 @@ function updateTracker() {
         ps.innerHTML = ph;
     }
 
-    let env = getEnvSettings(), current_r_min = 1, current_index_min = 1, current_hp_min = getBossMaxHP(1, 1), current_r_max = 1, current_index_max = 1, current_hp_max = getBossMaxHP(1, 1), totalMatrixScoreMin = 0, totalMatrixScoreMax = 0;
+    let env = getEnvSettings();
+    let current_r_min = 1, current_index_min = 1, current_hp_min = getBossMaxHP(1, 1), current_r_max = 1, current_index_max = 1, current_hp_max = getBossMaxHP(1, 1);
+    let totalMatrixScoreMin = 0, totalMatrixScoreMax = 0, actualTotalScore = 0;
     let simMode = document.getElementById('sim-mode') ? document.getElementById('sim-mode').value : 'auto';
+    
+    // 🚀 手動模式專用變數
+    let man_start_r = 1, man_start_idx = 1, man_start_hp_pct = 100;
+    let totalManualBaseScore = 0, totalManualMaxScore = 0;
+    
+    // 🚀 手動模式專用計算函數：取得指定王與血量的「累積總傷害」
+    let getCumDmg = (r, idx, hpPct) => {
+        let dmg = 0;
+        for (let i = 1; i <= r; i++) {
+            let maxJ = (i === r) ? idx : 4;
+            for (let j = 1; j <= maxJ; j++) {
+                let maxHp = getBossMaxHP(i, j);
+                if (i === r && j === idx) dmg += maxHp * (1 - hpPct / 100);
+                else dmg += maxHp;
+            }
+        }
+        return dmg;
+    };
 
     document.querySelectorAll('#team-board tr').forEach(row => {
         if (row.classList.contains('hidden-row')) return;
         let ss = row.querySelectorAll('select.char-select'), c1 = ss[0].value, c2 = ss[1].value, c3 = ss[2].value;
         let resTd = row.querySelector('.relay-result'), ebR = row.querySelector('.end-boss-r').value, ebIdx = row.querySelector('.end-boss-idx').value, ebHp = row.querySelector('.end-boss-hp').value;
         let chk_res = [row.querySelector('.res-chk-1').checked, row.querySelector('.res-chk-2').checked, row.querySelector('.res-chk-3').checked, row.querySelector('.res-chk-4').checked];
+
+        // 累積實戰總分
+        let scoreInputVal = parseFloat(row.querySelector('.score-input').value);
+        if (!isNaN(scoreInputVal)) actualTotalScore += scoreInputVal;
 
         if (c1 && c2 && c3) {
             if (simMode === 'auto') {
@@ -486,9 +636,8 @@ function updateTracker() {
                     let simulate = (hp, r, idx, dps) => {
                         let t_left = env.battleTime, dmg = 0, startStr = `R${r}-${idx}(${(hp/getBossMaxHP(r,idx)*100).toFixed(0)}%)`;
                         while (t_left > 0) {
-                            // 🚀 防無限大修正：限制最小除數
                             let eff_dps = dps * (chk_res[idx - 1] ? (1 - env.resPenalty / 100) : 1);
-                            eff_dps = Math.max(0.0001, eff_dps);
+                            eff_dps = Math.max(0.0001, eff_dps); // 防 Infinity
                             
                             let ttk = hp / eff_dps;
                             if (ttk <= t_left) { dmg += hp; t_left -= (ttk + env.transTime); idx++; if (idx > 4) { r++; idx = 1; } hp = getBossMaxHP(r, idx); } 
@@ -504,22 +653,100 @@ function updateTracker() {
                     resTd.innerHTML = `<span style="color:#aaa;">下限: </span><span style="color:var(--gold);">${resMin.startStr} ➔ ${resMin.endStr}</span><br><span style="color:#aaa;">上限: </span><span style="color:var(--neon-green);">${resMax.startStr} ➔ ${resMax.endStr}</span><br><span style="color:var(--neon-purple); font-weight:bold; font-size:1.1em;">${Math.floor(resMin.dmg * env.scoreRatio).toLocaleString()} ~ ${Math.floor(resMax.dmg * env.scoreRatio).toLocaleString()} 分</span>`;
                 } else { resTd.innerHTML = "-"; }
             } else if (simMode === 'manual') {
+                // 🚀 核心更新：手動推演模式的區間預估與置信度計算
                 let ebRInt = parseInt(ebR), ebIdxInt = parseInt(ebIdx), ebHpPct = parseFloat(ebHp);
-                if (!isNaN(ebRInt) && !isNaN(ebIdxInt) && !isNaN(ebHpPct)) {
-                    let dmg = 0, temp_r = current_r_min, temp_idx = current_index_min, temp_hp = current_hp_min;
-                    while (temp_r < ebRInt || (temp_r === ebRInt && temp_idx < ebIdxInt)) { dmg += temp_hp; temp_idx++; if (temp_idx > 4) { temp_r++; temp_idx = 1; } temp_hp = getBossMaxHP(temp_r, temp_idx); }
-                    let targetRemainingHP = getBossMaxHP(ebRInt, ebIdxInt) * (ebHpPct / 100);
-                    if (temp_hp > targetRemainingHP) dmg += (temp_hp - targetRemainingHP);
-                    let startStr = `R${current_r_min}-${current_index_min}(${(current_hp_min/getBossMaxHP(current_r_min, current_index_min)*100).toFixed(0)}%)`, endStr = `R${ebRInt}-${ebIdxInt}(${ebHpPct}%)`;
-                    resTd.innerHTML = `<span style="color:var(--neon-green);">🗺️ ${startStr} ➔ ${endStr}</span><br><span style="color:var(--neon-purple); font-weight:bold; font-size:1.1em;">${Math.floor(dmg * env.scoreRatio).toLocaleString()} 分</span>`;
-                    current_hp_min = current_hp_max = targetRemainingHP; current_r_min = current_r_max = ebRInt; current_index_min = current_index_max = ebIdxInt;
-                    totalMatrixScoreMin += dmg * env.scoreRatio; totalMatrixScoreMax += dmg * env.scoreRatio;
-                } else { resTd.innerHTML = `<span style="color:#ff5252; font-weight:bold;">⚠️ ${t('需設定終點王與血量')}</span>`; }
+                if (!isNaN(ebRInt) && !isNaN(ebIdxInt) && !isNaN(ebHpPct) && ebHpPct >= 0 && ebHpPct <= 99.99) {
+                    let startDmg = getCumDmg(man_start_r, man_start_idx, man_start_hp_pct);
+                    let endDmg = getCumDmg(ebRInt, ebIdxInt, ebHpPct);
+                    let rowDmg = Math.max(0, endDmg - startDmg);
+                    let baseScore = Math.floor(rowDmg * env.scoreRatio);
+                    
+                    // 估算一個最高分的可能時間加成 (依據推進的關卡數給予寬限)
+                    let stagesCleared = (ebRInt - man_start_r) * 4 + (ebIdxInt - man_start_idx);
+                    let timeBonus = Math.max(0, stagesCleared * 100 + 50);
+                    let maxScore = baseScore + timeBonus;
+                    
+                    totalManualBaseScore += baseScore;
+                    totalManualMaxScore += maxScore;
+                    
+                    let startStr = `R${man_start_r}-${man_start_idx}(${man_start_hp_pct === 100 ? '100%' : '剩'+man_start_hp_pct.toFixed(2)+'%'})`;
+                    let endStr = `R${ebRInt}-${ebIdxInt}(剩${ebHpPct.toFixed(2)}%)`;
+                    
+                    let confHtml = "";
+                    if (!isNaN(scoreInputVal) && scoreInputVal > 0) {
+                        let conf = (1 - Math.abs(scoreInputVal - baseScore) / scoreInputVal) * 100;
+                        let cColor = conf >= 80 ? "var(--neon-green)" : "#ff5252";
+                        let cIcon = conf >= 80 ? "✅" : "⚠️";
+                        confHtml = `<div style="margin-top: 5px; color:${cColor}; font-size:0.9em;">${cIcon} 單排置信度: <strong>${conf.toFixed(1)}%</strong></div>`;
+                        if (conf < 70) {
+                            confHtml += `<div style="color:#ff5252; font-size:0.8em;">⚠️ 偏差過大，請確認血量或實戰得分</div>`;
+                        }
+                    }
+                    
+                    resTd.innerHTML = `
+                        <div style="text-align: left; padding: 4px;">
+                            <div style="color:var(--neon-green); font-size: 1.05em;">✅ 預估得分：<strong>${baseScore}</strong></div>
+                            <div style="color:#aaa; font-size: 0.85em; margin: 4px 0;">📊 推演區間：${baseScore} ~ ${maxScore}</div>
+                            <div style="color:var(--gold); font-size: 0.9em;">🎯 擊殺進度：<br>${startStr} ➔ ${endStr}</div>
+                            ${confHtml}
+                        </div>
+                    `;
+                    
+                    // 傳遞至下一排伍的接力起點
+                    man_start_r = ebRInt;
+                    man_start_idx = ebIdxInt;
+                    man_start_hp_pct = ebHpPct;
+                } else {
+                    resTd.innerHTML = `<span style="color:#ffaa00;">⚠️ 需設定終點王與血量</span>`;
+                }
             }
         } else { resTd.innerHTML = "-"; }
     });
 
-    document.getElementById('matrix-total-score').innerText = simMode === 'auto' ? `${Math.floor(totalMatrixScoreMin).toLocaleString()} ~ ${Math.floor(totalMatrixScoreMax).toLocaleString()} 分` : `🗺️ ${Math.floor(totalMatrixScoreMin).toLocaleString()} 分`;
+    // 🚀 核心更新：動態替換全局儀表板
+    let dashboard = document.getElementById('dashboard-scores');
+    if (dashboard) {
+        if (simMode === 'auto') {
+            dashboard.innerHTML = `
+                <div>
+                    <span style="color:var(--neon-green); font-weight:bold; font-size: 1.1em;">⚔️ 自動推演區間 (依DPS)：</span><br>
+                    <span style="color:var(--neon-purple); font-weight:900; font-size:1.4em; text-shadow:0 0 10px rgba(207,0,255,0.5);">${Math.floor(totalMatrixScoreMin).toLocaleString()} ~ ${Math.floor(totalMatrixScoreMax).toLocaleString()} 分</span>
+                </div>
+                <div style="width: 1px; height: 40px; background: var(--border-glass);"></div>
+                <div>
+                    <span style="color:#ffaa00; font-weight:bold; font-size: 1.1em;">🎯 當前實戰總分：</span><br>
+                    <span style="color:#ffaa00; font-weight:900; font-size:1.4em;">${Math.floor(actualTotalScore).toLocaleString()} 分</span>
+                </div>
+            `;
+        } else {
+            let confHtml = "";
+            if (actualTotalScore > 0 && totalManualBaseScore > 0) {
+                let conf = (1 - Math.abs(actualTotalScore - totalManualBaseScore) / actualTotalScore) * 100;
+                let color = conf >= 80 ? "var(--neon-green)" : "#ff5252";
+                confHtml = `
+                    <div style="width: 1px; height: 40px; background: var(--border-glass);"></div>
+                    <div>
+                        <span style="color:${color}; font-weight:bold; font-size: 1.1em;">📈 數據置信度：</span><br>
+                        <span style="color:${color}; font-weight:900; font-size:1.4em;">${conf.toFixed(1)}%</span>
+                    </div>
+                `;
+            }
+
+            dashboard.innerHTML = `
+                <div style="flex: 1; min-width: 250px;">
+                    <span style="color:var(--gold); font-weight:bold; font-size: 1.1em;">🗺️ 實戰總得分：</span><br>
+                    <span style="color:var(--gold); font-weight:900; font-size:1.4em;">${Math.floor(actualTotalScore).toLocaleString()} 分</span>
+                </div>
+                <div style="width: 1px; height: 40px; background: var(--border-glass);"></div>
+                <div style="flex: 1; min-width: 250px;">
+                    <span style="color:#aaa; font-weight:bold; font-size: 1.1em;">📊 殘血推演預估：</span><br>
+                    <span style="color:#aaa; font-weight:900; font-size:1.4em;">${Math.floor(totalManualBaseScore).toLocaleString()} ~ ${Math.floor(totalManualMaxScore).toLocaleString()} 分</span>
+                </div>
+                ${confHtml}
+            `;
+        }
+    }
+
     saveData();
 }
 
@@ -646,11 +873,10 @@ function reverseInferAndOptimize() {
                     else {
                         effective_dmg_sum += (dmg_left / r_factor);
                         let ebRInt = parseInt(ebR), ebIdxInt = parseInt(ebIdx), ebHpPct = parseFloat(ebHp);
-                        if (!isNaN(ebRInt) && !isNaN(ebIdxInt) && !isNaN(ebHpPct) && ebRInt === tmp_r && ebIdxInt === tmp_idx && ebHpPct >= 0.01 && ebHpPct <= 100) {
+                        if (!isNaN(ebRInt) && !isNaN(ebIdxInt) && !isNaN(ebHpPct) && ebHpPct >= 0 && ebHpPct <= 99.99) {
                             let hKey = `R${ebRInt}-${ebIdxInt}`; if (!bossHPHistory[hKey]) bossHPHistory[hKey] = [];
-                            // 🚀 防無限大修正：限制最小殘血參數
                             let hp_factor = 1 - (ebHpPct / 100);
-                            if (hp_factor <= 0) hp_factor = 0.0001;
+                            if (hp_factor <= 0) hp_factor = 0.0001; // 🚀 防 Infinity
                             bossHPHistory[hKey].push({ dmg: (actualScore / env.scoreRatio) - dmgDealtToKilledBosses, pct: hp_factor });
                         }
                         tmp_hp -= dmg_left; dmg_left = 0;
@@ -728,23 +954,30 @@ function initBossHPMap() {
     renderIndividualHPPanel();
 }
 
+// 🚀 核心更新：預估血量顯示與 10% 誤差校正門檻
 function renderIndividualHPPanel() {
     let container = document.getElementById('individual-hp-container'); if (!container) return; let html = '';
     for (let r = 1; r <= 10; r++) {
         for (let i = 1; i <= 4; i++) {
-            let key = `R${r}-${i}`, data = bossHPMap[key], btnHtml = '';
-            if (bossHPHistory[key] && bossHPHistory[key].length >= 3) {
-                let avg = bossHPHistory[key].reduce((sum, h) => sum + h.dmg, 0) / bossHPHistory[key].reduce((sum, h) => sum + h.pct, 0); 
-                if (Math.abs(avg - getBaseEnvHP(r, i)) / getBaseEnvHP(r, i) > 0.03 && data.isDefault) btnHtml = `<button class="btn-calib" onclick="applyCalibratedHP('${key}', ${avg})">⚠️ 套用校正: ${avg.toFixed(1)}W</button>`;
+            let key = `R${r}-${i}`, data = bossHPMap[key], btnHtml = '', estHtml = '';
+            if (bossHPHistory[key] && bossHPHistory[key].length >= 1) {
+                let avg = bossHPHistory[key].reduce((sum, h) => sum + h.dmg, 0) / Math.max(0.0001, bossHPHistory[key].reduce((sum, h) => sum + h.pct, 0)); 
+                estHtml = `<div style="color: #00ffaa; font-size: 0.75em; margin-top: 2px;">📊 預估: ${avg.toFixed(2)}W</div>`;
+                
+                // 誤差大於 10% (0.10) 且有足夠樣本才出現校正按鈕
+                if (bossHPHistory[key].length >= 3 && Math.abs(avg - getBaseEnvHP(r, i)) / getBaseEnvHP(r, i) > 0.10 && data.isDefault) {
+                    btnHtml = `<button class="btn-calib" onclick="applyCalibratedHP('${key}', ${avg})">⚠️ 套用校正</button>`;
+                }
             }
-            html += `<div class="hp-item"><span class="hp-label">${key}</span><input type="number" class="hp-input ${!data.isDefault?'calibrated':''}" id="hp_${key}" value="${data.value.toFixed(2)}" step="10" onchange="manualUpdateHP('${key}')">${btnHtml}</div>`;
+            html += `<div class="hp-item"><span class="hp-label">${key}</span><input type="number" class="hp-input ${!data.isDefault?'calibrated':''}" id="hp_${key}" value="${data.value.toFixed(2)}" step="10" onchange="manualUpdateHP('${key}')">${estHtml}${btnHtml}</div>`;
         }
     }
     container.innerHTML = html;
 }
 
 function getBaseEnvHP(r, index) { let env = getEnvSettings(); if (r === 1) return env.r1_hp; if (r === 2) return index === 1 ? 546.67 : env.r2_hp; if (r === 3) return env.r3_hp; return env.r3_hp * (1 + env.growth * ((r - 4) * 4 + index)); }
-function getBossMaxHP(r, index) { return bossHPMap[`R${r}-${index}`] ? bossHPMap[`R${r}-${index}`].value : 400; }
+// 🚀 防 Infinity：預防手動把血量改為 0 導致當機
+function getBossMaxHP(r, index) { return Math.max(0.1, bossHPMap[`R${r}-${index}`] ? bossHPMap[`R${r}-${index}`].value : 400); }
 function manualUpdateHP(key) { let val = parseFloat(document.getElementById(`hp_${key}`).value); if (!isNaN(val) && val > 0) { bossHPMap[key] = { value: val, isDefault: false }; try { localStorage.setItem('ww_boss_hp', JSON.stringify(bossHPMap)); } catch(e) {} renderIndividualHPPanel(); updateTracker(); } }
 function applyCalibratedHP(key, avgValue) { bossHPMap[key] = { value: avgValue, isDefault: false }; try { localStorage.setItem('ww_boss_hp', JSON.stringify(bossHPMap)); } catch(e) {} renderIndividualHPPanel(); updateTracker(); alert(t(`已成功校正為平均值`) + `：${avgValue.toFixed(2)} ` + t(`萬`) + `！`); }
 function resetIndividualHP() { bossHPMap = {}; bossHPHistory = {}; try { localStorage.removeItem('ww_boss_hp'); localStorage.removeItem('ww_boss_hp_history'); } catch(e) {} initBossHPMap(); }
@@ -753,7 +986,7 @@ function getEnvSettings() { return { scoreRatio: parseFloat(document.getElementB
 
 function saveData() { try { localStorage.setItem('ww_roster', JSON.stringify([...ownedCharacters])); localStorage.setItem('ww_rotations', JSON.stringify([...checkedRotations])); let teams = []; document.querySelectorAll('#team-board tr').forEach(r => teams.push([...r.querySelectorAll('select.char-select')].map(s=>s.value))); localStorage.setItem('ww_teams', JSON.stringify(teams)); } catch(e) {} }
 
-// 🚀 核心更新：使用 try...catch 保護，並精確避開 hidden-row
+// 🚀 核心更新：截圖匯出邏輯優化
 function exportImage() {
     try {
         const rows = document.querySelectorAll('#team-board tr'); let completed = [];
@@ -785,10 +1018,10 @@ function exportImage() {
         h += `<tr style="background:#3f3f4e; color:#d4af37;"><th>${t("關卡")}</th><th>${t("主輸出")}</th><th>${t("副C/輔助")}</th><th>${t("生存/輔助")}</th><th style="color:#00ffaa;">${t("推演戰果 / 實戰與環境資訊")}</th></tr>`;
         completed.forEach(tData => h += `<tr><td style="border:1px solid #555; padding:15px; font-weight:bold; color:#4caf50;">${t("第")} ${tData.id} ${t("隊")}</td><td style="border:1px solid #555; padding:15px;">${t(tData.c1)}</td><td style="border:1px solid #555; padding:15px;">${t(tData.c2)}</td><td style="border:1px solid #555; padding:15px;">${t(tData.c3)}</td><td style="border:1px solid #555; padding:15px; font-size:0.85em; text-align:left;">${tData.res}</td></tr>`);
         
-        let scoreElem = document.getElementById('matrix-total-score');
-        let currentScore = scoreElem ? scoreElem.innerText : '0 分';
+        let scoreElem = document.getElementById('dashboard-scores');
+        let currentScore = scoreElem ? scoreElem.innerText.replace(/\n/g, '  ') : '0 分';
         
-        box.innerHTML = h + `</table><div style="margin-top:20px; text-align:right; color:#888; font-size:0.9em;">${t("總分預估")}：${currentScore} | ${t("生成時間")}：${new Date().toLocaleString()}</div>`;
+        box.innerHTML = h + `</table><div style="margin-top:20px; text-align:right; color:#888; font-size:0.9em;">${t("全局數據統計")}：${currentScore} | ${t("生成時間")}：${new Date().toLocaleString()}</div>`;
         document.body.appendChild(box);
         html2canvas(box, { backgroundColor: '#1e1e24', scale: 2 }).then(c => { let l = document.createElement('a'); l.download = '鳴潮矩陣推演編隊表.png'; l.href = c.toDataURL('image/png'); l.click(); document.body.removeChild(box); });
     } catch(err) {
@@ -830,9 +1063,8 @@ function submitToGoogleForm() {
                         effective_dmg_sum += (dmg_left / r_factor);
                         if (!isNaN(ebR) && !isNaN(ebIdx) && !isNaN(ebHp) && ebR === tmp_r && ebIdx === tmp_idx) {
                             let dmgDoneToEndBoss = (score / env.scoreRatio) - dmgDealtToKilledBosses;
-                            // 🚀 防無限大修正：限制最小殘血參數
                             let hp_factor = 1 - (ebHp / 100);
-                            if (hp_factor <= 0) hp_factor = 0.0001;
+                            if (hp_factor <= 0) hp_factor = 0.0001; // 🚀 防 Infinity 修正
                             calculatedTotalHP = dmgDoneToEndBoss / hp_factor;
                         }
                         dmg_left = 0;
@@ -854,7 +1086,7 @@ function submitToGoogleForm() {
 
 // 初始化啟動
 function initializeApp() {
-    initDpsData(); loadCustomRotations(); initBoard(); 
+    initDpsData(); initSavedLineups(); initBoard(); 
     try { isSimp = localStorage.getItem('ww_lang') === 'zh-CN'; } catch(e){}
     if (isSimp) document.getElementById('lang-toggle').innerText = "🌐 繁 / 简";
     try { const sr = localStorage.getItem('ww_roster'); if (sr) { let parsed = JSON.parse(sr); if (Array.isArray(parsed)) { ownedCharacters.clear(); parsed.forEach(name => { if (charData[name] || ['光主','暗主','風主'].includes(name)) ownedCharacters.add(name); }); } } else { ownedCharacters = new Set(Object.keys(charData)); } } catch(e) { ownedCharacters = new Set(Object.keys(charData)); }
