@@ -944,6 +944,106 @@ function updateOwnedCharacters() {
     document.querySelectorAll('#roster-setup input:checked').forEach(i => ownedCharacters.add(i.value)); 
     debouncedRenderAndTrack(); 
 }
+// ==========================================
+// 補回：被遺漏的 UI 狀態切換與數據總管函式
+// ==========================================
 
+function updateToggleButtons() {
+    const rBoxes = Array.from(document.querySelectorAll('#roster-setup .checkbox-item')).filter(l => l.style.display !== 'none').map(l => l.querySelector('input'));
+    if (rBoxes.length > 0) {
+        const rAnyChecked = rBoxes.some(i => i.checked);
+        let rBtn = document.getElementById('roster-switch');
+        if(rBtn) {
+            rBtn.innerHTML = rAnyChecked ? "🗑️ " + t("清空角色勾選") : "☑️ " + t("全選可見角色");
+            rBtn.className = rAnyChecked ? "btn-action-clear ratio-71" : "btn-action-all ratio-71";
+        }
+    }
+
+    const rotBoxes = Array.from(document.querySelectorAll('#rotation-setup input[type="checkbox"]')).filter(i => i.closest('div').style.display !== 'none');
+    if (rotBoxes.length > 0) {
+        const rotAnyChecked = rotBoxes.some(i => i.checked);
+        let rotBtn = document.getElementById('rot-all-btn');
+        if(rotBtn) {
+            rotBtn.innerHTML = rotAnyChecked ? "🗑️ " + t("清空可見排軸") : "☑️ " + t("全選可見排軸");
+            rotBtn.className = rotAnyChecked ? "btn-action-clear ratio-71" : "btn-action-all ratio-71";
+        }
+    }
+}
+
+function openDataManager() {
+    let content = document.getElementById('data-manager-content');
+    if (!content) return;
+    content.innerHTML = `
+        <div style="display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap;">
+            <div style="flex: 1; background: rgba(0, 255, 170, 0.1); border: 1px solid var(--neon-green); padding: 10px; border-radius: 8px; text-align: center;">
+                <div style="font-size: 1.5em; font-weight: bold; color: var(--neon-green);">${ownedCharacters.size}</div>
+                <div style="font-size: 0.8em; color: #aaa;">👤 ${t('已解鎖角色')}</div>
+            </div>
+            <div style="flex: 1; background: rgba(212, 175, 55, 0.1); border: 1px solid var(--gold); padding: 10px; border-radius: 8px; text-align: center;">
+                <div style="font-size: 1.5em; font-weight: bold; color: var(--gold);">${customRotations.length}</div>
+                <div style="font-size: 0.8em; color: #aaa;">⚔️ ${t('自訂編隊')}</div>
+            </div>
+            <div style="flex: 1; background: rgba(207, 0, 255, 0.1); border: 1px solid var(--neon-purple); padding: 10px; border-radius: 8px; text-align: center;">
+                <div style="font-size: 1.5em; font-weight: bold; color: var(--neon-purple);">${savedLineups.length}</div>
+                <div style="font-size: 0.8em; color: #aaa;">💾 ${t('已記憶編隊')}</div>
+            </div>
+        </div>
+        <div style="margin-bottom:20px;">
+            <p style="color:#aaa; font-size:0.9em;">${t('備份將包含上述所有數據及當前排軸設定與隊伍編排。')}</p>
+            <textarea id="dm-code" rows="3" style="width:100%; padding:10px; background:rgba(0,0,0,0.5); color:var(--neon-green); border:1px solid var(--border-glass); border-radius:8px; resize:none;"></textarea>
+            <div style="display:flex; gap:10px; margin-top:10px;">
+                <button onclick="generateExportCode()" class="btn-action-all" style="flex:1;">📥 ${t('產生備份代碼')}</button>
+                <button onclick="confirmImportFromCode()" class="btn-action-clear" style="flex:1; background:#ff9800; border-color:#ff9800;">📤 ${t('匯入存檔代碼')}</button>
+            </div>
+        </div>
+        <div style="border-top:1px dashed var(--border-glass); padding-top:15px;">
+            <h4 style="color:var(--gold); margin-top:0;">📝 ${t('自訂編隊庫管理')}</h4>
+            <div id="dm-teams" style="max-height: 150px; overflow-y: auto; padding-right: 5px;"></div>
+        </div>
+    `;
+    let teamHtml = customRotations.length === 0 ? `<p style="color:#666; text-align:center;">${t('無自訂資料')}</p>` : customRotations.map((cr, i) => `
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; background:rgba(0,0,0,0.3); padding:10px 12px; border-radius:8px; border: 1px solid var(--border-glass);">
+            <span style="color:#ddd; font-size: 0.95em;">${cr.diff} <span style="color:var(--gold); font-weight:bold;">${t(cr.c1)} + ${t(cr.c2)} + ${t(cr.c3)}</span> (DPS: ${cr.dps}w)</span>
+            <button onclick="deleteCustomTeam(${i})" class="btn-action-clear" style="padding:4px 10px; font-size:0.85em; border-radius:6px; box-shadow:none;">❌ ${t('刪除')}</button>
+        </div>`).join('');
+    document.getElementById('dm-teams').innerHTML = teamHtml;
+    document.getElementById('data-manager-modal').style.display = 'flex';
+}
+
+function closeDataManager() { document.getElementById('data-manager-modal').style.display = 'none'; }
+
+function generateExportCode() {
+    let data = { roster: [...ownedCharacters], rotations: [...checkedRotations], customStats: customStatsMap, bossHp: bossHPHistory, customTeams: customRotations, savedLineups: savedLineups, bossHPMap: bossHPMap };
+    document.getElementById('dm-code').value = btoa(encodeURIComponent(JSON.stringify(data))); 
+    alert(t('✅ 存檔代碼已產生，請複製保存。'));
+}
+
+function confirmImportFromCode() {
+    if(confirm(t('這將會覆寫您目前所有的自訂與記憶隊伍設定，確定執行嗎？'))) { importFromCode(); }
+}
+
+function importFromCode() {
+    let code = document.getElementById('dm-code').value; if(!code) return;
+    try {
+        let data = JSON.parse(decodeURIComponent(atob(code)));
+        if(data.roster) safeStorageSet('ww_roster', data.roster);
+        if(data.rotations) safeStorageSet('ww_rotations', data.rotations);
+        if(data.customStats) safeStorageSet('ww_custom_stats', data.customStats);
+        if(data.bossHp) safeStorageSet('ww_boss_hp_history', data.bossHp);
+        if(data.customTeams) safeStorageSet('ww_custom_rotations_v2', data.customTeams);
+        if(data.savedLineups) safeStorageSet('ww_saved_lineups', data.savedLineups);
+        if(data.bossHPMap) safeStorageSet('ww_boss_hp', data.bossHPMap);
+        alert(t('✅ 設定已還原！即將重新載入頁面。')); window.location.reload();
+    } catch(e) { alert(t('❌ 解析失敗，請確認代碼正確。')); }
+}
+
+function deleteCustomTeam(index) {
+    if(!confirm(t('確定刪除？'))) return; 
+    let cr = customRotations.splice(index, 1)[0];
+    safeStorageSet('ww_custom_rotations_v2', customRotations);
+    dpsData = dpsData.filter(d => d.id !== 'custom_rot_' + cr.id); 
+    debouncedRenderAndTrack(); 
+    openDataManager(); 
+}
 // 啟動程式
 initializeApp();
