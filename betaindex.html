@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>鳴潮矩陣編隊工具(測試版)</title>
+    
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-FYW9EX8V5G"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-FYW9EX8V5G');
+    </script>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <style>
+        /* 基礎全域設定 */
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #1e1e24; color: #f5f5f5; padding: 20px; max-width: 1550px; margin: auto; box-sizing: border-box; }
+        *, *::before, *::after { box-sizing: inherit; }
+        h2 { border-bottom: 2px solid #d4af37; padding-bottom: 10px; margin-bottom: 5px; display: inline-block; color: #fff; }
+        .data-source { color: #aaa; font-size: 0.9em; margin-bottom: 15px; font-style: italic; display: flex; flex-wrap: wrap; align-items: center; gap: 15px; }
+        
+        /* 分頁標籤 (Tabs) 樣式 */
+        .tab-menu { display: flex; gap: 10px; margin-bottom: 20px; border-bottom: 2px solid #555; padding-bottom: 0; }
+        .tab-btn { background: #2b2b36; color: #aaa; border: 1px solid #555; border-bottom: none; padding: 12px 24px; font-size: 1.1em; cursor: pointer; border-radius: 8px 8px 0 0; font-weight: bold; transition: 0.3s; margin-bottom: -2px; }
+        .tab-btn:hover { background: #3f3f4e; color: #fff; }
+        .tab-btn.active { background: #1e1e24; color: #d4af37; border: 2px solid #d4af37; border-bottom: 2px solid #1e1e24; }
+        .page-content { display: none; animation: fadeIn 0.3s ease-in-out; }
+        .page-content.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* 面板與容器 */
+        .panel { background: #2b2b36; padding: 20px; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.5); margin-bottom: 20px; }
+        .container { display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-start; }
+        .pool-panel { flex: 1; min-width: 280px; max-height: 80vh; overflow-y: auto; position: sticky; top: 20px; }
+        .team-panel { flex: 2; min-width: 0; width: 100%; }
+        
+        /* 角色勾選 */
+        #roster-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; margin-bottom: 15px; }
+        .checkbox-item { background: #3f3f4e; padding: 8px 12px; border-radius: 5px; cursor: pointer; user-select: none; display: flex; align-items: center; gap: 6px; border: 1px solid #555; transition: 0.2s; font-size: 0.95em; width: 100%; }
+        .checkbox-item:hover { background: #4f4f60; filter: brightness(1.2); }
+        input[type="checkbox"] { cursor: pointer; transform: scale(1.2); }
+        
+        /* 表格區塊與拖曳特效 */
+        .table-responsive { width: 100%; overflow-x: auto; border-radius: 5px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; min-width: 1150px; }
+        th, td { border: 1px solid #444; padding: 12px 8px; text-align: center; vertical-align: middle; }
+        th { background-color: #3f3f4e; color: #d4af37; white-space: nowrap; }
+        
+        .draggable-row { cursor: grab; transition: background-color 0.2s; }
+        .draggable-row:active { cursor: grabbing; }
+        .dragging { opacity: 0.6; background-color: #3f3f4e !important; box-shadow: inset 0 0 10px #00ffaa; }
+        .drag-over { border-top: 3px solid #00ffaa; }
+
+        select.char-select { width: 100%; padding: 10px 5px; background: #1e1e24; color: #fff; border: 1px solid #555; border-radius: 5px; outline: none; font-size: 1em; cursor: pointer; min-height: 44px; }
+        option.recommended { color: #d4af37; font-weight: bold; background-color: #3f3f4e; }
+        option:disabled { color: #888; font-style: italic; background-color: #2b2b36; }
+        
+        /* 輸入框與按鈕 */
+        .score-input { width: 100%; padding: 6px; background: #1e1e24; color: #d4af37; border: 1px solid #d4af37; border-radius: 4px; font-weight: bold; text-align: center; margin-bottom: 5px; }
+        .hp-calc-input { width: 55px; padding: 4px; background: #1e2b24; color: #00ffaa; border: 1px solid #00ffaa; border-radius: 4px; font-size: 0.85em; text-align: center; outline: none; }
+        .hp-calc-select { padding: 4px; background: #1e2b24; color: #00ffaa; border: 1px solid #00ffaa; border-radius: 4px; font-size: 0.85em; text-align: center; cursor: pointer; outline: none; }
+        .res-chk-group { display: flex; justify-content: center; gap: 4px; margin-top: 5px; font-size: 0.85em; color: #aaa; }
+        .env-input { width: 85px; padding: 6px; background: #1e1e24; color: #00ffaa; border: 1px solid #555; border-radius: 4px; font-weight: bold; text-align: center; }
+        
+        .btn-reset-dps { background-color: #444; color: #fff; border: 1px solid #888; padding: 4px 8px; border-radius: 4px; font-size: 0.8em; cursor: pointer; transition: 0.2s; width: 100%; margin-top: 5px; }
+        .btn-reset-dps:hover { background-color: #d9534f; border-color: #d9534f; }
+        
+        .header-actions { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
+        .btn-reset { background-color: #d9534f; color: white; border: none; padding: 10px 15px; border-radius: 5px; font-size: 1em; cursor: pointer; font-weight: bold; }
+        .btn-apply { background-color: #4caf50; color: white; border: none; padding: 10px 15px; border-radius: 5px; font-size: 1em; cursor: pointer; font-weight: bold; }
+        .btn-export { background-color: #3498db; color: white; border: none; padding: 10px 15px; border-radius: 5px; font-size: 1em; cursor: pointer; font-weight: bold; }
+        .btn-report { background-color: #ff9800; color: #1e1e24; border: none; padding: 10px 15px; border-radius: 5px; font-size: 1em; cursor: pointer; font-weight: bold; }
+        
+        .btn-filter { border: none; border-radius: 5px; padding: 8px 12px; font-size: 0.9em; cursor: pointer; font-weight: bold; transition: 0.2s; background: #2b2b36; color: #777; border: 1px solid #444; }
+        .btn-filter.active-5star { background: #d4af37; color: #1e1e24; border: 1px solid #d4af37; }
+        .btn-filter.active-4star { background: #9b59b6; color: #fff; border: 1px solid #9b59b6; }
+        .btn-filter.active-gen { background: #34495e; color: #fff; border: 1px solid #34495e; }
+        .btn-diff { border: none; border-radius: 5px; padding: 8px 12px; font-size: 0.95em; cursor: pointer; font-weight: bold; transition: 0.2s; background: #2b2b36; color: #777; border: 1px solid #444; }
+        .btn-diff.active-diff-1 { background: #4caf50; color: white; border-color: #4caf50; }
+        .btn-diff.active-diff-2 { background: #2196f3; color: white; border-color: #2196f3; }
+        .btn-diff.active-diff-3 { background: #ffb300; color: white; border-color: #ffb300; }
+        .btn-diff.active-diff-4 { background: #d32f2f; color: white; border-color: #d32f2f; }
+        .btn-diff.active-diff-5 { background: #8e44ad; color: white; border-color: #8e44ad; }
+
+        .preset-filters { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; align-items: center; border-bottom: 1px dashed #555; padding-bottom: 12px; }
+        .btn-preset-filter { border: 1px solid #444; border-radius: 5px; padding: 6px 10px; font-size: 0.9em; cursor: pointer; font-weight: bold; transition: 0.2s; background: #2b2b36; color: #777; }
+        .btn-preset-filter:hover { filter: brightness(1.2); }
+        .btn-preset-filter.active-attr-冷凝 { background: #00bcd4; color: #1e1e24; border-color: #00bcd4; }
+        .btn-preset-filter.active-attr-熱熔 { background: #ff5722; color: #fff; border-color: #ff5722; }
+        .btn-preset-filter.active-attr-導電 { background: #9c27b0; color: #fff; border-color: #9c27b0; }
+        .btn-preset-filter.active-attr-氣動 { background: #4caf50; color: #fff; border-color: #4caf50; }
+        .btn-preset-filter.active-attr-衍射 { background: #ffc107; color: #1e1e24; border-color: #ffc107; }
+        .btn-preset-filter.active-attr-湮滅 { background: #e91e63; color: #fff; border-color: #e91e63; }
+        .btn-preset-filter.active-gen { background: #34495e; color: #fff; border-color: #34495e; }
+        
+        .preset-box { background: #3f3f4e; padding: 15px; border-radius: 5px; margin-bottom: 15px; border: 1px solid #555; }
+        .preset-controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+        .preset-controls select { flex: 1; min-width: 250px; width: auto; padding: 8px; background: #1e1e24; color: #fff; border: 1px solid #555; border-radius: 4px; }
+
+        .char-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px dashed #444; font-size: 0.95em; }
+        .count-badge { background: #4caf50; padding: 4px 8px; border-radius: 12px; font-weight: bold; font-size: 0.85em; white-space: nowrap; }
+        .count-empty { background: #ff4d4d; color: white; opacity: 0.6; }
+        .type-title { color: #d4af37; margin-top: 15px; margin-bottom: 10px; font-size: 1.1em; font-weight: bold; border-bottom: 1px solid #555; padding-bottom: 5px; position: sticky; top: 0; background: #2b2b36; z-index: 10; }
+
+        /* 隱藏元素與動畫 */
+        #lang-toggle { position: absolute; top: 25px; right: 25px; background: #d4af37; color: #1e1e24; border: none; padding: 10px 22px; border-radius: 8px; font-weight: bold; font-size: 1.1em; cursor: pointer; transition: 0.2s; box-shadow: 0 4px 8px rgba(0,0,0,0.4); z-index: 100; }
+        #lang-toggle:hover { filter: brightness(1.1); transform: scale(1.05); }
+        
+        .btn-data-manager { position: absolute; top: 25px; right: 120px; background: #00ffaa; color: #1e1e24; border: none; padding: 10px 15px; border-radius: 8px; font-weight: bold; font-size: 1.1em; cursor: pointer; transition: 0.2s; box-shadow: 0 4px 8px rgba(0,255,170,0.4); z-index: 100; }
+        .btn-data-manager:hover { filter: brightness(1.1); transform: scale(1.05); }
+
+        input[type="range"] { -webkit-appearance: none; appearance: none; background: transparent; cursor: pointer; }
+        input[type="range"]::-webkit-slider-runnable-track { background: #444; height: 6px; border-radius: 3px; }
+        input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; margin-top: -6px; background-color: #cf00ff; height: 18px; width: 18px; border-radius: 50%; box-shadow: 0 0 10px rgba(207,0,255,0.8); }
+        
+        .hp-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; margin-top: 10px; padding: 15px; background: #1e2b24; border-radius: 8px; border: 1px dashed #00ffaa; }
+        .hp-item { display: flex; flex-direction: column; gap: 4px; }
+        .hp-label { font-size: 0.85em; color: #aaa; }
+        .hp-input { padding: 4px; background: #1e1e24; color: #fff; border: 1px solid #555; border-radius: 4px; text-align: center; font-family: monospace; }
+        .calibrated { color: #ffaa00 !important; border-color: #ffaa00 !important; }
+        .btn-calib { background: #d9534f; color: white; border: 1px solid #ff4d4d; border-radius: 4px; font-size: 0.7em; cursor: pointer; padding: 4px; margin-top: 2px; animation: blink 1.5s infinite; font-weight: bold; }
+        @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0.6; } 100% { opacity: 1; } }
+
+        /* Modal Overlay 共用樣式 */
+        .modal-overlay { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); z-index:2000; align-items:center; justify-content:center; backdrop-filter: blur(3px); }
+        
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #1e1e24; }
+        ::-webkit-scrollbar-thumb { background: #555; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #777; }
+
+        @media (max-width: 768px) {
+            .container { flex-direction: column; }
+            .pool-panel { width: 100%; position: static; max-height: 350px; }
+            #lang-toggle { top: 15px; right: 15px; padding: 8px 16px; font-size: 1em; }
+            .btn-data-manager { top: 15px; right: 100px; padding: 8px 12px; font-size: 0.9em; }
+        }
+    </style>
+</head>
+<body>
+
+    <button id="lang-toggle" onclick="toggleLang()">简 / 繁</button>
+    <button class="btn-data-manager" onclick="openDataManager()">⚙️ 數據總管與備份</button>
+    
+    <h2>鳴潮矩陣編隊工具 <span style="font-size: 0.5em; color: #cf00ff;">vBeta (測試版)</span></h2>
+    
+    <div class="data-source">
+        <span>📊 數據庫設計與邏輯：AI架構 / 數據提供：QuichilOvO、南邊 / 整理：Kolton / 流量統計：Google Analytics</span>
+        <a href="https://github.com/IndyChen/DPM-Team-Builder/issues" target="_blank" style="display: inline-block; background: #333; color: #fff; text-decoration: none; padding: 4px 10px; border-radius: 5px; border: 1px solid #555; font-size: 0.9em; transition: 0.2s;">
+            🐛 報錯與意見回饋 (GitHub Issues)
+        </a>
+        <a href="index.html" class="btn-reset" style="background: #34495e; padding: 4px 10px; font-size: 0.9em; text-decoration: none;">
+            🔙 返回正式版 (v4.7.4)
+        </a>
+    </div>
+
+    <div class="tab-menu">
+        <button class="tab-btn active" onclick="switchTab('page1', this)">📄 第一步：角色與排軸設定</button>
+        <button class="tab-btn" onclick="switchTab('page2', this)">📄 第二步：矩陣編隊與實戰推演</button>
+    </div>
+
+    <div id="page1" class="page-content active">
+        
+        <div style="display: flex; gap: 20px; flex-wrap: wrap;">
+            <details open style="flex: 1; min-width: 300px; background: #1e2b24; padding: 10px 15px; border-radius: 8px; border: 1px solid #2e5c3e; margin-bottom: 20px; cursor: pointer;">
+                <summary style="color: #4caf50; font-weight: bold; outline: none; font-size: 1.1em;">📖 歡迎使用！點此查看「頁面操作指南」與「Beta 版亮點」</summary>
+                <div style="margin-top: 15px; font-size: 0.95em; color: #ddd; line-height: 1.6; border-top: 1px dashed #2e5c3e; padding-top: 15px;">
+                    <strong style="color: #fff; font-size: 1.05em;">【當前頁面：角色與排軸設定】</strong><br>
+                    <ul style="margin: 5px 0 10px 20px; padding: 0; color: #ccc;">
+                        <li style="margin-bottom: 5px;"><strong>選擇角色：</strong>請在下方勾選您目前擁有的角色，系統會自動計算您可用的組隊次數。</li>
+                        <li style="margin-bottom: 5px;"><strong>篩選排軸難度：</strong>根據您的手法，勾選您有把握的排軸難度 (如🟩輪椅、⭐進階)。系統只會顯示您可以組建的隊伍。</li>
+                        <li style="margin-bottom: 5px;"><strong>微調穩定性：</strong>若您的手法容易失誤，可以透過拉桿微調「全局」或「各難度」的達成率，系統將自動折算您的實戰傷害下限。</li>
+                    </ul>
+
+                    <strong style="color: #00ffaa; font-size: 1.05em;">【下一頁預告：矩陣編隊與實戰推演】</strong><br>
+                    <ul style="margin: 5px 0 10px 20px; padding: 0; color: #ccc;">
+                        <li style="margin-bottom: 5px;">完成設定後，點擊右下角按鈕前往下一頁。</li>
+                        <li style="margin-bottom: 5px;">您可以在該頁面進行<strong>「一鍵自動編隊」</strong>，或是手動排兵布陣。</li>
+                        <li>該頁面亦提供硬核的<strong>「實戰分數反推與無損洗牌重排」</strong>功能，幫助您找出最優的出戰順序。</li>
+                    </ul>
+                    
+                    <div style="background: rgba(207, 0, 255, 0.1); border-left: 4px solid #cf00ff; padding: 12px; margin-top: 20px; border-radius: 4px;">
+                        <strong style="color: #cf00ff; font-size: 1.1em;">🚧 Beta 測試版專屬功能：</strong><br>
+                        <div style="margin-top: 5px; color: #ddd;">
+                            您目前正在使用的是實驗性質的 <strong>v4.8-Beta</strong>！我們在這個版本實裝了最硬核的系統：<br>
+                            1. <strong>【數據總管與備份】(右上角按鈕)</strong>：支援全設定檔的匯出/匯入代碼，並能手動剔除錯誤的王血量校正樣本。<br>
+                            2. <strong>【拖曳式排兵布陣】</strong>：在第二頁的編隊表格，您可以直接用滑鼠「按住並拖曳」隊伍來交換順序！<br>
+                            3. <strong>【新增自訂編隊】</strong>：允許您將自己開發的隊伍與測出的 DPS 永久存入系統中。
+                        </div>
+                    </div>
+                </div>
+            </details>
+        </div>
+
+        <div class="panel">
+            <details open>
+                <summary style="font-size: 1.17em; font-weight: bold; color: #fff; cursor: pointer; border-bottom: 2px solid #d4af37; padding-bottom: 10px; outline: none;">
+                    1. 勾選擁有的角色
+                </summary>
+                <div style="margin-top: 15px;">
+                    <div class="header-actions" style="margin-bottom: 10px; justify-content: flex-start; gap: 10px;">
+                        <button id="roster-switch" class="btn-reset" onclick="rosterCheckboxButton()">🗑️ 清空角色勾選</button>
+                        <div style="display: flex; gap: 5px;">
+                            <button id="btn-5star" class="btn-filter active-5star" onclick="toggleRarity(5)">🌟 5星</button>
+                            <button id="btn-4star" class="btn-filter active-4star" onclick="toggleRarity(4)">⭐ 4星</button>
+                        </div>
+                        <div style="display: flex; gap: 5px;">
+                            <button id="btn-g1" class="btn-filter active-gen" onclick="toggleGen(1)">1.X版</button>
+                            <button id="btn-g2" class="btn-filter active-gen" onclick="toggleGen(2)">2.X版</button>
+                            <button id="btn-g3" class="btn-filter active-gen" onclick="toggleGen(3)">3.X版</button>
+                        </div>
+                        <input type="text" id="char-search" placeholder="🔍 搜尋擁有角色..." oninput="filterCharacters()" style="padding: 8px 12px; border-radius: 5px; border: 1px solid #555; background: #1e1e24; color: #fff; flex: 1; outline: none; margin-left: auto; max-width: 200px;">
+                    </div>
+                    <div id="roster-setup"></div>
+                </div>
+            </details>
+        </div>
+
+        <div class="panel">
+            <details open>
+                <summary style="font-size: 1.17em; font-weight: bold; color: #fff; cursor: pointer; border-bottom: 2px solid #d4af37; padding-bottom: 10px; outline: none;">
+                    2. 配置實戰排軸 (僅顯示可組建的隊伍)
+                </summary>
+                <div class="header-actions" style="margin: 15px 0; justify-content: flex-start; gap: 15px;">
+                    <button id="rot-all-btn" class="btn-reset" onclick="toggleAllRotations()">🗑️ 清空所有排軸</button>
+                    <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+                        <button id="btn-diff-1" class="btn-diff active-diff-1" onclick="toggleDifficulty('🟩')">🟩 輪椅</button>
+                        <button id="btn-diff-2" class="btn-diff active-diff-2" onclick="toggleDifficulty('🔵')">🔵 中等</button>
+                        <button id="btn-diff-3" class="btn-diff active-diff-3" onclick="toggleDifficulty('⭐')">⭐ 進階</button>
+                        <button id="btn-diff-4" class="btn-diff active-diff-4" onclick="toggleDifficulty('⚠️')">⚠️ 極難</button>
+                        <button id="btn-diff-5" class="btn-diff active-diff-5" onclick="toggleDifficulty('🧩')">🧩 非主流</button>
+                    </div>
+                    
+                    <button class="btn-apply" onclick="openCustomTeamModal()" style="background: #ff9800; color: #1e1e24; box-shadow: 0 0 8px rgba(255,152,0,0.5);">➕ 新增自訂編隊</button>
+                    
+                    <input type="text" id="rot-search" placeholder="🔍 搜尋排軸角色..." oninput="filterRotations()" style="padding: 8px 12px; border-radius: 5px; border: 1px solid #555; background: #1e1e24; color: #fff; flex: 1; outline: none; max-width: 250px;">
+                </div>
+
+                <div style="margin-bottom: 15px; width: 100%; display: flex; flex-direction: column; background: #2b2b36; padding: 15px 20px; border-radius: 8px; border: 1px solid #555;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 10px;">
+                        <span style="color: #d4af37; font-weight: bold; font-size: 1.1em;">🎯 全局操作達成率 (自動依難度換算折損)</span>
+                        <div style="display: flex; align-items: center; gap: 15px;">
+                            <button onclick="openCalcModal()" style="background:#cf00ff; color:#fff; border:none; padding:5px 10px; border-radius:5px; cursor:pointer; font-weight:bold; box-shadow:0 0 8px rgba(207,0,255,0.5);">⏱️ 內建軸穩定性計算器</button>
+                            <span id="skill-display" style="color: #cf00ff; font-weight: bold; font-size: 1.2em;">100%</span>
+                        </div>
+                    </div>
+                    <input type="range" id="skill-slider" min="50" max="100" value="100" style="width: calc(100% - 20px); margin: 10px 10px;" oninput="updateMasterSkill()">
+                    
+                    <details style="margin-top: 10px; width: 100%;">
+                        <summary style="color: #aaa; cursor: pointer; font-size: 0.9em; outline: none;">⚙️ 依排軸難度微調各別穩定性 (點擊展開)</summary>
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; margin-top: 10px; padding: 15px; background: #1e1e24; border-radius: 8px; border: 1px solid #444;">
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <span style="width: 70px; color: #d32f2f; font-weight: bold;">⚠️ 極難:</span>
+                                <input type="range" id="slider-diff-4" min="0" max="100" value="100" style="flex: 1; margin: 0 10px;" oninput="updateSubSkill('⚠️', 'slider-diff-4', 'val-diff-4')">
+                                <span id="val-diff-4" style="width: 45px; text-align: right; color: #fff; font-weight: bold;">100%</span>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <span style="width: 70px; color: #ffb300; font-weight: bold;">⭐ 進階:</span>
+                                <input type="range" id="slider-diff-3" min="0" max="100" value="100" style="flex: 1; margin: 0 10px;" oninput="updateSubSkill('⭐', 'slider-diff-3', 'val-diff-3')">
+                                <span id="val-diff-3" style="width: 45px; text-align: right; color: #fff; font-weight: bold;">100%</span>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <span style="width: 70px; color: #2196f3; font-weight: bold;">🔵 中等:</span>
+                                <input type="range" id="slider-diff-2" min="0" max="100" value="100" style="flex: 1; margin: 0 10px;" oninput="updateSubSkill('🔵', 'slider-diff-2', 'val-diff-2')">
+                                <span id="val-diff-2" style="width: 45px; text-align: right; color: #fff; font-weight: bold;">100%</span>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <span style="width: 70px; color: #4caf50; font-weight: bold;">🟩 輪椅:</span>
+                                <input type="range" id="slider-diff-1" min="0" max="100" value="100" style="flex: 1; margin: 0 10px;" oninput="updateSubSkill('🟩', 'slider-diff-1', 'val-diff-1')">
+                                <span id="val-diff-1" style="width: 45px; text-align: right; color: #fff; font-weight: bold;">100%</span>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <span style="width: 70px; color: #8e44ad; font-weight: bold;">🧩 非主流:</span>
+                                <input type="range" id="slider-diff-5" min="0" max="100" value="100" style="flex: 1; margin: 0 10px;" oninput="updateSubSkill('🧩', 'slider-diff-5', 'val-diff-5')">
+                                <span id="val-diff-5" style="width: 45px; text-align: right; color: #fff; font-weight: bold;">100%</span>
+                            </div>
+                        </div>
+                    </details>
+                </div>
+
+                <div id="rotation-setup" style="max-height: 400px; overflow-y: auto; padding-right: 10px;"></div>
+            </details>
+        </div>
+        <div style="text-align: right;">
+            <button class="btn-apply" onclick="switchTab('page2', document.querySelectorAll('.tab-btn')[1])" style="font-size: 1.2em; padding: 15px 30px;">前往下一步：編隊與推演 ➡️</button>
+        </div>
+    </div>
+
+    <div id="page2" class="page-content">
+        
+        <details open style="background: #1e2b24; padding: 10px 15px; border-radius: 8px; border: 1px solid #2e5c3e; margin-bottom: 20px; cursor: pointer;">
+            <summary style="color: #4caf50; font-weight: bold; outline: none; font-size: 1.1em;">📖 點此查看「實戰編隊與推演功能」操作指南</summary>
+            <div style="margin-top: 15px; font-size: 0.95em; color: #ddd; line-height: 1.6; border-top: 1px dashed #2e5c3e; padding-top: 15px;">
+                <strong style="color: #fff; font-size: 1.05em;">【第一步：一鍵理論編隊】</strong><br>
+                如果您只是想知道手邊的角色能組出什麼最高分的隊伍，請直接點擊表格上方的<strong>「🔥 一鍵編制 (理論推演)」</strong>。系統會自動幫您配好隊伍。<br><br>
+                
+                <strong style="color: #00ffaa; font-size: 1.05em;">【第二步：拖曳排兵與實戰反推】</strong><br>
+                <ul style="margin: 5px 0 10px 20px; padding: 0; color: #ccc;">
+                    <li style="margin-bottom: 5px; color: #ffaa00;"><strong>🖱️ 拖曳排刀 (Beta 新功能)：</strong>您可以直接使用滑鼠「按住並拖曳」表格，自由交換隊伍的上場順序！</li>
+                    <li style="margin-bottom: 5px;">在表格內的<strong>「實戰得分」</strong>欄位，填入該隊打完結算的總分。</li>
+                    <li style="margin-bottom: 5px;">勾選該隊伍遭遇抗性的是第幾隻王 `[1] [2] [3] [4]`（若有）。</li>
+                    <li style="margin-bottom: 5px;"><strong>殘血推演與代數校正：</strong>若該隊伍沒把王打死，請在「🎯終:」下拉選單選擇終點王 (如 R2-2)，並在「🩸剩:」輸入剩餘血量 %。</li>
+                    <li style="margin-bottom: 5px;">最後，點擊 <strong>「🔄 依實戰得分反推與無損重排」</strong>。系統會精準扣除轉場延遲與抗性干擾，推算真實 DPS。<strong>系統會「完全記憶」您表單上的隊伍成員，為您無損重新排序最佳出戰順序！</strong></li>
+                </ul>
+            </div>
+        </details>
+
+        <div class="container">
+            <div class="panel pool-panel">
+                <h3>3. 剩餘可用次數</h3>
+                <div id="tracker"></div>
+            </div>
+            
+            <div class="panel team-panel">
+                <div class="header-actions" style="margin-bottom: 15px; flex-direction: column; align-items: flex-start; gap: 15px;">
+                    <h3 style="margin: 0; width: 100%;">4. 隊伍編排 (極限上限16隊)</h3>
+                    
+                    <div style="display: flex; flex-wrap: wrap; gap: 15px; width: 100%; align-items: flex-start;">
+                        <div style="display: flex; gap: 15px; flex-wrap: wrap; align-items: flex-start; background: #3f3f4e; padding: 12px; border-radius: 8px; border: 1px solid #555;">
+                            <div style="display: flex; flex-direction: column; gap: 6px;">
+                                <button class="btn-apply" onclick="autoBuildMaxDpsTeams()" style="background: #cf00ff; box-shadow: 0 0 10px rgba(207,0,255,0.4); padding: 10px 20px;">🔥 一鍵編制 (理論推演)</button>
+                                <span style="color: #aaa; font-size: 0.75em; max-width: 180px;">*依據理論最高 DPS，自動為您滿編</span>
+                            </div>
+                            
+                            <div style="width: 1px; background: #555; height: 50px; margin: 0 5px;"></div>
+                            
+                            <div style="display: flex; flex-direction: column; gap: 6px;">
+                                <button class="btn-apply" onclick="reverseInferAndOptimize()" style="background: #00ffaa; box-shadow: 0 0 10px rgba(0,255,170,0.4); padding: 10px 20px; color: #1e1e24;">🔄 依實戰得分反推與無損重排</button>
+                                <span style="color: #aaa; font-size: 0.75em; max-width: 260px;">*根據表格分數反推真實 DPS 後，將<strong>現有隊伍無損洗牌</strong>為最優順序！</span>
+                            </div>
+                        </div>
+                        
+                        <div style="flex-grow: 1;"></div>
+                        
+                        <div style="display: flex; flex-direction: column; gap: 10px; align-items: flex-end;">
+                            <div style="display: flex; gap: 10px;">
+                                <button class="btn-reset" onclick="resetTeams()" style="height: fit-content; padding: 8px 15px;">🗑️ 重設編制</button>
+                                <button class="btn-export" onclick="exportImage()" style="height: fit-content; padding: 8px 15px;">📷 截圖分享</button>
+                            </div>
+                            <button class="btn-report" onclick="submitToGoogleForm()" title="將您本次排出的矩陣波次與分數傳送給開發者，協助校正王血量公式！">📤 貢獻實戰大數據</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="preset-box" style="border: 1px solid #00ffaa; box-shadow: inset 0 2px 10px rgba(0,255,170,0.1);">
+                    <details open>
+                        <summary style="color:#00ffaa; font-weight:bold; font-size:1.1em; cursor:pointer; outline:none; margin-bottom: 10px;">
+                            🌌 矩陣實戰接力推演與環境設定 (影響分數與轉場計算)
+                        </summary>
+                        <div style="display: flex; flex-wrap: wrap; gap: 15px; padding-top: 10px; border-top: 1px dashed #555; font-size: 0.9em;">
+                            <div style="display: flex; flex-direction: column; gap: 5px;">
+                                <label>計分比例(分/萬):</label>
+                                <input type="number" id="env-ratio" class="env-input" style="color:#d4af37; border-color:#d4af37;" value="10" step="1" title="每 1 萬傷害等於多少分數 (預設 10 = 0.1萬得1分)" oninput="updateTracker()">
+                            </div>
+                            <div style="display: flex; flex-direction: column; gap: 5px;">
+                                <label>R1 均血(萬):</label>
+                                <input type="number" id="env-r1" class="env-input" value="400.89" step="10" oninput="resetIndividualHP(); updateTracker();">
+                            </div>
+                            <div style="display: flex; flex-direction: column; gap: 5px;">
+                                <label>R2 均血(萬):</label>
+                                <input type="number" id="env-r2" class="env-input" value="783.56" step="10" title="R2-1猩猩系統內建特例判定546.67萬" oninput="resetIndividualHP(); updateTracker();">
+                            </div>
+                            <div style="display: flex; flex-direction: column; gap: 5px;">
+                                <label>R3 均血(萬):</label>
+                                <input type="number" id="env-r3" class="env-input" value="1384.9" step="10" oninput="resetIndividualHP(); updateTracker();">
+                            </div>
+                            <div style="display: flex; flex-direction: column; gap: 5px;">
+                                <label>後續成長(%):</label>
+                                <input type="number" id="env-growth" class="env-input" value="5" step="1" title="R4以後每階血量成長率" oninput="resetIndividualHP(); updateTracker();">
+                            </div>
+                            <div style="display: flex; flex-direction: column; gap: 5px;">
+                                <label>抗性減傷(%):</label>
+                                <input type="number" id="env-res" class="env-input" style="color:#ffaa00; border-color:#ffaa00;" value="40" step="5" title="當隊伍遭遇抗性王時，降低的DPS百分比" oninput="updateTracker()">
+                            </div>
+                            <div style="display: flex; flex-direction: column; gap: 5px;">
+                                <label>轉場耗時(秒):</label>
+                                <input type="number" id="env-trans" class="env-input" value="1.5" step="0.1" title="擊殺BOSS後的出場動畫延遲" oninput="updateTracker()">
+                            </div>
+                            <div style="display: flex; flex-direction: column; gap: 5px;">
+                                <label>單隊時限(秒):</label>
+                                <input type="number" id="env-time" class="env-input" style="color:#cf00ff; border-color:#cf00ff;" value="120" step="10" oninput="updateTracker()">
+                            </div>
+                        </div>
+                        
+                        <details style="margin-top: 15px; border-top: 1px dashed #555; padding-top: 10px;">
+                            <summary style="color:#aaa; font-size:0.9em; cursor:pointer; outline:none;">🧮 進階：個別 BOSS 血量覆寫與代數反解校正面板 (點擊展開)</summary>
+                            <div style="font-size: 0.85em; color: #888; margin-top: 5px;">
+                                * 當您填寫表格中的「終點王殘血反解」與分數後，系統會自動將其加入背景的代數校正池。若需要剔除錯誤樣本，請前往右上角的「⚙️ 數據總管與備份」進行管理。
+                            </div>
+                            <div id="individual-hp-container" class="hp-grid"></div>
+                        </details>
+                    </details>
+                </div>
+
+                <div class="preset-box">
+                    <div class="preset-filters">
+                        <span style="color:#d4af37; font-weight:bold; margin-right:5px;">🔍 主輸出篩選：</span>
+                        <button class="btn-preset-filter" data-attr="冷凝" onclick="togglePresetAttr('冷凝')">❄️ 冷凝</button>
+                        <button class="btn-preset-filter" data-attr="熱熔" onclick="togglePresetAttr('熱熔')">🔥 熱熔</button>
+                        <button class="btn-preset-filter" data-attr="導電" onclick="togglePresetAttr('導電')">⚡ 導電</button>
+                        <button class="btn-preset-filter" data-attr="氣動" onclick="togglePresetAttr('氣動')">🌪️ 氣動</button>
+                        <button class="btn-preset-filter" data-attr="衍射" onclick="togglePresetAttr('衍射')">✨ 衍射</button>
+                        <button class="btn-preset-filter" data-attr="湮滅" onclick="togglePresetAttr('湮滅')">🌑 湮滅</button>
+                        <span style="color:#aaa; font-size:0.9em; margin-left:10px;">世代：</span>
+                        <button class="btn-preset-filter" data-gen="1" onclick="togglePresetGen('1')">1.X</button>
+                        <button class="btn-preset-filter" data-gen="2" onclick="togglePresetGen('2')">2.X</button>
+                        <button class="btn-preset-filter" data-gen="3" onclick="togglePresetGen('3')">3.X</button>
+                    </div>
+                    <div class="preset-controls">
+                        <label>🔥 推薦配隊快速填入：</label>
+                        <select id="preset-select"></select>
+                        <button class="btn-apply" onclick="applyPreset()">➕ 填入下一空位</button>
+                    </div>
+                </div>
+
+                <div style="background:#2b2b36; padding:15px; border-radius:8px; margin-bottom:15px; border:1px solid #444; box-shadow: inset 0 2px 5px rgba(0,0,0,0.3);">
+                    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap: wrap; gap: 10px;">
+                        <span style="color:#00ffaa; font-weight:bold; font-size:1.1em;">⚔️ 當前編隊 矩陣接力推演總分：</span>
+                        <span id="matrix-total-score" style="color:#cf00ff; font-weight:bold; font-size:1.4em; text-shadow:0 0 8px rgba(207,0,255,0.6);">0 分</span>
+                    </div>
+                </div>
+                
+                <div style="font-size: 0.9em; color: #ffaa00; margin-bottom: 10px; font-weight: bold; background: rgba(255, 170, 0, 0.1); padding: 8px; border-radius: 5px; border-left: 4px solid #ffaa00;">
+                    ⚠️ 提示：在表格內填寫【實戰得分】並點擊反推，系統會自動修改該隊伍的「自訂 DPS」。若要還原，請點擊該隊伍下方的「🔄 重設預設 DPS」。
+                </div>
+
+                <div class="table-responsive">
+                    <table>
+                        <thead><tr>
+                            <th width="4%">排序</th>
+                            <th width="14%">位置 1 (主C)</th>
+                            <th width="14%">位置 2 (副C)</th>
+                            <th width="14%">位置 3 (生存)</th>
+                            <th width="24%" style="color:#d4af37;">實戰得分 / 殘血反解與抗性</th>
+                            <th width="30%" style="background:#1e2b24; color:#00ffaa; letter-spacing: 1px;">推演戰果 (接力波次進度)</th>
+                        </tr></thead>
+                        <tbody id="team-board"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="stats-modal" class="modal-overlay">
+        <div style="background:#2b2b36; padding:25px; border-radius:10px; border:1px solid #d4af37; width:340px; box-shadow: 0 0 20px rgba(0,0,0,0.8);">
+            <h3 style="margin-top:0; color:#d4af37; font-size:1.2em; text-align:center;">📊 填寫檢測數據與環境加權</h3>
+            <p id="stats-modal-rot" style="color:#aaa; font-size:0.9em; text-align:center; margin-bottom: 20px; border-bottom: 1px dashed #555; padding-bottom: 10px;"></p>
+            <label style="display:block; margin-bottom:12px; font-weight:bold;">⚔️ 真實 DPS (萬): 
+                <input type="number" id="stats-dps" step="0.01" style="width:100%; padding:8px; background:#1e1e24; color:#fff; border:1px solid #555; border-radius:4px; margin-top:5px;">
+            </label>
+            <label style="display:block; margin-bottom:12px; font-weight:bold;">⚖️ 穩定性 (%): 
+                <input type="number" id="stats-stab" min="0" max="100" style="width:100%; padding:8px; background:#1e1e24; color:#fff; border:1px solid #555; border-radius:4px; margin-top:5px;">
+            </label>
+            <label style="display:block; margin-bottom:20px; font-weight:bold; color:#00ffaa;">🌟 當期屬性增傷加權 (%): 
+                <input type="number" id="stats-buff" step="1" style="width:100%; padding:8px; background:#1e2b24; color:#00ffaa; border:1px solid #00ffaa; border-radius:4px; margin-top:5px;">
+            </label>
+            <div style="display:flex; justify-content:space-between; gap: 10px;">
+                <button onclick="closeStatsModal()" style="flex:1; padding:8px; background:#555; color:#fff; border:none; border-radius:4px; cursor:pointer;">取消</button>
+                <button onclick="clearStatsModal()" style="flex:1; padding:8px; background:#d9534f; color:#fff; border:none; border-radius:4px; cursor:pointer;">清除自訂</button>
+                <button onclick="saveStatsModal()" style="flex:1; padding:8px; background:#4caf50; color:#fff; border:none; border-radius:4px; cursor:pointer; font-weight:bold;">儲存</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="calc-modal" class="modal-overlay">
+        <div style="background:#1e1e24; padding:25px; border-radius:10px; border:2px solid #cf00ff; width:400px; box-shadow: 0 0 30px rgba(207,0,255,0.4);">
+            <h3 style="margin-top:0; color:#cf00ff; font-size:1.3em; text-align:center;">⏱️ 實戰手法穩定性檢測</h3>
+            <label style="display:block; margin-bottom:10px; font-weight:bold; color:#d4af37;">📏 基準理論耗時 (秒): 
+                <input type="number" id="calc-base-time" step="0.1" value="25" style="width:100%; padding:8px; background:#2b2b36; color:#fff; border:1px solid #555; border-radius:4px; margin-top:5px;">
+            </label>
+            <label style="display:block; margin-bottom:15px; font-weight:bold; color:#d4af37;">📝 實測耗時紀錄 (秒): 
+                <textarea id="calc-times" rows="3" style="width:100%; padding:8px; background:#2b2b36; color:#fff; border:1px solid #555; border-radius:4px; margin-top:5px; resize:none;" placeholder="以逗號分隔"></textarea>
+            </label>
+            <button onclick="calculateStability()" style="width:100%; padding:10px; background:#cf00ff; color:#fff; border:none; border-radius:5px; cursor:pointer; font-weight:bold; font-size:1.1em; margin-bottom:15px;">執行檢測分析</button>
+            <div id="calc-result" style="display:none; background:#2b2b36; padding:15px; border-radius:8px; border:1px dashed #cf00ff; margin-bottom:15px;">
+                <div style="display:flex; justify-content:space-between; margin-bottom:5px;"><span>平均耗時:</span> <strong id="calc-res-mean" style="color:#fff;">0.00 秒</strong></div>
+                <div style="display:flex; justify-content:space-between; margin-bottom:5px;"><span>節奏標準差 (σ):</span> <strong id="calc-res-std" style="color:#ffb300;">0.00 秒</strong></div>
+                <div style="display:flex; justify-content:space-between; margin-bottom:5px;"><span>綜合穩定性:</span> <strong id="calc-res-stab" style="color:#cf00ff;">0 %</strong></div>
+            </div>
+            <div style="display:flex; justify-content:space-between; gap: 10px;">
+                <button onclick="closeCalcModal()" style="flex:1; padding:8px; background:#555; color:#fff; border:none; border-radius:4px; cursor:pointer;">關閉</button>
+                <button onclick="applyCalculatedStability()" style="flex:2; padding:8px; background:#4caf50; color:#fff; border:none; border-radius:4px; cursor:pointer; font-weight:bold;">套用至全局拉桿</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="data-manager-modal" class="modal-overlay">
+        <div style="background:#2b2b36; padding:25px; border-radius:10px; border:2px solid #00ffaa; width:700px; max-width:95vw; max-height:85vh; overflow-y:auto; box-shadow: 0 0 30px rgba(0,255,170,0.3);">
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px dashed #555; padding-bottom: 15px; margin-bottom: 20px;">
+                <h2 style="margin: 0; color: #00ffaa;">⚙️ 數據總管與備份</h2>
+                <button onclick="closeDataManager()" style="background:#d9534f; color:#fff; border:none; padding:8px 15px; border-radius:5px; font-weight:bold; cursor:pointer;">關閉</button>
+            </div>
+            
+            <div id="data-manager-content"></div>
+            
+        </div>
+    </div>
+
+    <div id="custom-team-modal" class="modal-overlay">
+        </div>
+
+    <script src="betaapp.js"></script>
+</body>
+</html>
