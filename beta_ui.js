@@ -4,9 +4,20 @@
 // 職責：DOM 操作、事件監聽、畫面更新、圖表與彈窗
 // ==========================================
 
-// ⚠️ 注意：所有全域變數 (dpsData 等) 與防抖 (debouncedUpdateTracker) 已在 beta_core.js 中宣告，此處直接使用。
+// --- 1. 防呆原生防抖事件綁定 (解決跨檔案 Scope 崩潰問題) ---
+let _trackerTimeout = null;
+function debouncedUpdateTracker() {
+    clearTimeout(_trackerTimeout);
+    _trackerTimeout = setTimeout(() => { updateTracker(); }, 300);
+}
 
-// --- 1. 語系與 DOM 翻譯 ---
+let _renderTimeout = null;
+function debouncedRenderAndTrack() {
+    clearTimeout(_renderTimeout);
+    _renderTimeout = setTimeout(() => { renderRotations(); updateTracker(); updateToggleButtons(); }, 150);
+}
+
+// --- 2. 語系與 DOM 翻譯 ---
 function translateDOM(node) {
     let walker = document.createTreeWalker(node, NodeFilter.SHOW_TEXT, null, false);
     let n;
@@ -47,7 +58,7 @@ function switchTab(pageId, btnElement) {
     window.scrollTo(0, 0);
 }
 
-// --- 2. 畫面初始化 (App Bootstrapper) ---
+// --- 3. 畫面初始化 (App Bootstrapper) ---
 function initializeApp() {
     initCoreData(); // 呼叫 core.js 的資料初始化
     initBoard(); 
@@ -134,7 +145,7 @@ function updateRowNumbers() {
     }); 
 }
 
-// --- 3. 選單與清單渲染 (UI Rendering) ---
+// --- 4. 選單與清單渲染 (UI Rendering) ---
 function renderCheckboxes() {
     if(typeof characterOrder === 'undefined' || typeof charData === 'undefined') return;
     const grid = document.getElementById('roster-setup');
@@ -235,7 +246,7 @@ function renderIndividualHPPanel() {
     container.innerHTML = html;
 }
 
-// --- 4. Tracker 與儀表板更新 (Dashboard Updates) ---
+// --- 5. Tracker 與儀表板更新 (Dashboard Updates) ---
 function updateTracker() {
     initBossHPMap();
     let env = getEnvSettings();
@@ -352,7 +363,7 @@ function renderDashboard(res, env) {
     }
 }
 
-// --- 5. 事件綁定與其他功能 (Event Handlers & Helpers) ---
+// --- 6. 事件綁定與拉桿微調邏輯 ---
 function updateOwnedCharacters() { 
     ownedCharacters.clear(); 
     document.querySelectorAll('#roster-setup input:checked').forEach(i => ownedCharacters.add(i.value)); 
@@ -365,35 +376,39 @@ function updateRotationState() {
     debouncedRenderAndTrack(); 
 }
 
-const debouncedFilterCharacters = debounce(() => {
-    let q = document.getElementById('char-search').value.toLowerCase();
-    document.querySelectorAll('.checkbox-item').forEach(l => {
-        let inputEl = l.querySelector('input'); if (!inputEl) return;
-        let name = inputEl.value, d = charData[name]; if (!d) return; 
-        let searchTarget = name.toLowerCase() + t(name).toLowerCase();
-        if (searchTarget.includes('漂泊者')) searchTarget += ' 光主 暗主 風主';
-        let matchRarity = (d.rarity === 5 && show5Star) || (d.rarity === 4 && show4Star);
-        let matchGen = (d.gen === 1 && showG1) || (d.gen === 2 && showG2) || (d.gen === 3 && showG3);
-        let matchSearch = q === '' || searchTarget.includes(q);
-        l.style.display = (matchSearch && matchRarity && matchGen) ? 'flex' : 'none';
-    });
-    updateToggleButtons();
-}, 150);
+let _filterCharTimeout = null;
+function filterCharacters() {
+    clearTimeout(_filterCharTimeout);
+    _filterCharTimeout = setTimeout(() => {
+        let q = document.getElementById('char-search').value.toLowerCase();
+        document.querySelectorAll('.checkbox-item').forEach(l => {
+            let inputEl = l.querySelector('input'); if (!inputEl) return;
+            let name = inputEl.value, d = charData[name]; if (!d) return; 
+            let searchTarget = name.toLowerCase() + t(name).toLowerCase();
+            if (searchTarget.includes('漂泊者')) searchTarget += ' 光主 暗主 風主';
+            let matchRarity = (d.rarity === 5 && show5Star) || (d.rarity === 4 && show4Star);
+            let matchGen = (d.gen === 1 && showG1) || (d.gen === 2 && showG2) || (d.gen === 3 && showG3);
+            let matchSearch = q === '' || searchTarget.includes(q);
+            l.style.display = (matchSearch && matchRarity && matchGen) ? 'flex' : 'none';
+        });
+        updateToggleButtons();
+    }, 150);
+}
 
-function filterCharacters() { debouncedFilterCharacters(); }
-
-const debouncedFilterRotations = debounce(() => {
-    let q = document.getElementById('rot-search').value.toLowerCase();
-    document.querySelectorAll('#rotation-setup .rot-row').forEach(row => { 
-        row.style.display = row.getAttribute('data-search').includes(q) ? 'inline-flex' : 'none'; 
-    });
-    document.querySelectorAll('#rotation-setup > div').forEach(g => { 
-        g.style.display = Array.from(g.querySelectorAll('.rot-row')).some(l => l.style.display !== 'none') ? 'block' : 'none'; 
-    });
-    updateToggleButtons();
-}, 150);
-
-function filterRotations() { debouncedFilterRotations(); }
+let _filterRotTimeout = null;
+function filterRotations() {
+    clearTimeout(_filterRotTimeout);
+    _filterRotTimeout = setTimeout(() => {
+        let q = document.getElementById('rot-search').value.toLowerCase();
+        document.querySelectorAll('#rotation-setup .rot-row').forEach(row => { 
+            row.style.display = row.getAttribute('data-search').includes(q) ? 'inline-flex' : 'none'; 
+        });
+        document.querySelectorAll('#rotation-setup > div').forEach(g => { 
+            g.style.display = Array.from(g.querySelectorAll('.rot-row')).some(l => l.style.display !== 'none') ? 'block' : 'none'; 
+        });
+        updateToggleButtons();
+    }, 150);
+}
 
 function togglePresetAttr(attr) { activePresetAttrs.has(attr) ? activePresetAttrs.delete(attr) : activePresetAttrs.add(attr); document.querySelector(`button[data-attr="${attr}"]`).classList.toggle(`active-attr-${attr}`); debouncedRenderAndTrack(); }
 function togglePresetGen(gen) { activePresetGens.has(gen) ? activePresetGens.delete(gen) : activePresetGens.add(gen); document.querySelector(`button[data-gen="${gen}"]`).classList.toggle(`active-gen`); debouncedRenderAndTrack(); }
@@ -402,11 +417,31 @@ function manualUpdateHP(key) { let val = parseFloat(document.getElementById(`hp_
 function applyCalibratedHP(key, avgValue) { bossHPMap[key] = { value: avgValue, isDefault: false }; safeStorageSet('ww_boss_hp', bossHPMap); renderIndividualHPPanel(); updateTracker(); alert(t(`已成功校正為平均值`) + `：${avgValue.toFixed(2)} ` + t(`萬`) + `！`); }
 function resetIndividualHP() { bossHPMap = {}; bossHPHistory = {}; try { localStorage.removeItem('ww_boss_hp'); localStorage.removeItem('ww_boss_hp_history'); } catch(e) {} initBossHPMap(); }
 
+// 拉桿微調邏輯 (全局 + 個別)
 function updateMasterSkill() {
     let val = parseInt(document.getElementById('skill-slider').value); 
     document.getElementById('skill-display').innerText = val + '%';
-    diffStability['⚠️'] = Math.max(0, 100 - (100 - val) * 1.8); diffStability['⭐'] = Math.max(0, 100 - (100 - val) * 1.4);
-    diffStability['🔵'] = Math.max(0, 100 - (100 - val) * 1.1); diffStability['🟩'] = Math.max(0, 100 - (100 - val) * 0.8); diffStability['🧩'] = Math.max(0, 100 - (100 - val) * 1.0);
+    
+    diffStability['⚠️'] = Math.max(0, 100 - (100 - val) * 1.8); 
+    diffStability['⭐'] = Math.max(0, 100 - (100 - val) * 1.4);
+    diffStability['🔵'] = Math.max(0, 100 - (100 - val) * 1.1); 
+    diffStability['🟩'] = Math.max(0, 100 - (100 - val) * 0.8); 
+    diffStability['🧩'] = Math.max(0, 100 - (100 - val) * 1.0);
+
+    if(document.getElementById('slider-diff-4')) {
+        document.getElementById('slider-diff-4').value = diffStability['⚠️']; document.getElementById('val-diff-4').innerText = Math.round(diffStability['⚠️']) + '%';
+        document.getElementById('slider-diff-3').value = diffStability['⭐']; document.getElementById('val-diff-3').innerText = Math.round(diffStability['⭐']) + '%';
+        document.getElementById('slider-diff-2').value = diffStability['🔵']; document.getElementById('val-diff-2').innerText = Math.round(diffStability['🔵']) + '%';
+        document.getElementById('slider-diff-1').value = diffStability['🟩']; document.getElementById('val-diff-1').innerText = Math.round(diffStability['🟩']) + '%';
+        document.getElementById('slider-diff-5').value = diffStability['🧩']; document.getElementById('val-diff-5').innerText = Math.round(diffStability['🧩']) + '%';
+    }
+    debouncedRenderAndTrack();
+}
+
+function updateIndividualSkill(diffKey, val, displayId) {
+    let num = parseInt(val);
+    diffStability[diffKey] = num;
+    if(document.getElementById(displayId)) document.getElementById(displayId).innerText = num + '%';
     debouncedRenderAndTrack();
 }
 
@@ -441,7 +476,7 @@ function updateTeamDisplayCount() {
     if (needsTrackerUpdate) updateTracker();
 }
 
-// --- 6. 進階推演與編隊功能 ---
+// --- 7. 進階推演與編隊功能 ---
 function reverseInferAndOptimize() {
     initBossHPMap(); let env = getEnvSettings(), currentTeams = [], rows = document.querySelectorAll('#team-board tr'), start_r = 1, start_idx = 1, start_hp = getBossMaxHP(1, 1);
     rows.forEach((row) => {
@@ -554,8 +589,7 @@ function resetRowDps(btn) {
     if(possibleRots.length > 0) { possibleRots.forEach(r => { delete customStatsMap[r.id]; }); safeStorageSet('ww_custom_stats', customStatsMap); row.querySelector('.score-input').value = ""; renderRotations(); updateTracker(); alert(t("已重設該隊伍的 DPS 為預設值。")); }
 }
 
-// --- 7. Modals (彈窗功能) ---
-let lastCalculatedStability = 100;
+// --- 8. Modals (彈窗與資料管理) ---
 function openCalcModal() { document.getElementById('calc-modal').style.display = 'flex'; document.getElementById('calc-result').style.display = 'none'; }
 function closeCalcModal() { document.getElementById('calc-modal').style.display = 'none'; }
 function calculateStability() {
@@ -638,7 +672,6 @@ function deleteCustomTeam(index) {
     if(!confirm(t('確定刪除？'))) return; let cr = customRotations.splice(index, 1)[0]; safeStorageSet('ww_custom_rotations_v2', customRotations); dpsData = dpsData.filter(d => d.id !== 'custom_rot_' + cr.id); debouncedRenderAndTrack(); openDataManager(); 
 }
 
-// --- 8. 匯出、反推與其他行為 ---
 function saveCurrentLineup() {
     let teams = []; let totalActualScore = 0; let rows = document.querySelectorAll('#team-board tr');
     rows.forEach((r) => {
@@ -686,7 +719,6 @@ function loadLineup(index) {
     if(parseInt(document.getElementById('team-count-select').value) < neededCount) { document.getElementById('team-count-select').value = neededCount; }
     updateTeamDisplayCount(); alert(t("✅ 記憶編隊載入成功！"));
 }
-
 function deleteLineup(index) { if(!confirm(t("確定刪除此紀錄？"))) return; savedLineups.splice(index, 1); safeStorageSet('ww_saved_lineups', savedLineups); openLineupModal(); }
 
 function exportImage() {
@@ -744,5 +776,5 @@ function submitToGoogleForm() {
     } catch(err) { alert(t("傳送失敗，錯誤資訊：") + err.message); }
 }
 
-// 啟動
+// --- 啟動 ---
 initializeApp();
