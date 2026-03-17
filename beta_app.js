@@ -1,12 +1,12 @@
 // ==========================================
-// 鳴潮矩陣編隊工具 - Beta 測試版核心邏輯 (效能優化版)
+// 鳴潮矩陣編隊工具 - Beta 測試版核心邏輯 (完整無缺漏版)
 // ==========================================
 
 if (typeof phraseDict !== 'undefined') phraseDict.sort((a, b) => b[0].length - a[0].length);
 let isSimp = false;
 
 // ==========================================
-// 工具函式 (Utils)
+// 工具與基礎函式
 // ==========================================
 function t(str) { 
     if (!isSimp || !str || typeof str !== 'string' || typeof phraseDict === 'undefined') return str; 
@@ -49,7 +49,6 @@ function debounce(func, wait) {
     };
 }
 
-// 安全讀取 LocalStorage (避免 JSON parse 報錯崩潰)
 function safeStorageGet(key, fallback = null) {
     try {
         let item = localStorage.getItem(key);
@@ -76,6 +75,20 @@ function clampHpPct(el) {
 function getBase(n) { return ['光主', '暗主', '風主'].includes(n) ? '漂泊者' : n; }
 function isOwned(n) { return ['光主', '暗主', '風主'].includes(n) ? ownedCharacters.has('漂泊者') : ownedCharacters.has(n); }
 
+function toggleLang() { 
+    isSimp = !isSimp; 
+    try { localStorage.setItem('ww_lang', isSimp ? 'zh-CN' : 'zh-TW'); } catch(e){} 
+    window.location.reload(); 
+}
+
+function switchTab(pageId, btnElement) {
+    document.querySelectorAll('.page-content').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById(pageId).classList.add('active');
+    btnElement.classList.add('active');
+    window.scrollTo(0, 0);
+}
+
 // ==========================================
 // 全域狀態 (State)
 // ==========================================
@@ -91,22 +104,82 @@ let bossHPHistory = {};
 let customRotations = [];
 let savedLineups = [];
 
-// 建立帶有防抖的更新函式，專給 Input 事件使用
 const debouncedUpdateTracker = debounce(() => { updateTracker(); }, 300);
 const debouncedRenderAndTrack = debounce(() => { renderRotations(); updateTracker(); updateToggleButtons(); }, 150);
 
 // ==========================================
-// 初始化模組 (Init)
+// 篩選器與按鈕連動功能 (你遺失的部分都在這裡)
+// ==========================================
+function toggleRarity(s) { 
+    s == 5 ? show5Star = !show5Star : show4Star = !show4Star; 
+    document.getElementById(`btn-${s}star`).classList.toggle(`active-${s}star`, s==5?show5Star:show4Star); 
+    filterCharacters(); 
+}
+
+function toggleGen(g) { 
+    if(g==1) showG1=!showG1; if(g==2) showG2=!showG2; if(g==3) showG3=!showG3; 
+    document.getElementById(`btn-g${g}`).classList.toggle('active-gen', g==1?showG1:g==2?showG2:showG3); 
+    filterCharacters(); 
+}
+
+function rosterCheckboxButton() {
+    const visibleBoxes = Array.from(document.querySelectorAll('#roster-setup .checkbox-item')).filter(l => l.style.display !== 'none').map(l => l.querySelector('input'));
+    if(!visibleBoxes.length) return;
+    const anyChecked = visibleBoxes.some(i => i.checked);
+    visibleBoxes.forEach(i => i.checked = !anyChecked); 
+    updateOwnedCharacters();
+}
+
+function toggleAllRotations() { 
+    const b = Array.from(document.querySelectorAll('#rotation-setup input[type="checkbox"]')).filter(i => i.closest('div').style.display !== 'none'); 
+    if(!b.length) return; 
+    const a = b.some(i => i.checked); 
+    b.forEach(i => i.checked = !a); 
+    updateRotationState(); 
+}
+
+function toggleDifficulty(diff) { 
+    const b = Array.from(document.querySelectorAll('#rotation-setup input[type="checkbox"]')).filter(i => i.closest('div').style.display !== 'none' && i.closest('div').innerText.includes(diff)); 
+    if(!b.length) return; 
+    const a = b.every(i => i.checked); 
+    b.forEach(i => i.checked = !a); 
+    updateRotationState(); 
+}
+
+function updateToggleButtons() {
+    const rBoxes = Array.from(document.querySelectorAll('#roster-setup .checkbox-item')).filter(l => l.style.display !== 'none').map(l => l.querySelector('input'));
+    if (rBoxes.length > 0) {
+        const rAnyChecked = rBoxes.some(i => i.checked);
+        let rBtn = document.getElementById('roster-switch');
+        if(rBtn) {
+            rBtn.innerHTML = rAnyChecked ? "🗑️ " + t("清空角色勾選") : "☑️ " + t("全選可見角色");
+            rBtn.className = rAnyChecked ? "btn-action-clear ratio-71" : "btn-action-all ratio-71";
+        }
+    }
+
+    const rotBoxes = Array.from(document.querySelectorAll('#rotation-setup input[type="checkbox"]')).filter(i => i.closest('div').style.display !== 'none');
+    if (rotBoxes.length > 0) {
+        const rotAnyChecked = rotBoxes.some(i => i.checked);
+        let rotBtn = document.getElementById('rot-all-btn');
+        if(rotBtn) {
+            rotBtn.innerHTML = rotAnyChecked ? "🗑️ " + t("清空可見排軸") : "☑️ " + t("全選可見排軸");
+            rotBtn.className = rotAnyChecked ? "btn-action-clear ratio-71" : "btn-action-all ratio-71";
+        }
+    }
+}
+
+// ==========================================
+// 初始化模組
 // ==========================================
 function initializeApp() {
     initDpsData(); 
     savedLineups = safeStorageGet('ww_saved_lineups', []);
     initBoard(); 
     
-    isSimp = localStorage.getItem('ww_lang') === 'zh-CN';
+    let savedLang = localStorage.getItem('ww_lang');
+    isSimp = (savedLang === 'zh-CN' || savedLang === '"zh-CN"');
     if (isSimp) document.getElementById('lang-toggle').innerText = "🌐 繁 / 简";
     
-    // 初始化角色池
     let parsedRoster = safeStorageGet('ww_roster', null);
     if (Array.isArray(parsedRoster)) {
         parsedRoster.forEach(name => { if (charData[name] || ['光主','暗主','風主'].includes(name)) ownedCharacters.add(name); });
@@ -114,7 +187,6 @@ function initializeApp() {
         ownedCharacters = new Set(Object.keys(charData));
     }
 
-    // 初始化排軸
     let parsedRots = safeStorageGet('ww_rotations', null);
     if (Array.isArray(parsedRots)) {
         const validIds = new Set(dpsData.map(d => d.id));
@@ -135,7 +207,6 @@ function initializeApp() {
     renderCheckboxes(); 
     renderRotations();
     
-    // 初始化表格內容
     const savedTeams = safeStorageGet('ww_teams', null);
     if (Array.isArray(savedTeams)) {
         document.querySelectorAll('#team-board tr').forEach((r, i) => {
@@ -203,7 +274,6 @@ function initBoard() {
         b.appendChild(tr);
     }
     
-    // Drag and Drop 邏輯
     let draggedRow = null;
     b.addEventListener('dragstart', e => { draggedRow = e.target.closest('tr'); if(draggedRow) draggedRow.classList.add('dragging'); });
     b.addEventListener('dragover', e => {
@@ -218,20 +288,15 @@ function initBoard() {
 }
 
 // ==========================================
-// 核心邏輯 - 拆解為三大區塊：Roster, Simulation, Dashboard
+// 核心邏輯 - 推演與儀表板渲染
 // ==========================================
 function updateTracker() {
     initBossHPMap();
     let env = getEnvSettings();
     let usedCharacters = getUsedCharacters();
 
-    // 1. 更新選單與數量追蹤
     updateRosterAndSelects(usedCharacters);
-
-    // 2. 執行推演並渲染戰果
     let simResults = runSimulations(env);
-
-    // 3. 渲染全局儀表板
     renderDashboard(simResults, env);
     
     saveData();
@@ -339,7 +404,7 @@ function runSimulations(env) {
 
                     let simulate = (hp, r, idx, dps) => {
                         let t_left = env.battleTime, dmg = 0, startStr = `R${r}-${idx}(${(hp/getBossMaxHP(r,idx)*100).toFixed(0)}%)`;
-                        let loopGuard = 0; // 防呆：避免無窮迴圈
+                        let loopGuard = 0;
                         while (t_left > 0 && loopGuard < 50) {
                             loopGuard++;
                             let eff_dps = Math.max(0.0001, dps * (chk_res[idx - 1] ? (1 - env.resPenalty / 100) : 1)); 
@@ -460,22 +525,8 @@ function renderDashboard(res, env) {
 }
 
 // ==========================================
-// 其他輔助函式與互動邏輯
+// 計算機、自訂與資料庫模組
 // ==========================================
-function switchTab(pageId, btnElement) {
-    document.querySelectorAll('.page-content').forEach(p => p.classList.remove('active'));
-    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-    document.getElementById(pageId).classList.add('active');
-    btnElement.classList.add('active');
-    window.scrollTo(0, 0);
-}
-
-function toggleLang() { 
-    isSimp = !isSimp; 
-    safeStorageSet('ww_lang', isSimp ? 'zh-CN' : 'zh-TW');
-    window.location.reload(); 
-}
-
 function updateMasterSkill() {
     let val = parseInt(document.getElementById('skill-slider').value); 
     document.getElementById('skill-display').innerText = val + '%';
@@ -483,6 +534,21 @@ function updateMasterSkill() {
     diffStability['🔵'] = Math.max(0, 100 - (100 - val) * 1.1); diffStability['🟩'] = Math.max(0, 100 - (100 - val) * 0.8); diffStability['🧩'] = Math.max(0, 100 - (100 - val) * 1.0);
     debouncedRenderAndTrack();
 }
+
+let lastCalculatedStability = 100;
+function openCalcModal() { document.getElementById('calc-modal').style.display = 'flex'; document.getElementById('calc-result').style.display = 'none'; }
+function closeCalcModal() { document.getElementById('calc-modal').style.display = 'none'; }
+function calculateStability() {
+    let baseTime = parseFloat(document.getElementById('calc-base-time').value);
+    let times = document.getElementById('calc-times').value.split(/[\n,]+/).map(s => parseFloat(s.trim())).filter(n => !isNaN(n) && n > 0);
+    if (isNaN(baseTime) || baseTime <= 0 || times.length < 2) { alert(t("請確認資料正確並輸入至少2筆。")); return; }
+    let n = times.length, mean = times.reduce((a, b) => a + b, 0) / n, stdDev = Math.sqrt(times.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / n);
+    let stability = Math.max(0, Math.min(100, ((baseTime / mean) * 100) - (stdDev * 1.5)));
+    lastCalculatedStability = Math.round(stability);
+    document.getElementById('calc-res-mean').innerText = mean.toFixed(2) + ' 秒'; document.getElementById('calc-res-std').innerText = stdDev.toFixed(2) + ' 秒';
+    document.getElementById('calc-res-stab').innerText = lastCalculatedStability + ' %'; document.getElementById('calc-result').style.display = 'block';
+}
+function applyCalculatedStability() { document.getElementById('skill-slider').value = lastCalculatedStability; updateMasterSkill(); closeCalcModal(); }
 
 function buildOptionsHTML(slotType, v1, v2, v3, curRaw, used, teamBases) {
     let html = `<option value="">-- ${slotType==1 ? t('主C') : slotType==2 ? t('副C') : t('生存')} --</option>`;
@@ -670,22 +736,6 @@ const debouncedFilterRotations = debounce(() => {
 
 function filterRotations() { debouncedFilterRotations(); }
 
-function toggleAllRotations() { 
-    const b = Array.from(document.querySelectorAll('#rotation-setup input[type="checkbox"]')).filter(i => i.closest('div').style.display !== 'none'); 
-    if(!b.length) return; 
-    const a = b.some(i => i.checked); 
-    b.forEach(i => i.checked = !a); 
-    updateRotationState(); 
-}
-
-function toggleDifficulty(diff) { 
-    const b = Array.from(document.querySelectorAll('#rotation-setup input[type="checkbox"]')).filter(i => i.closest('div').style.display !== 'none' && i.closest('div').innerText.includes(diff)); 
-    if(!b.length) return; 
-    const a = b.every(i => i.checked); 
-    b.forEach(i => i.checked = !a); 
-    updateRotationState(); 
-}
-
 function updateRotationState() { 
     checkedRotations.clear(); 
     document.querySelectorAll('#rotation-setup input:checked').forEach(i => checkedRotations.add(i.value)); 
@@ -716,12 +766,12 @@ function reverseInferAndOptimize() {
                     if (dmg_left >= tmp_hp) { dmg_left -= tmp_hp; dmgDealtToKilledBosses += tmp_hp; effective_dmg_sum += (tmp_hp / r_factor); kills++; tmp_idx++; if (tmp_idx > 4) { tmp_r++; tmp_idx = 1; } tmp_hp = getBossMaxHP(tmp_r, tmp_idx); } 
                     else {
                         effective_dmg_sum += (dmg_left / r_factor);
-                        let ebRInt = parseInt(ebR), ebIdxInt = parseInt(ebIdx), ebHpPct = parseFloat(ebHp);
-                        if (!isNaN(ebRInt) && !isNaN(ebIdxInt) && !isNaN(ebHpPct) && ebHpPct >= 0 && ebHpPct <= 99.99) {
-                            let hKey = `R${ebRInt}-${ebIdxInt}`; if (!bossHPHistory[hKey]) bossHPHistory[hKey] = [];
-                            let hp_factor = 1 - (ebHpPct / 100);
+                        if (!isNaN(ebR) && !isNaN(ebIdx) && !isNaN(ebHp) && ebR === tmp_r && ebIdx === tmp_idx) {
+                            let dmgDoneToEndBoss = (score / env.scoreRatio) - dmgDealtToKilledBosses;
+                            let hp_factor = 1 - (ebHp / 100);
                             if (hp_factor <= 0) hp_factor = 0.0001; 
-                            bossHPHistory[hKey].push({ dmg: (actualScore / env.scoreRatio) - dmgDealtToKilledBosses, pct: hp_factor });
+                            bossHPHistory[`R${ebRInt}-${ebIdxInt}`] = bossHPHistory[`R${ebRInt}-${ebIdxInt}`] || [];
+                            bossHPHistory[`R${ebRInt}-${ebIdxInt}`].push({ dmg: (actualScore / env.scoreRatio) - dmgDealtToKilledBosses, pct: hp_factor });
                         }
                         tmp_hp -= dmg_left; dmg_left = 0;
                     }
@@ -931,43 +981,188 @@ const debouncedFilterCharacters = debounce(() => {
 
 function filterCharacters() { debouncedFilterCharacters(); }
 
-function rosterCheckboxButton() {
-    const visibleBoxes = Array.from(document.querySelectorAll('#roster-setup .checkbox-item')).filter(l => l.style.display !== 'none').map(l => l.querySelector('input'));
-    if(!visibleBoxes.length) return;
-    const anyChecked = visibleBoxes.some(i => i.checked);
-    visibleBoxes.forEach(i => i.checked = !anyChecked); 
-    updateOwnedCharacters();
-}
-
 function updateOwnedCharacters() { 
     ownedCharacters.clear(); 
     document.querySelectorAll('#roster-setup input:checked').forEach(i => ownedCharacters.add(i.value)); 
     debouncedRenderAndTrack(); 
 }
-// ==========================================
-// 補回：被遺漏的 UI 狀態切換與數據總管函式
-// ==========================================
 
-function updateToggleButtons() {
-    const rBoxes = Array.from(document.querySelectorAll('#roster-setup .checkbox-item')).filter(l => l.style.display !== 'none').map(l => l.querySelector('input'));
-    if (rBoxes.length > 0) {
-        const rAnyChecked = rBoxes.some(i => i.checked);
-        let rBtn = document.getElementById('roster-switch');
-        if(rBtn) {
-            rBtn.innerHTML = rAnyChecked ? "🗑️ " + t("清空角色勾選") : "☑️ " + t("全選可見角色");
-            rBtn.className = rAnyChecked ? "btn-action-clear ratio-71" : "btn-action-all ratio-71";
-        }
-    }
+let activePresetAttrs = new Set(); let activePresetGens = new Set();
+function togglePresetAttr(attr) { activePresetAttrs.has(attr) ? activePresetAttrs.delete(attr) : activePresetAttrs.add(attr); document.querySelector(`button[data-attr="${attr}"]`).classList.toggle(`active-attr-${attr}`); debouncedRenderAndTrack(); }
+function togglePresetGen(gen) { activePresetGens.has(gen) ? activePresetGens.delete(gen) : activePresetGens.add(gen); document.querySelector(`button[data-gen="${gen}"]`).classList.toggle(`active-gen`); debouncedRenderAndTrack(); }
 
-    const rotBoxes = Array.from(document.querySelectorAll('#rotation-setup input[type="checkbox"]')).filter(i => i.closest('div').style.display !== 'none');
-    if (rotBoxes.length > 0) {
-        const rotAnyChecked = rotBoxes.some(i => i.checked);
-        let rotBtn = document.getElementById('rot-all-btn');
-        if(rotBtn) {
-            rotBtn.innerHTML = rotAnyChecked ? "🗑️ " + t("清空可見排軸") : "☑️ " + t("全選可見排軸");
-            rotBtn.className = rotAnyChecked ? "btn-action-clear ratio-71" : "btn-action-all ratio-71";
-        }
+let currentEditRotId = null;
+function openStatsModal(e, rotId) {
+    e.preventDefault(); e.stopPropagation(); currentEditRotId = rotId;
+    let d = dpsData.find(x => x.id === rotId); document.getElementById('stats-modal-rot').innerText = `${t(d.c1)} + ${t(d.c2)} + ${t(d.c3)}`;
+    let stats = customStatsMap[rotId];
+    if (stats) { document.getElementById('stats-dps').value = stats.dps; document.getElementById('stats-stab').value = stats.stability; }
+    else { document.getElementById('stats-dps').value = d.dps > 0 ? d.dps : ''; document.getElementById('stats-stab').value = 100; }
+    document.getElementById('stats-modal').style.display = 'flex';
+}
+function closeStatsModal() { document.getElementById('stats-modal').style.display = 'none'; currentEditRotId = null; }
+function clearStatsModal() { if (currentEditRotId) { delete customStatsMap[currentEditRotId]; safeStorageSet('ww_custom_stats', customStatsMap); debouncedRenderAndTrack(); } closeStatsModal(); }
+function saveStatsModal() {
+    let dpsVal = parseFloat(document.getElementById('stats-dps').value), stabVal = parseFloat(document.getElementById('stats-stab').value);
+    if (isNaN(dpsVal) || isNaN(stabVal)) return alert(t("請輸入有效的數字！"));
+    if (currentEditRotId) { customStatsMap[currentEditRotId] = { dps: dpsVal, stability: Math.min(100, Math.max(0, stabVal)), buff: 0 }; safeStorageSet('ww_custom_stats', customStatsMap); debouncedRenderAndTrack(); }
+    closeStatsModal();
+}
+
+function resetRowDps(btn) {
+    let row = btn.closest('tr'); let ss = row.querySelectorAll('select.char-select');
+    let c1 = ss[0].value, c2 = ss[1].value, c3 = ss[2].value;
+    if (!c1 || !c2 || !c3) return alert(t("請先排滿該隊伍的成員。"));
+    let possibleRots = dpsData.filter(d => d.c1 === c1 && d.c2 === c2 && d.c3 === c3);
+    if(possibleRots.length > 0) { possibleRots.forEach(r => { delete customStatsMap[r.id]; }); safeStorageSet('ww_custom_stats', customStatsMap); row.querySelector('.score-input').value = ""; renderRotations(); updateTracker(); alert(t("已重設該隊伍的 DPS 為預設值。")); }
+}
+
+function openCustomTeamModal() {
+    let m = document.getElementById('custom-team-modal');
+    if(typeof charData === 'undefined') return;
+    
+    let charOpts = '';
+    if (typeof characterOrder !== 'undefined') {
+        characterOrder.forEach(n => {
+            if (n === '漂泊者') {
+                charOpts += `<option value="光主">${t("光主")}</option><option value="暗主">${t("暗主")}</option><option value="風主">${t("風主")}</option>`;
+            } else if (charData[n]) {
+                charOpts += `<option value="${n}">${t(n)}</option>`;
+            }
+        });
+    } else {
+        charOpts = Object.keys(charData).map(n => `<option value="${n}">${t(n)}</option>`).join('');
     }
+    
+    m.innerHTML = `
+        <div style="background:var(--bg-panel); backdrop-filter:blur(20px); padding:25px; border-radius:16px; border:1px solid var(--gold); width:340px; max-width:90%;">
+            <h3 style="margin-top:0; color:var(--gold); text-align:center;">➕ ${t('新增自訂編隊')}</h3>
+            <select id="ct-c1" class="char-select" style="margin-bottom:10px;"><option value="">-- ${t('選擇主輸出')} --</option>${charOpts}</select>
+            <select id="ct-c2" class="char-select" style="margin-bottom:10px;"><option value="">-- ${t('選擇副C/輔助')} --</option>${charOpts}</select>
+            <select id="ct-c3" class="char-select" style="margin-bottom:10px;"><option value="">-- ${t('選擇生存/輔助')} --</option>${charOpts}</select>
+            <input type="number" id="ct-dps" placeholder="${t('預設理論 DPS (萬)')}" class="score-input">
+            <select id="ct-diff" class="char-select" style="margin-bottom:20px;">
+                <option value="🟩">🟩 ${t('輪椅')}</option><option value="🔵">🔵 ${t('中等')}</option><option value="⭐">⭐ ${t('進階')}</option><option value="⚠️">⚠️ ${t('極難')}</option><option value="🧩">🧩 ${t('非主流')}</option>
+            </select>
+            <div style="display:flex; gap:10px;">
+                <button onclick="document.getElementById('custom-team-modal').style.display='none'" class="btn-action-clear" style="flex:1; background:#555; border:none;">${t('取消')}</button>
+                <button onclick="saveCustomTeam()" class="btn-action-all" style="flex:1;">${t('儲存')}</button>
+            </div>
+        </div>`;
+    m.style.display = 'flex';
+}
+
+function saveCustomTeam() {
+    let c1 = document.getElementById('ct-c1').value, c2 = document.getElementById('ct-c2').value, c3 = document.getElementById('ct-c3').value;
+    let dps = parseFloat(document.getElementById('ct-dps').value) || 0, diff = document.getElementById('ct-diff').value;
+    if (!c1 || !c2 || !c3) return alert(t('請完整選擇三名角色！'));
+    let newId = Date.now(), newRot = { id: newId, c1: c1, c2: c2, c3: c3, dps: dps, rot: "自訂", diff: diff };
+    customRotations.push(newRot);
+    safeStorageSet('ww_custom_rotations_v2', customRotations);
+    dpsData.push({ id: 'custom_rot_' + newId, c1: c1, c2: c2, c3: c3, dps: dps, rot: "自訂", diff: diff, gen: charData[c1]?charData[c1].gen:1, isUserCustom: true });
+    document.getElementById('custom-team-modal').style.display = 'none'; debouncedRenderAndTrack(); alert(t('自訂編隊已成功加入。'));
+}
+
+// 補回遺失的功能
+function toggleRarity(s) { 
+    s == 5 ? show5Star = !show5Star : show4Star = !show4Star; 
+    document.getElementById(`btn-${s}star`).classList.toggle(`active-${s}star`, s==5?show5Star:show4Star); 
+    filterCharacters(); 
+}
+
+function toggleGen(g) { 
+    if(g==1) showG1=!showG1; if(g==2) showG2=!showG2; if(g==3) showG3=!showG3; 
+    document.getElementById(`btn-g${g}`).classList.toggle('active-gen', g==1?showG1:g==2?showG2:showG3); 
+    filterCharacters(); 
+}
+
+let lastCalculatedStability = 100;
+function openCalcModal() { document.getElementById('calc-modal').style.display = 'flex'; document.getElementById('calc-result').style.display = 'none'; }
+function closeCalcModal() { document.getElementById('calc-modal').style.display = 'none'; }
+function calculateStability() {
+    let baseTime = parseFloat(document.getElementById('calc-base-time').value);
+    let times = document.getElementById('calc-times').value.split(/[\n,]+/).map(s => parseFloat(s.trim())).filter(n => !isNaN(n) && n > 0);
+    if (isNaN(baseTime) || baseTime <= 0 || times.length < 2) { alert(t("請確認資料正確並輸入至少2筆。")); return; }
+    let n = times.length, mean = times.reduce((a, b) => a + b, 0) / n, stdDev = Math.sqrt(times.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / n);
+    let stability = Math.max(0, Math.min(100, ((baseTime / mean) * 100) - (stdDev * 1.5)));
+    lastCalculatedStability = Math.round(stability);
+    document.getElementById('calc-res-mean').innerText = mean.toFixed(2) + ' 秒'; 
+    document.getElementById('calc-res-std').innerText = stdDev.toFixed(2) + ' 秒';
+    document.getElementById('calc-res-stab').innerText = lastCalculatedStability + ' %'; 
+    document.getElementById('calc-result').style.display = 'block';
+}
+function applyCalculatedStability() { 
+    document.getElementById('skill-slider').value = lastCalculatedStability; 
+    updateMasterSkill(); 
+    closeCalcModal(); 
+}
+
+function openLineupModal() {
+    let container = document.getElementById('lineup-list');
+    if (savedLineups.length === 0) {
+        container.innerHTML = `<p style="color:#aaa; text-align:center;">${t('尚無記憶的編隊，請先在沙盤點擊「💾 記憶當前實戰」')}</p>`;
+    } else {
+        container.innerHTML = savedLineups.map((l, i) => `
+            <div style="background:rgba(0,0,0,0.4); border:1px solid #555; border-radius:8px; padding:12px; margin-bottom:10px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px dashed #444; padding-bottom:8px; margin-bottom:8px;">
+                    <strong style="color:var(--neon-purple); font-size:1.1em;">${l.name}</strong>
+                    <span style="color:#ffaa00; font-weight:bold;">🎯 ${t('總分')}: ${l.totalScore.toLocaleString()}</span>
+                </div>
+                <div style="font-size:0.85em; color:#aaa; margin-bottom:10px;">
+                    ${l.teams.map(t => `<span style="color:#ddd">${t.c1?t.c1:'?'}</span>+${t.c2?t.c2:'?'}+${t.c3?t.c3:'?'}`).join(' | ')}
+                </div>
+                <div style="display:flex; gap:10px;">
+                    <button onclick="loadLineup(${i})" class="btn-action-all" style="flex:1; padding:6px;">📥 ${t('載入此編隊')}</button>
+                    <button onclick="deleteLineup(${i})" class="btn-action-clear" style="padding:6px 12px; background:#555; border:none; box-shadow:none;">❌ ${t('刪除')}</button>
+                </div>
+            </div>
+        `).join('');
+    }
+    document.getElementById('lineup-modal').style.display = 'flex';
+}
+
+function loadLineup(index) {
+    if(!confirm(t("將清空當前沙盤畫面並載入該記憶編隊，確定？"))) return;
+    let lineup = savedLineups[index];
+    document.querySelectorAll('.char-select, .score-input, .end-boss-r, .end-boss-idx, .end-boss-hp').forEach(el => el.value = ""); 
+    document.querySelectorAll('input[type="checkbox"][class^="res-chk"]').forEach(c => c.checked = false);
+
+    let rows = document.querySelectorAll('#team-board tr');
+    lineup.teams.forEach((tData, i) => {
+        if (rows[i]) {
+            let ss = rows[i].querySelectorAll('select.char-select');
+            if(tData.c1 && ss[0].querySelector(`option[value="${tData.c1}"]`) == null) ss[0].innerHTML += `<option value="${tData.c1}">${tData.c1}</option>`;
+            if(tData.c2 && ss[1].querySelector(`option[value="${tData.c2}"]`) == null) ss[1].innerHTML += `<option value="${tData.c2}">${tData.c2}</option>`;
+            if(tData.c3 && ss[2].querySelector(`option[value="${tData.c3}"]`) == null) ss[2].innerHTML += `<option value="${tData.c3}">${tData.c3}</option>`;
+            if (tData.c1) ss[0].value = tData.c1;
+            if (tData.c2) ss[1].value = tData.c2;
+            if (tData.c3) ss[2].value = tData.c3;
+            rows[i].querySelector('.score-input').value = tData.scoreInput || "";
+            rows[i].querySelector('.end-boss-r').value = tData.ebR || "";
+            rows[i].querySelector('.end-boss-idx').value = tData.ebIdx || "";
+            rows[i].querySelector('.end-boss-hp').value = tData.ebHp || "";
+            if (tData.res) {
+                if(rows[i].querySelector('.res-chk-1')) rows[i].querySelector('.res-chk-1').checked = tData.res[0];
+                if(rows[i].querySelector('.res-chk-2')) rows[i].querySelector('.res-chk-2').checked = tData.res[1];
+                if(rows[i].querySelector('.res-chk-3')) rows[i].querySelector('.res-chk-3').checked = tData.res[2];
+                if(rows[i].querySelector('.res-chk-4')) rows[i].querySelector('.res-chk-4').checked = tData.res[3];
+            }
+        }
+    });
+    document.getElementById('lineup-modal').style.display = 'none';
+    let neededCount = 3;
+    while(neededCount < lineup.teams.length && neededCount < 16) neededCount += 3;
+    if(neededCount > 16) neededCount = 16;
+    if(parseInt(document.getElementById('team-count-select').value) < neededCount) { document.getElementById('team-count-select').value = neededCount; }
+    updateTeamDisplayCount(); 
+    alert(t("✅ 記憶編隊載入成功！"));
+}
+
+function deleteLineup(index) {
+    if(!confirm(t("確定刪除此紀錄？"))) return;
+    savedLineups.splice(index, 1);
+    safeStorageSet('ww_saved_lineups', savedLineups);
+    openLineupModal();
 }
 
 function openDataManager() {
@@ -1045,5 +1240,6 @@ function deleteCustomTeam(index) {
     debouncedRenderAndTrack(); 
     openDataManager(); 
 }
+
 // 啟動程式
 initializeApp();
