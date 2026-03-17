@@ -4,11 +4,9 @@
 // 職責：DOM 操作、事件監聽、畫面更新、圖表與彈窗
 // ==========================================
 
-// --- 1. 防抖事件綁定 ---
-const debouncedUpdateTracker = debounce(() => { updateTracker(); }, 300);
-const debouncedRenderAndTrack = debounce(() => { renderRotations(); updateTracker(); updateToggleButtons(); }, 150);
+// ⚠️ 注意：所有全域變數 (dpsData 等) 與防抖 (debouncedUpdateTracker) 已在 beta_core.js 中宣告，此處直接使用。
 
-// --- 2. 語系與 DOM 翻譯 ---
+// --- 1. 語系與 DOM 翻譯 ---
 function translateDOM(node) {
     let walker = document.createTreeWalker(node, NodeFilter.SHOW_TEXT, null, false);
     let n;
@@ -49,7 +47,7 @@ function switchTab(pageId, btnElement) {
     window.scrollTo(0, 0);
 }
 
-// --- 3. 畫面初始化 (App Bootstrapper) ---
+// --- 2. 畫面初始化 (App Bootstrapper) ---
 function initializeApp() {
     initCoreData(); // 呼叫 core.js 的資料初始化
     initBoard(); 
@@ -136,7 +134,7 @@ function updateRowNumbers() {
     }); 
 }
 
-// --- 4. 選單與清單渲染 (UI Rendering) ---
+// --- 3. 選單與清單渲染 (UI Rendering) ---
 function renderCheckboxes() {
     if(typeof characterOrder === 'undefined' || typeof charData === 'undefined') return;
     const grid = document.getElementById('roster-setup');
@@ -237,14 +235,14 @@ function renderIndividualHPPanel() {
     container.innerHTML = html;
 }
 
-// --- 5. Tracker 與儀表板更新 (Dashboard Updates) ---
+// --- 4. Tracker 與儀表板更新 (Dashboard Updates) ---
 function updateTracker() {
     initBossHPMap();
     let env = getEnvSettings();
     let usedCharacters = getUsedCharacters();
 
     updateRosterAndSelects(usedCharacters);
-    let simResults = runSimulations(env); // 呼叫 Core
+    let simResults = runSimulations(env); // 呼叫 Core 運算
     
     // 更新 DOM
     document.querySelectorAll('#team-board tr').forEach((row, index) => {
@@ -354,7 +352,7 @@ function renderDashboard(res, env) {
     }
 }
 
-// --- 6. 事件綁定與其他功能 (Event Handlers & Helpers) ---
+// --- 5. 事件綁定與其他功能 (Event Handlers & Helpers) ---
 function updateOwnedCharacters() { 
     ownedCharacters.clear(); 
     document.querySelectorAll('#roster-setup input:checked').forEach(i => ownedCharacters.add(i.value)); 
@@ -443,7 +441,7 @@ function updateTeamDisplayCount() {
     if (needsTrackerUpdate) updateTracker();
 }
 
-// --- 7. 進階推演與編隊功能 ---
+// --- 6. 進階推演與編隊功能 ---
 function reverseInferAndOptimize() {
     initBossHPMap(); let env = getEnvSettings(), currentTeams = [], rows = document.querySelectorAll('#team-board tr'), start_r = 1, start_idx = 1, start_hp = getBossMaxHP(1, 1);
     rows.forEach((row) => {
@@ -556,7 +554,7 @@ function resetRowDps(btn) {
     if(possibleRots.length > 0) { possibleRots.forEach(r => { delete customStatsMap[r.id]; }); safeStorageSet('ww_custom_stats', customStatsMap); row.querySelector('.score-input').value = ""; renderRotations(); updateTracker(); alert(t("已重設該隊伍的 DPS 為預設值。")); }
 }
 
-// --- 8. Modals (彈窗功能) ---
+// --- 7. Modals (彈窗功能) ---
 let lastCalculatedStability = 100;
 function openCalcModal() { document.getElementById('calc-modal').style.display = 'flex'; document.getElementById('calc-result').style.display = 'none'; }
 function closeCalcModal() { document.getElementById('calc-modal').style.display = 'none'; }
@@ -640,6 +638,7 @@ function deleteCustomTeam(index) {
     if(!confirm(t('確定刪除？'))) return; let cr = customRotations.splice(index, 1)[0]; safeStorageSet('ww_custom_rotations_v2', customRotations); dpsData = dpsData.filter(d => d.id !== 'custom_rot_' + cr.id); debouncedRenderAndTrack(); openDataManager(); 
 }
 
+// --- 8. 匯出、反推與其他行為 ---
 function saveCurrentLineup() {
     let teams = []; let totalActualScore = 0; let rows = document.querySelectorAll('#team-board tr');
     rows.forEach((r) => {
@@ -655,6 +654,7 @@ function saveCurrentLineup() {
     savedLineups.unshift(lineup); if (savedLineups.length > 10) savedLineups.pop();
     safeStorageSet('ww_saved_lineups', savedLineups); alert(t("✅ 實戰編隊已成功記憶！"));
 }
+
 function openLineupModal() {
     let container = document.getElementById('lineup-list');
     if (savedLineups.length === 0) {
@@ -664,6 +664,7 @@ function openLineupModal() {
     }
     document.getElementById('lineup-modal').style.display = 'flex';
 }
+
 function loadLineup(index) {
     if(!confirm(t("將清空當前沙盤畫面並載入該記憶編隊，確定？"))) return;
     let lineup = savedLineups[index];
@@ -685,9 +686,9 @@ function loadLineup(index) {
     if(parseInt(document.getElementById('team-count-select').value) < neededCount) { document.getElementById('team-count-select').value = neededCount; }
     updateTeamDisplayCount(); alert(t("✅ 記憶編隊載入成功！"));
 }
+
 function deleteLineup(index) { if(!confirm(t("確定刪除此紀錄？"))) return; savedLineups.splice(index, 1); safeStorageSet('ww_saved_lineups', savedLineups); openLineupModal(); }
 
-// --- 9. 圖片匯出與表單發送 ---
 function exportImage() {
     try {
         const rows = document.querySelectorAll('#team-board tr'); let completed = [];
