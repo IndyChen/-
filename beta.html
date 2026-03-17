@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>鳴潮矩陣編隊工具 vBeta)</title>
+    <title>鳴潮矩陣編隊工具 vBeta</title>
     
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-FYW9EX8V5G"></script>
     <script>
@@ -49,30 +49,19 @@
         .pool-panel { flex: 1; min-width: 300px; max-height: 80vh; overflow-y: auto; position: sticky; top: 20px; padding-right: 10px; }
         .team-panel { flex: 2; min-width: 0; width: 100%; }
         
-        /* ========================================================= */
-        /* 🚀 核心更新：70% 寬度收束與 7.1 : 8.5 : 9.9 黃金比例排版 */
-        /* ========================================================= */
+        /* 🚀 70% 寬度收束與 7.1 : 8.5 : 9.9 黃金比例排版 */
         .filter-wrapper { display: flex; flex-direction: column; gap: 12px; margin-bottom: 15px; width: 100%; }
         @media (min-width: 769px) { .filter-wrapper { width: 70%; } }
         
-        /* 5 格等寬 Grid 排版 */
         .filter-grid-5 { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; width: 100%; }
-        
-        /* 操作列等高排列 */
         .filter-actions-row { display: flex; flex-wrap: wrap; gap: 8px; width: 100%; align-items: stretch; }
 
-        /* 比例分配設定 (僅在電腦版生效) */
         @media (min-width: 769px) {
-            .ratio-71 { flex: 7.1; }
-            .ratio-85 { flex: 8.5; }
-            .ratio-99 { flex: 9.9; }
-            .ratio-184 { flex: 18.4; } /* 8.5 + 9.9，用來完美對齊上方的搜尋框 */
+            .ratio-71 { flex: 7.1; } .ratio-85 { flex: 8.5; } .ratio-99 { flex: 9.9; } .ratio-184 { flex: 18.4; } 
         }
-        /* 手機版自動改為滿版堆疊，好點擊不破版 */
         @media (max-width: 768px) {
             .ratio-71, .ratio-85, .ratio-99, .ratio-184 { flex: 1 1 100%; }
         }
-        /* ========================================================= */
 
         #roster-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 10px; margin-bottom: 15px; }
         .checkbox-item { background: rgba(0,0,0,0.4); padding: 10px 12px; border-radius: 10px; cursor: pointer; user-select: none; display: flex; align-items: center; gap: 8px; border: 1px solid var(--border-glass); transition: 0.2s; font-size: 0.95em; font-weight: 600; box-shadow: inset 0 2px 4px rgba(255,255,255,0.02); }
@@ -110,7 +99,7 @@
         .btn-apply:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(76, 175, 80, 0.5); }
         
         .btn-filter, .btn-diff, .btn-preset-filter { border: 1px solid #444; border-radius: 8px; padding: 10px 5px; font-size: 0.9em; cursor: pointer; font-weight: bold; transition: 0.2s; background: #2b2b36; color: #888; text-align: center; }
-        .btn-filter:hover, .btn-diff:hover { filter: brightness(1.2); }
+        .btn-filter:hover, .btn-diff:hover, .btn-preset-filter:hover { filter: brightness(1.2); }
         
         .btn-filter.active-5star { background: #ffb300; color: #1e1e24; border-color: #ffb300; }
         .btn-filter.active-4star { background: #9b59b6; color: #fff; border-color: #9b59b6; }
@@ -135,7 +124,7 @@
         .btn-preset-filter.active-attr-衍射 { background: #ffc107; color: #1e1e24; border-color: #ffc107; }
         .btn-preset-filter.active-attr-湮滅 { background: #e91e63; color: #fff; border-color: #e91e63; }
         .preset-controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
-        .preset-controls select { flex: 1; min-width: 250px; width: auto; padding: 8px; background: rgba(0,0,0,0.5); color: #fff; border: 1px solid var(--border-glass); border-radius: 4px; outline: none; }
+        .preset-controls select { flex: 1; min-width: 250px; width: auto; padding: 10px; background: rgba(0,0,0,0.5); color: #fff; border: 1px solid var(--border-glass); border-radius: 8px; outline: none; font-size: 0.95em; }
 
         input[type="range"] { -webkit-appearance: none; appearance: none; background: transparent; cursor: pointer; width: 100%; }
         input[type="range"]::-webkit-slider-runnable-track { background: rgba(255,255,255,0.1); height: 8px; border-radius: 4px; }
@@ -148,6 +137,10 @@
         .calibrated { color: #ffaa00 !important; border-color: #ffaa00 !important; }
         .btn-calib { background: #d9534f; color: white; border: 1px solid #ff4d4d; border-radius: 4px; font-size: 0.7em; cursor: pointer; padding: 4px; margin-top: 2px; animation: blink 1.5s infinite; font-weight: bold; }
         @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0.6; } 100% { opacity: 1; } }
+
+        /* 警告與提示面板 */
+        .info-panel { background: rgba(255, 170, 0, 0.1); padding: 12px; border-radius: 8px; border-left: 4px solid #ffaa00; margin-bottom: 15px; font-size: 0.9em; color: #ddd; box-shadow: 0 2px 10px rgba(0,0,0,0.2); }
+        .info-panel strong { color: #ffaa00; }
 
         @media (max-width: 768px) {
             body { padding: 5px; padding-bottom: 100px; overflow-x: hidden; } 
@@ -191,33 +184,54 @@
 
     <div class="top-toolbar">
         <button id="lang-toggle" class="btn-top" onclick="toggleLang()">🌐 简 / 繁</button>
-        <button class="btn-top" onclick="openDataManager()" style="color:var(--neon-green); border-color:var(--border-glass);">⚙️ 數據備份</button>
+        <button class="btn-top" onclick="openDataManager()" style="color:var(--neon-green); border-color:var(--border-glass);">⚙️ 數據總管與備份</button>
     </div>
     
     <h2>鳴潮矩陣編隊工具 <span style="font-size: 0.5em; color: var(--neon-purple); vertical-align: middle;">vBeta</span></h2>
     
     <div class="data-source">
-        <span>📊 邏輯：AI架構 / 數據提供：QuichilOvO、南邊 / 整理：Kolton</span>
-        <a href="https://github.com/IndyChen/DPM-Team-Builder/issues" target="_blank" style="color: #00ffaa; text-decoration: none; padding: 4px 8px; border: 1px solid #00ffaa; border-radius: 6px;">🐛 報錯回饋</a>
+        <span>📊 數據庫設計與邏輯：AI架構 / 數據提供：QuichilOvO、南邊 / 整理：Kolton</span>
+        <a href="https://github.com/IndyChen/DPM-Team-Builder/issues" target="_blank" style="color: #00ffaa; text-decoration: none; padding: 4px 8px; border: 1px solid #00ffaa; border-radius: 6px;">🐛 報錯與意見回饋</a>
         <a href="index.html" style="color: #ff5252; text-decoration: none; padding: 4px 8px; border: 1px solid #ff5252; border-radius: 6px;">🔙 返回正式版</a>
     </div>
 
     <div class="tab-menu">
-        <button class="tab-btn active" onclick="switchTab('page1', this)">👤 第一步：設定</button>
-        <button class="tab-btn" onclick="switchTab('page2', this)">⚔️ 第二步：編隊</button>
+        <button class="tab-btn active" onclick="switchTab('page1', this)">👤 第一步：角色與排軸設定</button>
+        <button class="tab-btn" onclick="switchTab('page2', this)">⚔️ 第二步：矩陣編隊與實戰推演</button>
     </div>
 
     <div id="page1" class="page-content active">
-        <div class="panel" style="background: rgba(0, 255, 170, 0.05); border-color: var(--neon-green);">
-            <details open>
-                <summary style="color: var(--neon-green); font-weight: bold; outline: none; font-size: 1.1em; cursor: pointer;">📖 Beta 版亮點與操作指南</summary>
-                <div style="margin-top: 15px; font-size: 0.95em; color: #ddd; line-height: 1.6;">
-                    <strong>🚧 現代化版本更新：</strong><br>
-                    1. <strong>全新卡片式介面</strong>：針對手機單手操作進行深度優化，告別惱人的橫向捲軸。<br>
-                    2. <strong>完美電腦排版</strong>：濾鏡與按鈕縮小集中至 70% 寬度，等比例切割排版，操作不再遙遠。<br>
-                    3. <strong>智慧紅綠燈按鈕</strong>：全選與清空按鈕會依據您的勾選狀態自動變換顏色與功能。<br>
-                    4. <strong>雙模式推演引擎</strong>：新增「🔥自動推演」與「🗺️手動排刀區間算分」模式。<br>
-                    5. <strong>動態自訂編隊</strong>：允許將未收錄在預設庫內的獨門配隊，永久存入系統中。
+        
+        <div style="display: flex; gap: 20px; flex-wrap: wrap; margin-bottom: 20px;">
+            <details style="flex: 1; min-width: 300px; background: rgba(0, 255, 170, 0.05); padding: 15px; border-radius: 12px; border: 1px solid var(--neon-green); cursor: pointer;">
+                <summary style="color: var(--neon-green); font-weight: bold; outline: none; font-size: 1.1em;">📖 操作指南：實戰編隊與推演功能 (點擊展開)</summary>
+                <div style="margin-top: 15px; font-size: 0.95em; color: #ddd; line-height: 1.6; border-top: 1px dashed var(--neon-green); padding-top: 15px;">
+                    <strong style="color: #fff; font-size: 1.05em;">【第一步：一鍵理論編隊】</strong><br>
+                    如果您只是想知道手邊的角色能組出什麼最高分的隊伍，請直接點擊表格上方的<strong>「🔥 一鍵極限編制 (理論推演)」</strong>。系統會依已存於本機與預設的編制，自動配出最高總 DPS 的組合（註：當前演算法尚未針對各隊伍排軸的「出傷折線」進行最佳化）。<br><br>
+                    
+                    <strong style="color: var(--neon-green); font-size: 1.05em;">【第二步：實戰反推與無損洗牌 (進階功能)】</strong><br>
+                    <ul style="margin: 5px 0 10px 20px; padding: 0; color: #ccc;">
+                        <li style="margin-bottom: 5px;">請先按照您在遊戲中實際出戰的順序，將隊伍排在表格上。</li>
+                        <li style="margin-bottom: 5px;">在表格內的<strong>「實戰得分」</strong>欄位，填入該隊打完結算的總分。</li>
+                        <li style="margin-bottom: 5px;">勾選該隊伍遭遇抗性的是第幾隻王 `[1] [2] [3] [4]`（若有）。</li>
+                        <li style="margin-bottom: 5px;"><strong>殘血推演與代數校正：</strong>若該隊伍沒把王打死，請在「🎯終:」下拉選單選擇終點王，並在「🩸剩:」輸入剩餘血量 %。</li>
+                        <li style="margin-bottom: 5px;">點擊 <strong>「🔄 依實戰得分反推與無損重排」</strong>。系統會精準扣除轉場動畫延遲與抗性干擾，推算真實 DPS，並<strong>無損為您重新排序最佳出戰順序！</strong></li>
+                    </ul>
+                </div>
+            </details>
+
+            <details open style="flex: 1; min-width: 300px; background: rgba(30, 30, 36, 0.7); padding: 15px; border-radius: 12px; border: 1px solid var(--border-glass); cursor: pointer;">
+                <summary style="color: var(--gold); font-weight: bold; outline: none; font-size: 1.1em;">✨ vBeta 專屬更新說明 (對比正式版)</summary>
+                <div style="margin-top: 15px; font-size: 0.95em; color: #ccc; line-height: 1.6; border-top: 1px dashed var(--border-glass); padding-top: 15px;">
+                    <ul style="margin: 5px 0 10px 20px; padding: 0; color: #ccc;">
+                        <li>📱 <strong>全新 App 級介面</strong>：引進暗黑毛玻璃卡片佈局與合適排版比例，解決手機端破版與電腦版過寬問題。</li>
+                        <li>🚦 <strong>智慧狀態指示燈</strong>：全選(綠)與清空(紅)按鈕將依據您的勾選狀態自動切換；過濾器採用高反差設計。</li>
+                        <li>🖱️ <strong>拖曳式排兵布陣</strong>：在編隊卡片上，直接用滑鼠或手指「按住拖曳」即可無縫交換隊伍順序！</li>
+                        <li>📉 <strong>動態數量控制</strong>：新增自訂「顯示編隊數量」選單，減少手機版不必要的滑動空間。</li>
+                        <li>💾 <strong>動態自訂編隊</strong>：允許將未收錄在預設庫內的獨門配隊，永久存入系統中並參與推演。</li>
+                        <li>⚙️ <strong>雙模式推演引擎</strong>：新增「🔥自動推演 (依DPS接力)」與「🗺️手動編隊 (依設定終點算分)」兩種模式。</li>
+                        <li>📷 <strong>進階截圖分享</strong>：新增分享全編制實戰得分、BOSS 殘血狀態，以及是否曾遭遇抗性之功能。</li>
+                    </ul>
                 </div>
             </details>
         </div>
@@ -235,7 +249,7 @@
                 </div>
                 <div class="filter-actions-row">
                     <button id="roster-switch" class="btn-action-clear ratio-71" onclick="rosterCheckboxButton()">🗑️ 清空角色勾選</button>
-                    <input type="text" id="char-search" class="ratio-184" placeholder="🔍 搜尋角色..." oninput="filterCharacters()" style="padding: 10px 12px; border-radius: 8px; border: 1px solid var(--border-glass); background: #1e1e24; color: #fff; outline: none; box-sizing: border-box;">
+                    <input type="text" id="char-search" class="ratio-184" placeholder="🔍 搜尋擁有角色..." oninput="filterCharacters()" style="padding: 10px 12px; border-radius: 8px; border: 1px solid var(--border-glass); background: #1e1e24; color: #fff; outline: none; box-sizing: border-box;">
                 </div>
             </div>
             
@@ -243,7 +257,7 @@
         </div>
 
         <div class="panel">
-            <h3 style="color: #fff; margin-top: 0; border-bottom: 1px solid var(--border-glass); padding-bottom: 10px;">2. 配置實戰排軸</h3>
+            <h3 style="color: #fff; margin-top: 0; border-bottom: 1px solid var(--border-glass); padding-bottom: 10px;">2. 配置實戰排軸 (僅顯示可組建的隊伍)</h3>
             
             <div class="filter-wrapper">
                 <div class="filter-grid-5">
@@ -256,15 +270,15 @@
                 <div class="filter-actions-row">
                     <button id="rot-all-btn" class="btn-action-clear ratio-71" onclick="toggleAllRotations()">🗑️ 清空可見排軸</button>
                     <button class="btn-apply ratio-85" onclick="openCustomTeamModal()" style="background: #ffb300; color: #1e1e24; border: none; box-shadow: 0 4px 10px rgba(255,179,0,0.3);">➕ 新增自訂</button>
-                    <input type="text" id="rot-search" class="ratio-99" placeholder="🔍 搜尋排軸(含主C)..." oninput="filterRotations()" style="padding: 10px 12px; border-radius: 8px; border: 1px solid var(--border-glass); background: #1e1e24; color: #fff; outline: none; box-sizing: border-box;">
+                    <input type="text" id="rot-search" class="ratio-99" placeholder="🔍 搜尋排軸 (支援主C/副C/生存)..." oninput="filterRotations()" style="padding: 10px 12px; border-radius: 8px; border: 1px solid var(--border-glass); background: #1e1e24; color: #fff; outline: none; box-sizing: border-box;">
                 </div>
             </div>
 
             <div style="margin-bottom: 20px; background: rgba(0,0,0,0.3); padding: 15px; border-radius: 12px; border: 1px solid var(--border-glass);">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-wrap: wrap; gap: 10px;">
-                    <span style="color: var(--gold); font-weight: bold;">🎯 全局操作達成率</span>
+                    <span style="color: var(--gold); font-weight: bold;">🎯 全局操作達成率 (自動依難度換算折損)</span>
                     <div style="display: flex; align-items: center; gap: 15px;">
-                        <button onclick="openCalcModal()" style="background:var(--neon-purple); color:#fff; border:none; padding:6px 12px; border-radius:8px; cursor:pointer; font-weight:bold; box-shadow:0 0 10px rgba(207,0,255,0.4);">⏱️ 穩定度計算器</button>
+                        <button onclick="openCalcModal()" style="background:var(--neon-purple); color:#fff; border:none; padding:6px 12px; border-radius:8px; cursor:pointer; font-weight:bold; box-shadow:0 0 10px rgba(207,0,255,0.4);">⏱️ 內建軸穩定性計算器</button>
                         <span id="skill-display" style="color: var(--neon-purple); font-weight: 800; font-size: 1.2em;">100%</span>
                     </div>
                 </div>
@@ -275,7 +289,7 @@
         </div>
         
         <div style="text-align: right;">
-            <button class="btn-apply" onclick="switchTab('page2', document.querySelectorAll('.tab-btn')[1])" style="font-size: 1.1em; padding: 15px 30px; border-radius: 30px;">前往下一步 ➡️</button>
+            <button class="btn-apply" onclick="switchTab('page2', document.querySelectorAll('.tab-btn')[1])" style="font-size: 1.1em; padding: 15px 30px; border-radius: 30px;">前往下一步：編隊與推演 ➡️</button>
         </div>
     </div>
 
@@ -287,21 +301,34 @@
             </div>
             
             <div class="panel team-panel">
-                <h3 style="color: #fff; margin-top: 0;">4. 隊伍編排沙盤</h3>
+                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; border-bottom: 1px solid var(--border-glass); padding-bottom: 10px; margin-bottom: 15px;">
+                    <h3 style="color: #fff; margin: 0;">4. 隊伍編排沙盤 (動態顯示)</h3>
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <label style="color: #aaa; font-size: 0.95em;">顯示隊伍數：</label>
+                        <select id="team-count-select" onchange="updateTeamDisplayCount()" style="padding: 6px 12px; background: rgba(0,0,0,0.5); color: var(--gold); border: 1px solid var(--gold); border-radius: 6px; outline: none; font-weight: bold; font-size: 1em;">
+                            <option value="16">16 隊 (極限上限)</option>
+                            <option value="12">12 隊</option>
+                            <option value="9">9 隊</option>
+                            <option value="6">6 隊</option>
+                            <option value="3">3 隊</option>
+                        </select>
+                    </div>
+                </div>
+
                 <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 15px;">
-                    <button class="btn-apply" onclick="autoBuildMaxDpsTeams()" style="flex: 1; background: linear-gradient(135deg, #cf00ff, #8e24aa);">🔥 一鍵極限編制</button>
-                    <button class="btn-apply" onclick="reverseInferAndOptimize()" style="flex: 1; background: linear-gradient(135deg, #00ffaa, #00b0ff); color: #000;">🔄 無損洗牌反推</button>
-                    <button class="btn-reset" onclick="resetTeams()">🗑️ 重設</button>
+                    <button class="btn-apply" onclick="autoBuildMaxDpsTeams()" style="flex: 1; background: linear-gradient(135deg, #cf00ff, #8e24aa);">🔥 一鍵極限編制 (理論推演)</button>
+                    <button class="btn-apply" onclick="reverseInferAndOptimize()" style="flex: 1; background: linear-gradient(135deg, #00ffaa, #00b0ff); color: #000;">🔄 依實戰得分反推與無損重排</button>
+                    <button class="btn-action-clear" onclick="resetTeams()">🗑️ 重設編制</button>
                 </div>
 
                 <div class="preset-box" style="background: rgba(0,0,0,0.3); padding: 15px; border-radius: 12px; border: 1px solid var(--neon-green); margin-bottom: 15px;">
                     <details open>
-                        <summary style="color:var(--neon-green); font-weight:bold; cursor:pointer; outline:none;">🌌 矩陣實戰接力推演與環境設定</summary>
+                        <summary style="color:var(--neon-green); font-weight:bold; cursor:pointer; outline:none;">🌌 矩陣實戰接力推演與環境設定 (影響分數與轉場計算)</summary>
                         <div style="margin-top: 15px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center;">
                             <span style="color:#00ffaa; font-weight:bold;">⚙️ 模式：</span>
                             <select id="sim-mode" onchange="updateTracker()" style="background:rgba(0,0,0,0.5); color:#fff; border:1px solid var(--border-glass); padding:8px; border-radius:8px; outline:none; flex: 1;">
-                                <option value="auto">🔥 理論極限推演 (依 DPS 接力)</option>
-                                <option value="manual">🗺️ 戰前手動編隊 (依設定終點)</option>
+                                <option value="auto">🔥 自動推演 (依DPS接力)</option>
+                                <option value="manual">🗺️ 手動編隊 (依設定終點算分)</option>
                             </select>
                         </div>
                         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 8px; margin-top: 15px;">
@@ -315,7 +342,10 @@
                             <div><label style="font-size:0.8em; color:#aaa;">單隊時限(秒):</label><input type="number" id="env-time" class="env-input" style="color:var(--neon-purple);" value="120" step="10" oninput="updateTracker()"></div>
                         </div>
                         <details style="margin-top: 15px; border-top: 1px dashed #555; padding-top: 10px;">
-                            <summary style="color:#aaa; font-size:0.9em; cursor:pointer; outline:none;">🧮 進階：個別 BOSS 血量覆寫與代數反解校正面板</summary>
+                            <summary style="color:#aaa; font-size:0.9em; cursor:pointer; outline:none;">🧮 進階：個別 BOSS 血量覆寫與代數反解校正面板 (點擊展開)</summary>
+                            <div style="font-size: 0.85em; color: #888; margin-top: 5px;">
+                                * 當您填寫表格中的「終點王殘血反解」與分數後，系統會統計並代數反解出真實血量。若樣本數足夠且偏差較大，將會出現警告供您一鍵校正。
+                            </div>
                             <div id="individual-hp-container" class="hp-grid"></div>
                         </details>
                     </details>
@@ -338,13 +368,23 @@
                     <div class="preset-controls">
                         <label style="color:#fff; font-weight:bold;">🔥 推薦配隊快速填入：</label>
                         <select id="preset-select"></select>
-                        <button class="btn-apply" onclick="applyPreset()">➕ 填入下一空位</button>
+                        <button class="btn-apply" onclick="applyPreset()" style="background:#4caf50;">➕ 填入下一空位</button>
                     </div>
                 </div>
 
-                <div style="background:rgba(0,0,0,0.4); padding:15px; border-radius:12px; margin-bottom:15px; display:flex; justify-content:space-between; align-items:center; border: 1px solid var(--border-glass);">
-                    <span style="color:var(--neon-green); font-weight:bold; font-size: 1.1em;">⚔️ 預估總分：</span>
-                    <span id="matrix-total-score" style="color:var(--neon-purple); font-weight:900; font-size:1.5em; text-shadow:0 0 10px rgba(207,0,255,0.5);">0 分</span>
+                <div style="background:rgba(0,0,0,0.4); padding:15px; border-radius:12px; margin-bottom:15px; display:flex; justify-content:space-between; align-items:center; border: 1px solid var(--border-glass); flex-wrap: wrap; gap: 10px;">
+                    <div>
+                        <span style="color:var(--neon-green); font-weight:bold; font-size: 1.1em;">⚔️ 當前編隊 矩陣接力推演總分：</span><br>
+                        <span id="matrix-total-score" style="color:var(--neon-purple); font-weight:900; font-size:1.5em; text-shadow:0 0 10px rgba(207,0,255,0.5);">0 分</span>
+                    </div>
+                    <div style="display: flex; gap: 10px;">
+                        <button onclick="exportImage()" class="btn-top" style="color:var(--neon-green); border-color:var(--neon-green);">📷 截圖分享</button>
+                        <button onclick="submitToGoogleForm()" class="btn-top" style="color:var(--gold); border-color:var(--gold);">📤 貢獻實戰大數據</button>
+                    </div>
+                </div>
+                
+                <div class="info-panel">
+                    <strong>⚠️ 提示：</strong>在表格內填寫【實戰得分】並點擊反推，系統會自動修改該隊伍的「自訂 DPS」。若要還原，請點擊該隊伍下方的「🔄 重設預設 DPS」。
                 </div>
 
                 <div class="table-responsive">
@@ -354,8 +394,8 @@
                             <th width="15%">位置 1 (主C)</th>
                             <th width="15%">位置 2 (副C)</th>
                             <th width="15%">位置 3 (生存)</th>
-                            <th width="25%">實戰得分 / 殘血設定</th>
-                            <th width="25%" style="color:var(--neon-green);">推演戰果</th>
+                            <th width="25%">實戰得分 / 殘血反解與抗性</th>
+                            <th width="25%" style="color:var(--neon-green);">推演戰果 (接力波次進度)</th>
                         </tr></thead>
                         <tbody id="team-board"></tbody>
                     </table>
@@ -371,8 +411,8 @@
             <label style="display:block; margin-bottom:12px; color:#fff;">⚔️ 真實 DPS (萬): <input type="number" id="stats-dps" step="0.01" class="score-input" style="color:#fff; border-color:var(--border-glass);"></label>
             <label style="display:block; margin-bottom:12px; color:#fff;">⚖️ 穩定性 (%): <input type="number" id="stats-stab" class="score-input" style="color:#fff; border-color:var(--border-glass);"></label>
             <div style="display:flex; gap: 10px; margin-top: 20px;">
-                <button onclick="closeStatsModal()" class="btn-action-clear" style="flex:1; padding: 10px;">取消</button>
-                <button onclick="clearStatsModal()" class="btn-action-clear" style="flex:1; padding: 10px; background:#d9534f;">清除</button>
+                <button onclick="closeStatsModal()" class="btn-action-clear" style="flex:1; padding: 10px; background:#555; border:none;">取消</button>
+                <button onclick="clearStatsModal()" class="btn-action-clear" style="flex:1; padding: 10px; background:#d9534f;">清除自訂</button>
                 <button onclick="saveStatsModal()" class="btn-action-all" style="flex:1; padding: 10px;">儲存</button>
             </div>
         </div>
@@ -394,7 +434,7 @@
                 <div style="display:flex; justify-content:space-between; margin-bottom:5px;"><span>綜合穩定性:</span> <strong id="calc-res-stab" style="color:var(--neon-purple);">0 %</strong></div>
             </div>
             <div style="display:flex; justify-content:space-between; gap: 10px;">
-                <button onclick="closeCalcModal()" class="btn-action-clear" style="flex:1;">關閉</button>
+                <button onclick="closeCalcModal()" class="btn-action-clear" style="flex:1; background:#555; border:none;">關閉</button>
                 <button onclick="applyCalculatedStability()" class="btn-action-all" style="flex:2;">套用至全局拉桿</button>
             </div>
         </div>
@@ -403,8 +443,8 @@
     <div id="data-manager-modal" class="modal-overlay">
         <div style="background:var(--bg-panel); backdrop-filter:blur(20px); padding:25px; border-radius:16px; border:1px solid var(--neon-green); width:90%; max-width:600px; max-height:80vh; overflow-y:auto; box-shadow: 0 10px 40px rgba(0,0,0,0.8);">
             <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border-glass); padding-bottom: 15px; margin-bottom: 15px;">
-                <h3 style="margin:0; color:var(--neon-green);">⚙️ 數據總管</h3>
-                <button onclick="closeDataManager()" class="btn-action-clear" style="padding: 5px 15px;">關閉</button>
+                <h3 style="margin:0; color:var(--neon-green);">⚙️ 數據總管與備份</h3>
+                <button onclick="closeDataManager()" class="btn-action-clear" style="padding: 5px 15px; background:#555; border:none;">關閉</button>
             </div>
             <div id="data-manager-content"></div>
         </div>
