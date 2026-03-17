@@ -1,9 +1,9 @@
 // ==========================================
 // 鳴潮矩陣編隊工具 - Beta 測試版核心邏輯
-// 獨立檔案：beta_app.js (已移除資料庫，純邏輯版)
+// 獨立檔案：beta_app.js
 // ==========================================
 
-// 確保翻譯字典在初始化時按照字串長度排序 (避免短詞截斷長句)
+// 確保翻譯字典在初始化時按照字串長度排序
 if (typeof phraseDict !== 'undefined') {
     phraseDict.sort((a, b) => b[0].length - a[0].length);
 }
@@ -16,6 +16,7 @@ function t(str) {
     return res;
 }
 
+// 支援 data-label 的高精度翻譯引擎
 function translateDOM(node) {
     let walker = document.createTreeWalker(node, NodeFilter.SHOW_TEXT, null, false);
     let n;
@@ -26,7 +27,7 @@ function translateDOM(node) {
             n.nodeValue = isSimp ? t(n.originalValue) : n.originalValue;
         }
     }
-    document.querySelectorAll('input[placeholder], textarea[placeholder], option').forEach(el => {
+    document.querySelectorAll('input[placeholder], textarea[placeholder], option, td[data-label]').forEach(el => {
         if (el.tagName === 'OPTION' && el.label) {
             if (el.originalLabel === undefined) el.originalLabel = el.label;
             el.label = isSimp ? t(el.originalLabel) : el.originalLabel;
@@ -34,6 +35,10 @@ function translateDOM(node) {
         if (el.placeholder) {
             if (el.originalPlaceholder === undefined) el.originalPlaceholder = el.placeholder;
             el.placeholder = isSimp ? t(el.originalPlaceholder) : el.originalPlaceholder;
+        }
+        if (el.hasAttribute('data-label')) {
+            if (el.originalDataLabel === undefined) el.originalDataLabel = el.getAttribute('data-label');
+            el.setAttribute('data-label', isSimp ? t(el.originalDataLabel) : el.originalDataLabel);
         }
     });
 }
@@ -431,7 +436,7 @@ function calculateStability() {
 function applyCalculatedStability() { document.getElementById('skill-slider').value = lastCalculatedStability; updateMasterSkill(); closeCalcModal(); }
 
 // ==========================================
-// 矩陣排兵布陣與拖曳系統 (Drag & Drop) + 雙模式切換 UI
+// 矩陣排兵布陣與拖曳系統 (Drag & Drop)
 // ==========================================
 function updateRowNumbers() {
     const rows = document.querySelectorAll('#team-board tr');
@@ -465,14 +470,15 @@ function initBoard() {
         let tr = document.createElement('tr');
         tr.className = 'draggable-row';
         tr.draggable = true; 
+        
         tr.innerHTML = `<td style="font-weight:bold; color:#d4af37; cursor:grab;">${t("第")} ${i} ${t("隊")}</td>
-                        <td><select class="char-select" onchange="updateTracker()"></select></td>
-                        <td><select class="char-select" onchange="updateTracker()"></select></td>
-                        <td>
+                        <td data-label="⚔️ ${t('位置 1 (主C)')}："><select class="char-select" onchange="updateTracker()"></select></td>
+                        <td data-label="🗡️ ${t('位置 2 (副C)')}："><select class="char-select" onchange="updateTracker()"></select></td>
+                        <td data-label="🛡️ ${t('位置 3 (生存)')}：">
                             <select class="char-select" onchange="updateTracker()"></select>
                             <button onclick="resetRowDps(this)" class="btn-reset-dps">🔄 ${t('重設預設')} DPS</button>
                         </td>
-                        <td style="font-size:0.85em; text-align:center;">
+                        <td data-label="📊 ${t('實戰得分')} 與 ${t('設定')}：" style="font-size:0.85em; text-align:center;">
                             <input type="number" class="score-input" placeholder="${t('實戰得分')}" title="${t('打完結算給的總分')}"><br>
                             <div style="display:flex; justify-content:center; align-items:center; gap:2px; margin-bottom:4px; background:#1e2b24; padding:3px; border-radius:4px; border:1px solid #00ffaa;">
                                 <span style="color:#00ffaa; font-weight:bold;">🎯${t('終')}:</span>
@@ -490,7 +496,7 @@ function initBoard() {
                                 <label><input type="checkbox" class="res-chk-4" onchange="updateTracker()">[4]</label>
                             </div>
                         </td>
-                        <td class="relay-result" style="font-size:0.85em; text-align:left; padding-left:15px; border-left:2px solid #00ffaa;">-</td>`;
+                        <td data-label="🏁 ${t('推演戰果 (接力波次進度)')}：" class="relay-result" style="font-size:0.85em; text-align:left; padding-left:15px; border-left:2px solid #00ffaa;">-</td>`;
         b.appendChild(tr);
     }
 
@@ -774,76 +780,44 @@ function renderRotations() {
     container.innerHTML = html;
 }
 
-function initBossHPMap() {
-    let env = { r1_hp: parseFloat(document.getElementById('env-r1').value) || 400.89, r2_hp: parseFloat(document.getElementById('env-r2').value) || 783.56, r3_hp: parseFloat(document.getElementById('env-r3').value) || 1384.9, growth: (parseFloat(document.getElementById('env-growth').value) || 5) / 100 };
-    try {
-        let stored = localStorage.getItem('ww_boss_hp'); if (stored) bossHPMap = JSON.parse(stored);
-        let hist = localStorage.getItem('ww_boss_hp_history'); if (hist) bossHPHistory = JSON.parse(hist);
-    } catch(e) {}
+const debouncedFilterRotations = debounce(() => {
+    let q = document.getElementById('rot-search').value.toLowerCase();
+    document.querySelectorAll('#rotation-setup input[type="checkbox"]').forEach(i => {
+        let container = i.closest('div');
+        container.style.display = container.innerText.toLowerCase().includes(q) ? 'inline-flex' : 'none';
+    });
+    document.querySelectorAll('#rotation-setup > div').forEach(group => { group.style.display = Array.from(group.querySelectorAll('div > div')).some(l => l.style.display !== 'none') ? 'block' : 'none'; });
+}, 150);
 
-    for (let r = 1; r <= 10; r++) {
-        for (let i = 1; i <= 4; i++) {
-            let key = `R${r}-${i}`;
-            if (!bossHPMap[key] || bossHPMap[key].isDefault) {
-                let hp = (r === 1) ? env.r1_hp : (r === 2 && i === 1) ? 546.67 : (r === 2) ? env.r2_hp : (r === 3) ? env.r3_hp : env.r3_hp * (1 + env.growth * ((r - 4) * 4 + i));
-                bossHPMap[key] = { value: hp, isDefault: true };
-            }
-        }
-    }
-    renderIndividualHPPanel();
+function filterRotations() { debouncedFilterRotations(); }
+
+function toggleAllRotations() {
+    const visibleBoxes = Array.from(document.querySelectorAll('#rotation-setup input[type="checkbox"]')).filter(i => i.closest('div').style.display !== 'none');
+    if(!visibleBoxes.length) return;
+    const anyChecked = visibleBoxes.some(i => i.checked);
+    visibleBoxes.forEach(i => i.checked = !anyChecked);
+    updateRotationState();
 }
 
-function renderIndividualHPPanel() {
-    let container = document.getElementById('individual-hp-container');
-    if (!container) return;
-    let html = '';
-    for (let r = 1; r <= 10; r++) {
-        for (let i = 1; i <= 4; i++) {
-            let key = `R${r}-${i}`, data = bossHPMap[key], btnHtml = '';
-            
-            if (bossHPHistory[key] && bossHPHistory[key].length >= 3) {
-                const totalDmg = bossHPHistory[key].reduce((sum, h) => sum + h.dmg, 0);
-                const totalPct = bossHPHistory[key].reduce((sum, h) => sum + h.pct, 0);
-                let avg = totalDmg / totalPct; 
-                
-                if (Math.abs(avg - getBaseEnvHP(r, i)) / getBaseEnvHP(r, i) > 0.03 && data.isDefault) {
-                    btnHtml = `<button class="btn-calib" onclick="applyCalibratedHP('${key}', ${avg})">⚠️ ${t('套用校正')}: ${avg.toFixed(1)}W</button>`;
-                }
-            }
-            html += `<div class="hp-item"><span class="hp-label">${key}</span><input type="number" class="hp-input ${!data.isDefault?'calibrated':''}" id="hp_${key}" value="${data.value.toFixed(2)}" step="10" onchange="manualUpdateHP('${key}')">${btnHtml}</div>`;
-        }
-    }
-    container.innerHTML = html;
+function toggleDifficulty(diff) {
+    const visibleBoxes = Array.from(document.querySelectorAll('#rotation-setup input[type="checkbox"]')).filter(i => i.closest('div').style.display !== 'none' && i.closest('div').innerText.includes(diff));
+    if(!visibleBoxes.length) return;
+    const allChecked = visibleBoxes.every(i => i.checked);
+    visibleBoxes.forEach(i => i.checked = !allChecked);
+    updateRotationState();
 }
 
-function getBaseEnvHP(r, index) {
-    let env = getEnvSettings();
-    if (r === 1) return env.r1_hp; if (r === 2) return index === 1 ? 546.67 : env.r2_hp; if (r === 3) return env.r3_hp;
-    return env.r3_hp * (1 + env.growth * ((r - 4) * 4 + index));
+function updateRotationState() {
+    checkedRotations.clear(); document.querySelectorAll('#rotation-setup input:checked').forEach(i => checkedRotations.add(i.value)); debouncedRenderAndTrack();
 }
 
-function getBossMaxHP(r, index) { return bossHPMap[`R${r}-${index}`] ? bossHPMap[`R${r}-${index}`].value : 400; }
-function manualUpdateHP(key) {
-    let val = parseFloat(document.getElementById(`hp_${key}`).value);
-    if (!isNaN(val) && val > 0) { bossHPMap[key] = { value: val, isDefault: false }; try { localStorage.setItem('ww_boss_hp', JSON.stringify(bossHPMap)); } catch(e) {} renderIndividualHPPanel(); updateTracker(); }
-}
-function applyCalibratedHP(key, avgValue) {
-    bossHPMap[key] = { value: avgValue, isDefault: false }; try { localStorage.setItem('ww_boss_hp', JSON.stringify(bossHPMap)); } catch(e) {}
-    renderIndividualHPPanel(); updateTracker(); alert(t(`已成功校正為平均值`) + `：${avgValue.toFixed(2)} ` + t(`萬`) + `！`);
-}
-function resetIndividualHP() { bossHPMap = {}; bossHPHistory = {}; try { localStorage.removeItem('ww_boss_hp'); localStorage.removeItem('ww_boss_hp_history'); } catch(e) {} initBossHPMap(); }
+let activePresetAttrs = new Set(); let activePresetGens = new Set();
+function togglePresetAttr(attr) { activePresetAttrs.has(attr) ? activePresetAttrs.delete(attr) : activePresetAttrs.add(attr); document.querySelector(`button[data-attr="${attr}"]`).classList.toggle(`active-attr-${attr}`); debouncedRenderAndTrack(); }
+function togglePresetGen(gen) { activePresetGens.has(gen) ? activePresetGens.delete(gen) : activePresetGens.add(gen); document.querySelector(`button[data-gen="${gen}"]`).classList.toggle(`active-gen`); debouncedRenderAndTrack(); }
 
-function getEnvSettings() {
-    return {
-        scoreRatio: parseFloat(document.getElementById('env-ratio').value) || 10,
-        r1_hp: parseFloat(document.getElementById('env-r1').value) || 400.89, r2_hp: parseFloat(document.getElementById('env-r2').value) || 783.56,
-        r3_hp: parseFloat(document.getElementById('env-r3').value) || 1384.9, growth: (parseFloat(document.getElementById('env-growth').value) || 5) / 100,
-        transTime: parseFloat(document.getElementById('env-trans').value) || 1.5, battleTime: parseFloat(document.getElementById('env-time').value) || 120,
-        resPenalty: parseFloat(document.getElementById('env-res').value) || 40
-    };
-}
-
+// ==========================================
 // 實戰反推與演算法優化 (Pooled Estimator)
+// ==========================================
 function reverseInferAndOptimize() {
     initBossHPMap();
     let env = getEnvSettings(), currentTeams = [], rows = document.querySelectorAll('#team-board tr'), start_r = 1, start_idx = 1, start_hp = getBossMaxHP(1, 1);
@@ -921,6 +895,75 @@ function reverseInferAndOptimize() {
         alert(t("✅ 實戰反推與無損洗牌完成！"));
     }
     updateTracker();
+}
+
+function initBossHPMap() {
+    let env = { r1_hp: parseFloat(document.getElementById('env-r1').value) || 400.89, r2_hp: parseFloat(document.getElementById('env-r2').value) || 783.56, r3_hp: parseFloat(document.getElementById('env-r3').value) || 1384.9, growth: (parseFloat(document.getElementById('env-growth').value) || 5) / 100 };
+    try {
+        let stored = localStorage.getItem('ww_boss_hp'); if (stored) bossHPMap = JSON.parse(stored);
+        let hist = localStorage.getItem('ww_boss_hp_history'); if (hist) bossHPHistory = JSON.parse(hist);
+    } catch(e) {}
+
+    for (let r = 1; r <= 10; r++) {
+        for (let i = 1; i <= 4; i++) {
+            let key = `R${r}-${i}`;
+            if (!bossHPMap[key] || bossHPMap[key].isDefault) {
+                let hp = (r === 1) ? env.r1_hp : (r === 2 && i === 1) ? 546.67 : (r === 2) ? env.r2_hp : (r === 3) ? env.r3_hp : env.r3_hp * (1 + env.growth * ((r - 4) * 4 + i));
+                bossHPMap[key] = { value: hp, isDefault: true };
+            }
+        }
+    }
+    renderIndividualHPPanel();
+}
+
+function renderIndividualHPPanel() {
+    let container = document.getElementById('individual-hp-container');
+    if (!container) return;
+    let html = '';
+    for (let r = 1; r <= 10; r++) {
+        for (let i = 1; i <= 4; i++) {
+            let key = `R${r}-${i}`, data = bossHPMap[key], btnHtml = '';
+            
+            if (bossHPHistory[key] && bossHPHistory[key].length >= 3) {
+                const totalDmg = bossHPHistory[key].reduce((sum, h) => sum + h.dmg, 0);
+                const totalPct = bossHPHistory[key].reduce((sum, h) => sum + h.pct, 0);
+                let avg = totalDmg / totalPct; 
+                
+                if (Math.abs(avg - getBaseEnvHP(r, i)) / getBaseEnvHP(r, i) > 0.03 && data.isDefault) {
+                    btnHtml = `<button class="btn-calib" onclick="applyCalibratedHP('${key}', ${avg})">⚠️ ${t('套用校正')}: ${avg.toFixed(1)}W</button>`;
+                }
+            }
+            html += `<div class="hp-item"><span class="hp-label">${key}</span><input type="number" class="hp-input ${!data.isDefault?'calibrated':''}" id="hp_${key}" value="${data.value.toFixed(2)}" step="10" onchange="manualUpdateHP('${key}')">${btnHtml}</div>`;
+        }
+    }
+    container.innerHTML = html;
+}
+
+function getBaseEnvHP(r, index) {
+    let env = getEnvSettings();
+    if (r === 1) return env.r1_hp; if (r === 2) return index === 1 ? 546.67 : env.r2_hp; if (r === 3) return env.r3_hp;
+    return env.r3_hp * (1 + env.growth * ((r - 4) * 4 + index));
+}
+
+function getBossMaxHP(r, index) { return bossHPMap[`R${r}-${index}`] ? bossHPMap[`R${r}-${index}`].value : 400; }
+function manualUpdateHP(key) {
+    let val = parseFloat(document.getElementById(`hp_${key}`).value);
+    if (!isNaN(val) && val > 0) { bossHPMap[key] = { value: val, isDefault: false }; try { localStorage.setItem('ww_boss_hp', JSON.stringify(bossHPMap)); } catch(e) {} renderIndividualHPPanel(); updateTracker(); }
+}
+function applyCalibratedHP(key, avgValue) {
+    bossHPMap[key] = { value: avgValue, isDefault: false }; try { localStorage.setItem('ww_boss_hp', JSON.stringify(bossHPMap)); } catch(e) {}
+    renderIndividualHPPanel(); updateTracker(); alert(t(`已成功校正為平均值`) + `：${avgValue.toFixed(2)} ` + t(`萬`) + `！`);
+}
+function resetIndividualHP() { bossHPMap = {}; bossHPHistory = {}; try { localStorage.removeItem('ww_boss_hp'); localStorage.removeItem('ww_boss_hp_history'); } catch(e) {} initBossHPMap(); }
+
+function getEnvSettings() {
+    return {
+        scoreRatio: parseFloat(document.getElementById('env-ratio').value) || 10,
+        r1_hp: parseFloat(document.getElementById('env-r1').value) || 400.89, r2_hp: parseFloat(document.getElementById('env-r2').value) || 783.56,
+        r3_hp: parseFloat(document.getElementById('env-r3').value) || 1384.9, growth: (parseFloat(document.getElementById('env-growth').value) || 5) / 100,
+        transTime: parseFloat(document.getElementById('env-trans').value) || 1.5, battleTime: parseFloat(document.getElementById('env-time').value) || 120,
+        resPenalty: parseFloat(document.getElementById('env-res').value) || 40
+    };
 }
 
 function autoBuildMaxDpsTeams() {
