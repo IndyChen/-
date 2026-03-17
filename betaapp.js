@@ -88,7 +88,7 @@ const phraseDict = [
     ["雙錨", "双锚"], ["錯延", "错延"], ["旋踢", "旋踢"], ["新增自訂編隊", "新增自订编队"], ["預設理論", "预设理论"],
     ["數據總管與備份", "数据总管与备份"], ["返回正式版", "返回正式版"], ["管理校正樣本", "管理校正样本"], 
     ["匯出存檔", "汇出存档"], ["匯入存檔", "汇入存档"], ["複製代碼", "复制代码"], ["還原設定", "还原设定"],
-    ["排序", "排序"]
+    ["排序", "排序"], ["未來版本嚐鮮", "未来版本尝鲜"]
 ];
 
 phraseDict.sort((a, b) => b[0].length - a[0].length);
@@ -138,7 +138,7 @@ function debounce(func, wait) {
 }
 
 // ==========================================
-// 2. 核心資料庫與自訂系統
+// 2. 核心資料庫
 // ==========================================
 const charData = {
     "漂泊者": { max: 1, rarity: 5, gen: 1, type: "一般角色 (可用 1 次)" }, "維里奈": { max: 2, rarity: 5, gen: 1, type: "生存位 (可用 2 次)" }, 
@@ -517,7 +517,7 @@ function deleteHPSample(key, index) {
 
 
 // ==========================================
-// 6. UI 互動與畫面渲染核心 (修復遺失的部分)
+// 6. UI 互動與畫面渲染核心
 // ==========================================
 
 function toggleRarity(s) { 
@@ -548,12 +548,24 @@ function renderCheckboxes() {
 
 const debouncedFilterCharacters = debounce(() => {
     let q = document.getElementById('char-search').value.toLowerCase();
-    let qTrad = q; 
+    
     document.querySelectorAll('.checkbox-item').forEach(l => {
-        let name = l.querySelector('input').value, d = charData[name];
+        let inputEl = l.querySelector('input');
+        if (!inputEl) return;
+        
+        let name = inputEl.value;
+        let d = charData[name];
+        if (!d) return; 
+
         let searchTarget = name.toLowerCase() + t(name).toLowerCase();
         if (searchTarget.includes('漂泊者')) searchTarget += ' 光主 暗主 風主';
-        let m = searchTarget.includes(qTrad) && ((d.rarity==5 && show5Star) || (d.rarity==4 && show4Star)) && ((d.gen==1 && showG1) || (d.gen==2 && showG2) || (d.gen==3 && showG3));
+        
+        let matchRarity = (d.rarity === 5 && show5Star) || (d.rarity === 4 && show4Star);
+        let matchGen = (d.gen === 1 && showG1) || (d.gen === 2 && showG2) || (d.gen === 3 && showG3);
+        let matchSearch = q === '' || searchTarget.includes(q);
+
+        let m = matchSearch && matchRarity && matchGen;
+        
         l.style.display = m ? 'flex' : 'none';
     });
 }, 150);
@@ -752,16 +764,33 @@ function updateTracker() {
         📊 ${t("理論最大")}：<span style="color:#4caf50;font-weight:bold;font-size:1.2em;">${getMaxTeams({})}</span> <span style="color:#aaa;">${t("隊")}</span> | ⏳ ${t("剩餘可排")}：<span style="color:#ffb300;font-weight:bold;font-size:1.2em;">${getMaxTeams(used)}</span> <span style="color:#aaa;">${t("隊")}</span>
     </div>`;
 
-    let groups = { "生存位 (可用 2 次)": [], "一般角色 (可用 1 次)": [] };
-    ownedCharacters.forEach(name => { let base = getBase(name); if(charData[base]) groups[charData[base].type].push(name); });
-    for(let type in groups) {
-        if(groups[type].length === 0) continue;
-        tracker.innerHTML += `<div class="type-title">${t(type.split(" ")[0])} <span style="font-size:0.8em; color:#888;">${t(type.substring(type.indexOf("(")))}</span></div>`;
-        groups[type].sort((a,b) => {
+    // 移除會產生 Bug 的中文字串依賴，改用英文 Key
+    let groups = { "surv": [], "dps": [] };
+    ownedCharacters.forEach(name => { 
+        let base = getBase(name); 
+        if(charData[base]) {
+            if(charData[base].type.includes("生存位")) groups["surv"].push(name);
+            else groups["dps"].push(name);
+        }
+    });
+
+    if(groups["surv"].length > 0) {
+        tracker.innerHTML += `<div class="type-title">${t('生存位')} <span style="font-size:0.8em; color:#888;">(${t('可用 2 次')})</span></div>`;
+        groups["surv"].sort((a,b) => {
             let rA = charData[getBase(a)].max - (used[getBase(a)]||0), rB = charData[getBase(b)].max - (used[getBase(b)]||0);
             if(rA > 0 && rB <= 0) return -1; if(rA <= 0 && rB > 0) return 1; return characterOrder.indexOf(a) - characterOrder.indexOf(b);
+        }).forEach(name => {
+            let rem = charData[getBase(name)].max - (used[getBase(name)]||0);
+            tracker.innerHTML += `<div class="char-row"><span>${t(name)}</span><span class="count-badge ${rem<=0?'count-empty':''}">${rem<=0?t('耗盡'):rem}</span></div>`;
         });
-        groups[type].forEach(name => {
+    }
+
+    if(groups["dps"].length > 0) {
+        tracker.innerHTML += `<div class="type-title">${t('一般角色')} <span style="font-size:0.8em; color:#888;">(${t('可用 1 次')})</span></div>`;
+        groups["dps"].sort((a,b) => {
+            let rA = charData[getBase(a)].max - (used[getBase(a)]||0), rB = charData[getBase(b)].max - (used[getBase(b)]||0);
+            if(rA > 0 && rB <= 0) return -1; if(rA <= 0 && rB > 0) return 1; return characterOrder.indexOf(a) - characterOrder.indexOf(b);
+        }).forEach(name => {
             let rem = charData[getBase(name)].max - (used[getBase(name)]||0);
             tracker.innerHTML += `<div class="char-row"><span>${t(name)}</span><span class="count-badge ${rem<=0?'count-empty':''}">${rem<=0?t('耗盡'):rem}</span></div>`;
         });
