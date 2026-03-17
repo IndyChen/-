@@ -142,7 +142,7 @@ function openCustomTeamModal() {
                 <option value="🟩">🟩 輪椅</option><option value="🔵">🔵 中等</option><option value="⭐">⭐ 進階</option><option value="⚠️">⚠️ 極難</option><option value="🧩">🧩 非主流</option>
             </select>
             <div style="display:flex; gap:10px;">
-                <button onclick="document.getElementById('custom-team-modal').style.display='none'" class="btn-action-clear" style="flex:1;">取消</button>
+                <button onclick="document.getElementById('custom-team-modal').style.display='none'" class="btn-action-clear" style="flex:1; background:#555; border:none;">取消</button>
                 <button onclick="saveCustomTeam()" class="btn-action-all" style="flex:1;">儲存</button>
             </div>
         </div>`;
@@ -160,27 +160,59 @@ function saveCustomTeam() {
     document.getElementById('custom-team-modal').style.display = 'none'; debouncedRenderAndTrack(); alert(t('自訂編隊已成功加入。'));
 }
 
+// 🚀 核心更新：數據總管儀表板與卡片化設計
 function openDataManager() {
+    let overriddenBossCount = Object.values(bossHPMap).filter(data => !data.isDefault).length;
+    
     let content = document.getElementById('data-manager-content');
     content.innerHTML = `
-        <div style="margin-bottom:20px;">
-            <p style="color:#aaa; font-size:0.9em;">包含角色、排軸、自訂編隊、血量校正紀錄。</p>
-            <textarea id="dm-code" rows="3" style="width:100%; padding:10px; background:rgba(0,0,0,0.5); color:var(--neon-green); border:1px solid var(--border-glass); border-radius:8px; resize:none;"></textarea>
-            <div style="display:flex; gap:10px; margin-top:10px;"><button onclick="generateExportCode()" class="btn-action-all" style="flex:1;">📥 產生代碼</button><button onclick="importFromCode()" class="btn-action-clear" style="flex:1; background:#ff9800; border-color:#ff9800;">📤 還原設定</button></div>
+        <div style="display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap;">
+            <div style="flex: 1; background: rgba(0, 255, 170, 0.1); border: 1px solid var(--neon-green); padding: 10px; border-radius: 8px; text-align: center;">
+                <div style="font-size: 1.5em; font-weight: bold; color: var(--neon-green);">${ownedCharacters.size}</div>
+                <div style="font-size: 0.8em; color: #aaa;">👤 已解鎖角色</div>
+            </div>
+            <div style="flex: 1; background: rgba(212, 175, 55, 0.1); border: 1px solid var(--gold); padding: 10px; border-radius: 8px; text-align: center;">
+                <div style="font-size: 1.5em; font-weight: bold; color: var(--gold);">${customRotations.length}</div>
+                <div style="font-size: 0.8em; color: #aaa;">⚔️ 自訂編隊</div>
+            </div>
+            <div style="flex: 1; background: rgba(207, 0, 255, 0.1); border: 1px solid var(--neon-purple); padding: 10px; border-radius: 8px; text-align: center;">
+                <div style="font-size: 1.5em; font-weight: bold; color: var(--neon-purple);">${overriddenBossCount}</div>
+                <div style="font-size: 0.8em; color: #aaa;">🧮 覆寫王血量</div>
+            </div>
         </div>
-        <div style="border-top:1px dashed var(--border-glass); padding-top:15px;"><h4 style="color:var(--gold); margin-top:0;">📝 自訂編隊管理</h4><div id="dm-teams"></div></div>
+        <div style="margin-bottom:20px;">
+            <p style="color:#aaa; font-size:0.9em;">備份將包含上述所有數據及當前排軸設定與隊伍編排。</p>
+            <textarea id="dm-code" rows="3" style="width:100%; padding:10px; background:rgba(0,0,0,0.5); color:var(--neon-green); border:1px solid var(--border-glass); border-radius:8px; resize:none;"></textarea>
+            <div style="display:flex; gap:10px; margin-top:10px;">
+                <button onclick="generateExportCode()" class="btn-action-all" style="flex:1;">📥 產生備份代碼</button>
+                <button onclick="confirmImportFromCode()" class="btn-action-clear" style="flex:1; background:#ff9800; border-color:#ff9800;">📤 匯入存檔代碼</button>
+            </div>
+        </div>
+        <div style="border-top:1px dashed var(--border-glass); padding-top:15px;">
+            <h4 style="color:var(--gold); margin-top:0;">📝 自訂編隊管理</h4>
+            <div id="dm-teams" style="max-height: 250px; overflow-y: auto; padding-right: 5px;"></div>
+        </div>
     `;
-    let teamHtml = customRotations.length === 0 ? `<p style="color:#666;">無資料</p>` : customRotations.map((cr, i) => `<div style="display:flex; justify-content:space-between; margin-bottom:5px; background:rgba(0,0,0,0.3); padding:8px; border-radius:6px;"><span>${cr.diff} ${t(cr.c1)}+${t(cr.c2)}+${t(cr.c3)} (${cr.dps}w)</span><button onclick="deleteCustomTeam(${i})" class="btn-action-clear" style="padding:2px 8px;">❌</button></div>`).join('');
+    let teamHtml = customRotations.length === 0 ? `<p style="color:#666; text-align:center;">無自訂資料</p>` : customRotations.map((cr, i) => `
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; background:rgba(0,0,0,0.3); padding:10px 12px; border-radius:8px; border: 1px solid var(--border-glass);">
+            <span style="color:#ddd; font-size: 0.95em;">${cr.diff} <span style="color:var(--gold); font-weight:bold;">${t(cr.c1)} + ${t(cr.c2)} + ${t(cr.c3)}</span> (DPS: ${cr.dps}w)</span>
+            <button onclick="deleteCustomTeam(${i})" class="btn-action-clear" style="padding:4px 10px; font-size:0.85em; border-radius:6px; box-shadow:none;">❌ 刪除</button>
+        </div>`).join('');
     document.getElementById('dm-teams').innerHTML = teamHtml;
     document.getElementById('data-manager-modal').style.display = 'flex';
 }
 function closeDataManager() { document.getElementById('data-manager-modal').style.display = 'none'; }
 function generateExportCode() {
     let data = { roster: [...ownedCharacters], rotations: [...checkedRotations], customStats: customStatsMap, bossHp: bossHPHistory, customTeams: customRotations };
-    document.getElementById('dm-code').value = btoa(encodeURIComponent(JSON.stringify(data))); alert(t('✅ 代碼已產生。'));
+    document.getElementById('dm-code').value = btoa(encodeURIComponent(JSON.stringify(data))); alert(t('✅ 存檔代碼已產生，請複製保存。'));
+}
+function confirmImportFromCode() {
+    if(confirm(t(`這將會覆寫您目前的 ${customRotations.length} 組自訂隊伍與所有設定，確定執行嗎？`))) {
+        importFromCode();
+    }
 }
 function importFromCode() {
-    let code = document.getElementById('dm-code').value; if(!code || !confirm(t('這將會覆寫所有設定，確定？'))) return;
+    let code = document.getElementById('dm-code').value; if(!code) return;
     try {
         let data = JSON.parse(decodeURIComponent(atob(code)));
         if(data.roster) localStorage.setItem('ww_roster', JSON.stringify(data.roster));
@@ -188,8 +220,8 @@ function importFromCode() {
         if(data.customStats) localStorage.setItem('ww_custom_stats', JSON.stringify(data.customStats));
         if(data.bossHp) localStorage.setItem('ww_boss_hp_history', JSON.stringify(data.bossHp));
         if(data.customTeams) localStorage.setItem('ww_custom_rotations_v2', JSON.stringify(data.customTeams));
-        alert(t('✅ 設定已還原！')); window.location.reload();
-    } catch(e) { alert(t('❌ 解析失敗。')); }
+        alert(t('✅ 設定已還原！即將重新載入頁面。')); window.location.reload();
+    } catch(e) { alert(t('❌ 解析失敗，請確認代碼正確。')); }
 }
 function deleteCustomTeam(index) {
     if(!confirm(t('確定刪除？'))) return; let cr = customRotations.splice(index, 1)[0];
@@ -265,7 +297,7 @@ function resetRowDps(btn) {
     let c1 = ss[0].value, c2 = ss[1].value, c3 = ss[2].value;
     if (!c1 || !c2 || !c3) return alert(t("請先排滿該隊伍的成員。"));
     let possibleRots = dpsData.filter(d => d.c1 === c1 && d.c2 === c2 && d.c3 === c3);
-    if(possibleRots.length > 0) { possibleRots.forEach(r => { delete customStatsMap[r.id]; }); try { localStorage.setItem('ww_custom_stats', JSON.stringify(customStatsMap)); } catch(e){} row.querySelector('.score-input').value = ""; renderRotations(); updateTracker(); alert(t("已清除")); }
+    if(possibleRots.length > 0) { possibleRots.forEach(r => { delete customStatsMap[r.id]; }); try { localStorage.setItem('ww_custom_stats', JSON.stringify(customStatsMap)); } catch(e){} row.querySelector('.score-input').value = ""; renderRotations(); updateTracker(); alert(t("已重設該隊伍的 DPS 為預設值。")); }
 }
 
 let currentEditRotId = null;
@@ -312,8 +344,8 @@ function initBoard() {
         tr.innerHTML = `<td>${t("第")} ${i} ${t("隊")}</td>
                         <td data-label="⚔️ ${t('主C')}："><select class="char-select" onchange="updateTracker()"></select></td>
                         <td data-label="🗡️ ${t('副C')}："><select class="char-select" onchange="updateTracker()"></select></td>
-                        <td data-label="🛡️ ${t('生存')}："><select class="char-select" onchange="updateTracker()"></select><button onclick="resetRowDps(this)" class="btn-reset-dps" style="margin-top:5px; padding:4px 8px; border-radius:4px; font-size:0.8em; background:#2b2b36; color:#aaa; border:1px solid #555; cursor:pointer;">🔄 Reset DPS</button></td>
-                        <td data-label="📊 ${t('實戰得分')} 與 ${t('設定')}：">
+                        <td data-label="🛡️ ${t('生存')}："><select class="char-select" onchange="updateTracker()"></select><button onclick="resetRowDps(this)" class="btn-reset-dps" style="margin-top:5px; padding:4px 8px; border-radius:4px; font-size:0.8em; background:#2b2b36; color:#aaa; border:1px solid #555; cursor:pointer;">🔄 ${t('重設預設')} DPS</button></td>
+                        <td data-label="📊 ${t('實戰得分')} / ${t('殘血設定')}：">
                             <input type="number" class="score-input" placeholder="${t('實戰得分')}"><br>
                             <div style="display:flex; justify-content:center; align-items:center; gap:4px; flex-wrap:wrap; margin-bottom:6px; background:rgba(0,0,0,0.3); padding:8px; border-radius:6px; border:1px solid var(--neon-green);">
                                 <span>🎯終:</span><select class="hp-calc-select end-boss-r">${rOpts}</select>
@@ -343,6 +375,39 @@ function initBoard() {
     b.addEventListener('dragend', e => { if(draggedRow) draggedRow.classList.remove('dragging'); draggedRow = null; updateRowNumbers(); debouncedRenderAndTrack(); });
 }
 
+// 🚀 核心更新：動態顯示隊伍數量邏輯 (強制釋放資源防呆)
+function updateTeamDisplayCount() {
+    let count = parseInt(document.getElementById('team-count-select').value) || 16;
+    try { localStorage.setItem('ww_display_count', count); } catch(e) {}
+    
+    let rows = document.querySelectorAll('#team-board tr');
+    let needsTrackerUpdate = false;
+    
+    rows.forEach((row, index) => {
+        if (index < count) {
+            row.style.display = ''; // 顯示隊伍
+        } else {
+            if (row.style.display !== 'none') {
+                row.style.display = 'none'; // 隱藏隊伍
+                // ⚠️ 強制清空被隱藏的資料，歸還角色次數
+                let selects = row.querySelectorAll('select.char-select');
+                let hasData = Array.from(selects).some(s => s.value !== "");
+                if (hasData) {
+                    selects.forEach(s => s.value = "");
+                    row.querySelector('.score-input').value = "";
+                    row.querySelector('.end-boss-r').value = "";
+                    row.querySelector('.end-boss-idx').value = "";
+                    row.querySelector('.end-boss-hp').value = "";
+                    row.querySelectorAll('input[type="checkbox"][class^="res-chk"]').forEach(c => c.checked = false);
+                    needsTrackerUpdate = true;
+                }
+            }
+        }
+    });
+    
+    if (needsTrackerUpdate) updateTracker();
+}
+
 let activePresetAttrs = new Set(); let activePresetGens = new Set();
 function togglePresetAttr(attr) { activePresetAttrs.has(attr) ? activePresetAttrs.delete(attr) : activePresetAttrs.add(attr); document.querySelector(`button[data-attr="${attr}"]`).classList.toggle(`active-attr-${attr}`); debouncedRenderAndTrack(); }
 function togglePresetGen(gen) { activePresetGens.has(gen) ? activePresetGens.delete(gen) : activePresetGens.add(gen); document.querySelector(`button[data-gen="${gen}"]`).classList.toggle(`active-gen`); debouncedRenderAndTrack(); }
@@ -353,6 +418,7 @@ function updateTracker() {
     document.querySelectorAll('.char-select').forEach(s => { if(s.value) used[getBase(s.value)]++; });
     
     document.querySelectorAll('#team-board tr').forEach(row => {
+        if (row.style.display === 'none') return; // 不渲染隱藏的隊伍選單
         let ss = row.querySelectorAll('select.char-select'), v1=ss[0].value, v2=ss[1].value, v3=ss[2].value;
         let bases = new Set([v1,v2,v3].filter(x=>x).map(x=>getBase(x)));
         ss.forEach((s, i) => {
@@ -401,6 +467,7 @@ function updateTracker() {
     let simMode = document.getElementById('sim-mode') ? document.getElementById('sim-mode').value : 'auto';
 
     document.querySelectorAll('#team-board tr').forEach(row => {
+        if (row.style.display === 'none') return;
         let ss = row.querySelectorAll('select.char-select'), c1 = ss[0].value, c2 = ss[1].value, c3 = ss[2].value;
         let resTd = row.querySelector('.relay-result'), ebR = row.querySelector('.end-boss-r').value, ebIdx = row.querySelector('.end-boss-idx').value, ebHp = row.querySelector('.end-boss-hp').value;
         let chk_res = [row.querySelector('.res-chk-1').checked, row.querySelector('.res-chk-2').checked, row.querySelector('.res-chk-3').checked, row.querySelector('.res-chk-4').checked];
@@ -501,18 +568,19 @@ function getMaxTeams(usedObj) {
 function renderRotations() {
     const container = document.getElementById('rotation-setup');
     const valid = dpsData.filter(d => isOwned(d.c1) && isOwned(d.c2) && isOwned(d.c3));
-    if(!valid.length) { container.innerHTML = `<p style="color:#888;">請勾選角色以解鎖排軸</p>`; return; }
+    if(!valid.length) { container.innerHTML = `<p style="color:#888;">請先在上方勾選擁有的角色，以解鎖可組建的排軸</p>`; return; }
     let groups = {}; valid.forEach(d => { if(!groups[d.c1]) groups[d.c1] = []; groups[d.c1].push(d); });
     let html = '';
     for(let c1 in groups) {
         html += `<div style="margin-bottom:15px; padding:12px; background:rgba(0,0,0,0.3); border-radius:12px; border-left: 4px solid var(--gold);"><strong style="color: var(--gold);">🎯 ${t(c1)}</strong><div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:8px;">`;
         groups[c1].sort((a,b) => getRotDpsRange(b).min - getRotDpsRange(a).min).forEach(d => {
-            let r = getRotDpsRange(d), dpsStr = (r.max > 0 || r.isCustom) ? `[${r.min.toFixed(2)}~${r.max.toFixed(2)}w]` : t('[無DPS]'), colorStyle = r.isCustom ? 'color:var(--neon-green); text-decoration:underline dashed;' : (r.min < r.max ? 'color:var(--gold);' : 'color:#fff;');
-            // 🚀 核心更新：加入 data-search 屬性，包含主C、副C、生存、難度與軸名，支援全域搜索
+            let r = getRotDpsRange(d), dpsStr = (r.max > 0 || r.isCustom) ? `[${r.min.toFixed(2)}~${r.max.toFixed(2)}w]` : t('[無預設/點擊自訂]'), colorStyle = r.isCustom ? 'color:var(--neon-green); text-decoration:underline dashed;' : (r.min < r.max ? 'color:var(--gold);' : 'color:#fff;');
             let searchStr = `${t(d.c1)} ${t(d.c2)} ${t(d.c3)} ${t(d.rot)} ${t(d.diff)}`.toLowerCase();
             html += `<div class="rot-row" data-search="${searchStr}" style="background:rgba(255,255,255,0.05); padding:8px 12px; border-radius:8px; font-size:0.9em; border: 1px solid var(--border-glass); display:inline-flex; align-items:center; gap:8px;">
-                        <input type="checkbox" value="${d.id}" ${checkedRotations.has(d.id)?'checked':''} onchange="updateRotationState()">
-                        <span style="color:#aaa;">${t(d.diff)}</span><span onclick="openStatsModal(event, '${d.id}')" style="cursor:pointer; font-weight:bold; ${colorStyle};">${dpsStr}</span><span style="color:#eee;">${d.isUserCustom?'<b style="color:var(--neon-green)">[自訂]</b> ':''}${t(d.c2)}/${t(d.c3)} (${t(d.rot)})</span>
+                        <input type="checkbox" id="chk_${d.id}" value="${d.id}" ${checkedRotations.has(d.id)?'checked':''} onchange="updateRotationState()">
+                        <label for="chk_${d.id}" style="cursor:pointer; margin:0;">${t(d.diff)}</label>
+                        <span onclick="openStatsModal(event, '${d.id}')" style="cursor:pointer; font-weight:bold; ${colorStyle};">${dpsStr}</span>
+                        <label for="chk_${d.id}" style="cursor:pointer; margin:0;">${d.isUserCustom?'<b style="color:var(--neon-green)">['+t('自訂')+']</b> ':''}${t(d.c2)}/${t(d.c3)} (${t(d.rot)})</label>
                     </div>`;
         });
         html += `</div></div>`;
@@ -520,13 +588,11 @@ function renderRotations() {
     container.innerHTML = html;
 }
 
-// 🚀 核心更新：使用 data-search 實現包含主C的高精度搜索
 const debouncedFilterRotations = debounce(() => {
     let q = document.getElementById('rot-search').value.toLowerCase();
     document.querySelectorAll('#rotation-setup .rot-row').forEach(row => { 
         row.style.display = row.getAttribute('data-search').includes(q) ? 'inline-flex' : 'none'; 
     });
-    // 如果該主C底下的排軸全部被隱藏，則隱藏整個主C區塊
     document.querySelectorAll('#rotation-setup > div').forEach(g => { 
         g.style.display = Array.from(g.querySelectorAll('.rot-row')).some(l => l.style.display !== 'none') ? 'block' : 'none'; 
     });
@@ -560,6 +626,7 @@ function updateRotationState() {
 function reverseInferAndOptimize() {
     initBossHPMap(); let env = getEnvSettings(), currentTeams = [], rows = document.querySelectorAll('#team-board tr'), start_r = 1, start_idx = 1, start_hp = getBossMaxHP(1, 1);
     rows.forEach((row) => {
+        if (row.style.display === 'none') return;
         let ss = row.querySelectorAll('select.char-select'), c1 = ss[0].value, c2 = ss[1].value, c3 = ss[2].value, scoreInput = row.querySelector('.score-input').value, ebR = row.querySelector('.end-boss-r').value, ebIdx = row.querySelector('.end-boss-idx').value, ebHp = row.querySelector('.end-boss-hp').value;
         let chk_res = [row.querySelector('.res-chk-1').checked, row.querySelector('.res-chk-2').checked, row.querySelector('.res-chk-3').checked, row.querySelector('.res-chk-4').checked];
         if (c1) { 
@@ -592,8 +659,12 @@ function reverseInferAndOptimize() {
     if (currentTeams.length > 0) {
         currentTeams.sort((a, b) => b.calculatedMinDps - a.calculatedMinDps);
         document.querySelectorAll('.char-select, .score-input, .end-boss-r, .end-boss-idx, .end-boss-hp').forEach(el => el.value = ""); document.querySelectorAll('input[type="checkbox"][class^="res-chk"]').forEach(c => c.checked = false);
+        
+        // 限制只填寫當前顯示的隊伍數
+        let maxAllowed = parseInt(document.getElementById('team-count-select').value) || 16;
         currentTeams.forEach((tData, index) => {
-            let row = rows[index]; if(row) {
+            if (index < maxAllowed && rows[index]) {
+                let row = rows[index];
                 let ss = row.querySelectorAll('select.char-select');
                 ss[0].innerHTML = `<option value="${tData.c1}">${tData.c1}</option>`; ss[1].innerHTML = `<option value="${tData.c2}">${tData.c2}</option>`; ss[2].innerHTML = `<option value="${tData.c3}">${tData.c3}</option>`;
                 ss[0].value = tData.c1; ss[1].value = tData.c2; ss[2].value = tData.c3;
@@ -612,25 +683,33 @@ function autoBuildMaxDpsTeams() {
     validTeams.sort((a, b) => getRotDpsRange(b).min - getRotDpsRange(a).min);
     let charUsageCount = {}; for(let n in charData) charUsageCount[n] = 0;
     let finalOptimizedTeams = [];
+    
+    // 🚀 核心更新：根據選單限制一鍵編隊的數量
+    let maxAllowed = parseInt(document.getElementById('team-count-select').value) || 16;
+    
     for (let team of validTeams) {
         let b1 = getBase(team.c1), b2 = getBase(team.c2), b3 = getBase(team.c3), u1 = charUsageCount[b1] || 0, u2 = charUsageCount[b2] || 0, u3 = charUsageCount[b3] || 0;
         if (u1 < (charData[b1]?.max||1) && u2 < (charData[b2]?.max||1) && u3 < (charData[b3]?.max||1)) { if (b1 === b2 || b1 === b3 || b2 === b3) continue; finalOptimizedTeams.push(team); charUsageCount[b1]=u1+1; charUsageCount[b2]=u2+1; charUsageCount[b3]=u3+1; }
-        if (finalOptimizedTeams.length >= 16) break;
+        if (finalOptimizedTeams.length >= maxAllowed) break; 
     }
     document.querySelectorAll('.char-select, .score-input, .end-boss-hp, .end-boss-r, .end-boss-idx').forEach(el => el.value=""); document.querySelectorAll('input[type="checkbox"][class^="res-chk"]').forEach(c => c.checked=false);
     let rows = document.querySelectorAll('#team-board tr');
-    finalOptimizedTeams.forEach((tData, index) => { if(rows[index]) { let ss = rows[index].querySelectorAll('select.char-select'); ss[0].innerHTML = `<option value="${tData.c1}">${tData.c1}</option>`; ss[1].innerHTML = `<option value="${tData.c2}">${tData.c2}</option>`; ss[2].innerHTML = `<option value="${tData.c3}">${tData.c3}</option>`; ss[0].value = tData.c1; ss[1].value = tData.c2; ss[2].value = tData.c3; } });
+    finalOptimizedTeams.forEach((tData, index) => { if(rows[index] && index < maxAllowed) { let ss = rows[index].querySelectorAll('select.char-select'); ss[0].innerHTML = `<option value="${tData.c1}">${tData.c1}</option>`; ss[1].innerHTML = `<option value="${tData.c2}">${tData.c2}</option>`; ss[2].innerHTML = `<option value="${tData.c3}">${tData.c3}</option>`; ss[0].value = tData.c1; ss[1].value = tData.c2; ss[2].value = tData.c3; } });
     updateTracker(); alert(t(`一鍵配置完成！共組建 `) + finalOptimizedTeams.length + t(` 隊。`));
 }
 
 function applyPreset() {
     let val = document.getElementById('preset-select').value; if(!val) return;
     let cs = val.split(','), rows = document.querySelectorAll('#team-board tr'), applied = false;
-    for(let r of rows) {
+    let maxAllowed = parseInt(document.getElementById('team-count-select').value) || 16;
+    
+    for (let i = 0; i < maxAllowed; i++) {
+        let r = rows[i];
+        if (!r) continue;
         let ss = r.querySelectorAll('select.char-select');
         if(!ss[0].value && !ss[1].value && !ss[2].value) { ss[0].value=cs[0]; ss[1].value=cs[1]; ss[2].value=cs[2]; applied = true; break; }
     }
-    if(!applied) alert(t("沒有空白隊伍了！")); updateTracker();
+    if(!applied) alert(t("當前顯示的隊伍中已經沒有空位了！")); updateTracker();
 }
 
 function resetTeams() { if(!confirm(t("確定清空編隊表嗎？"))) return; document.querySelectorAll('.char-select, .score-input, .end-boss-hp, .end-boss-r, .end-boss-idx').forEach(el => el.value=""); document.querySelectorAll('input[type="checkbox"][class^="res-chk"]').forEach(c => c.checked=false); updateTracker(); }
@@ -667,6 +746,83 @@ function getEnvSettings() { return { scoreRatio: parseFloat(document.getElementB
 
 function saveData() { try { localStorage.setItem('ww_roster', JSON.stringify([...ownedCharacters])); localStorage.setItem('ww_rotations', JSON.stringify([...checkedRotations])); let teams = []; document.querySelectorAll('#team-board tr').forEach(r => teams.push([...r.querySelectorAll('select.char-select')].map(s=>s.value))); localStorage.setItem('ww_teams', JSON.stringify(teams)); } catch(e) {} }
 
+// 🚀 核心更新：截圖分享加入所有進階資訊與精確輸出
+function exportImage() {
+    const rows = document.querySelectorAll('#team-board tr'); let completed = [];
+    rows.forEach((r, i) => {
+        if (r.style.display === 'none') return; // 不截圖隱藏的隊伍
+        let ss = r.querySelectorAll('select.char-select'), resTd = r.querySelector('.relay-result');
+        let score = r.querySelector('.score-input').value, ebR = r.querySelector('.end-boss-r').value, ebIdx = r.querySelector('.end-boss-idx').value, ebHp = r.querySelector('.end-boss-hp').value;
+        if(ss[0].value && ss[1].value && ss[2].value) {
+            let resText = resTd.innerText.replace(/\n/g, ' | ');
+            let finalScore = score ? `🎯 實得分: ${score}` : resText;
+            
+            // 抓取是否有遭遇抗性王
+            let resInfo = [];
+            if(r.querySelector('.res-chk-1').checked) resInfo.push("[1]");
+            if(r.querySelector('.res-chk-2').checked) resInfo.push("[2]");
+            if(r.querySelector('.res-chk-3').checked) resInfo.push("[3]");
+            if(r.querySelector('.res-chk-4').checked) resInfo.push("[4]");
+            if(resInfo.length > 0) finalScore += ` ⚠️ 抗性: ${resInfo.join(",")}`;
+            
+            // 抓取是否有殘血設定
+            if(ebR && ebIdx && ebHp) finalScore += ` 🩸 終點: R${ebR}-${ebIdx}(剩${ebHp}%)`;
+            
+            completed.push({id: i+1, c1: ss[0].value, c2: ss[1].value, c3: ss[2].value, res: finalScore});
+        }
+    });
+    if(!completed.length) return alert(t("請先完成至少一支滿編隊伍！"));
+    let box = document.createElement('div'); box.style = "position:absolute; left:-9999px; background:#1e1e24; color:#fff; padding:30px; border-radius:15px; width:1000px; font-family:'Segoe UI',sans-serif;";
+    let h = `<h2 style="color:#d4af37; text-align:center; border-bottom:2px solid #d4af37; padding-bottom:10px;">${t("鳴潮矩陣實戰推演編隊表")}</h2><table style="width:100%; border-collapse:collapse; margin-top:20px; text-align:center; font-size:1.1em;">`;
+    h += `<tr style="background:#3f3f4e; color:#d4af37;"><th>${t("關卡")}</th><th>${t("主輸出")}</th><th>${t("副C/輔助")}</th><th>${t("生存/輔助")}</th><th style="color:#00ffaa;">${t("推演戰果 / 實戰與環境資訊")}</th></tr>`;
+    completed.forEach(tData => h += `<tr><td style="border:1px solid #555; padding:15px; font-weight:bold; color:#4caf50;">${t("第")} ${tData.id} ${t("隊")}</td><td style="border:1px solid #555; padding:15px;">${t(tData.c1)}</td><td style="border:1px solid #555; padding:15px;">${t(tData.c2)}</td><td style="border:1px solid #555; padding:15px;">${t(tData.c3)}</td><td style="border:1px solid #555; padding:15px; font-size:0.85em; text-align:left;">${tData.res}</td></tr>`);
+    box.innerHTML = h + `</table><div style="margin-top:20px; text-align:right; color:#888; font-size:0.9em;">${t("總分預估")}：${document.getElementById('matrix-total-score').innerText} | ${t("生成時間")}：${new Date().toLocaleString()}</div>`;
+    document.body.appendChild(box);
+    html2canvas(box, { backgroundColor: '#1e1e24', scale: 2 }).then(c => { let l = document.createElement('a'); l.download = '鳴潮矩陣推演編隊表.png'; l.href = c.toDataURL('image/png'); l.click(); document.body.removeChild(box); });
+}
+
+// 🚀 核心更新：表單送出功能回歸
+function submitToGoogleForm() {
+    if(!confirm(t("您即將匿名提交當前表單上的數據，是否繼續？"))) return;
+    let dataParams = []; let rows = document.querySelectorAll('#team-board tr');
+    let env = getEnvSettings();
+    dataParams.push("主C,副C,生存,實戰分數,真實DPS,終點王R,終點王隻數,剩餘血量%,推算王血量,王1抗,王2抗,王3抗,王4抗");
+    
+    rows.forEach((r) => {
+        if (r.style.display === 'none') return;
+        let ss = r.querySelectorAll('select.char-select'), score = parseFloat(r.querySelector('.score-input').value), ebR = parseInt(r.querySelector('.end-boss-r').value), ebIdx = parseInt(r.querySelector('.end-boss-idx').value), ebHp = parseFloat(r.querySelector('.end-boss-hp').value);
+        if(ss[0].value && ss[1].value && ss[2].value && !isNaN(score)) {
+            let res1 = r.querySelector('.res-chk-1').checked ? 1 : 0, res2 = r.querySelector('.res-chk-2').checked ? 1 : 0, res3 = r.querySelector('.res-chk-3').checked ? 1 : 0, res4 = r.querySelector('.res-chk-4').checked ? 1 : 0;
+            
+            let dmg_left = score / env.scoreRatio, kills = 0, effective_dmg_sum = 0, tmp_r = 1, tmp_idx = 1, tmp_hp = getBossMaxHP(1, 1), dmgDealtToKilledBosses = 0;
+            let chk_res = [res1, res2, res3, res4];
+            let calculatedTotalHP = 0;
+            
+            while (dmg_left > 0 && kills < 40) { 
+                let r_factor = chk_res[tmp_idx - 1] ? (1 - env.resPenalty / 100) : 1; if (r_factor <= 0) r_factor = 0.1; 
+                if (dmg_left >= tmp_hp) {
+                    dmg_left -= tmp_hp; dmgDealtToKilledBosses += tmp_hp; effective_dmg_sum += (tmp_hp / r_factor);
+                    kills++; tmp_idx++; if (tmp_idx > 4) { tmp_r++; tmp_idx = 1; } tmp_hp = getBossMaxHP(tmp_r, tmp_idx);
+                } else {
+                    effective_dmg_sum += (dmg_left / r_factor);
+                    if (!isNaN(ebR) && !isNaN(ebIdx) && !isNaN(ebHp) && ebR === tmp_r && ebIdx === tmp_idx) {
+                        let dmgDoneToEndBoss = (score / env.scoreRatio) - dmgDealtToKilledBosses;
+                        calculatedTotalHP = dmgDoneToEndBoss / (1 - (ebHp / 100));
+                    }
+                    dmg_left = 0;
+                }
+            }
+            let effective_time = env.battleTime - (kills * env.transTime);
+            let trueBaseDps = effective_time > 0 ? (effective_dmg_sum / effective_time) : 0;
+
+            dataParams.push(`${ss[0].value},${ss[1].value},${ss[2].value},${score},${trueBaseDps.toFixed(2)},${ebR||''},${ebIdx||''},${ebHp||''},${calculatedTotalHP ? calculatedTotalHP.toFixed(2) : ''},${res1},${res2},${res3},${res4}`);
+        }
+    });
+    if (dataParams.length === 1) return alert(t("請先在編隊表中填寫【實戰得分】！"));
+    let csvReport = dataParams.join('\n');
+    window.open(`https://docs.google.com/forms/d/e/1FAIpQLSfB2g_uLwL7D2O1uUuM1iEaWkO7q29Xm9eG-8yPqg6Vw/viewform?usp=pp_url&entry.956555135=${encodeURIComponent(csvReport)}`, '_blank');
+}
+
 // 初始化啟動
 function initializeApp() {
     initDpsData(); loadCustomRotations(); initBoard(); 
@@ -675,6 +831,14 @@ function initializeApp() {
     try { const sr = localStorage.getItem('ww_roster'); if (sr) { let parsed = JSON.parse(sr); if (Array.isArray(parsed)) { ownedCharacters.clear(); parsed.forEach(name => { if (charData[name] || ['光主','暗主','風主'].includes(name)) ownedCharacters.add(name); }); } } else { ownedCharacters = new Set(Object.keys(charData)); } } catch(e) { ownedCharacters = new Set(Object.keys(charData)); }
     try { const srot = localStorage.getItem('ww_rotations'); if (srot) { let parsed = JSON.parse(srot); if (Array.isArray(parsed)) { checkedRotations.clear(); const validIds = new Set(dpsData.map(d => d.id)); parsed.forEach(id => { if (validIds.has(id)) checkedRotations.add(id); }); } } else { checkedRotations = new Set(dpsData.map(d => d.id)); } } catch(e) { checkedRotations = new Set(dpsData.map(d => d.id)); }
     try { let stored = localStorage.getItem('ww_custom_stats'); if (stored) customStatsMap = JSON.parse(stored); } catch(e) {}
+
+    // 🚀 核心更新：載入顯示隊伍數
+    try {
+        let savedCount = localStorage.getItem('ww_display_count');
+        if (savedCount && document.getElementById('team-count-select')) {
+            document.getElementById('team-count-select').value = savedCount;
+        }
+    } catch(e) {}
 
     document.getElementById('skill-slider').value = 100; updateMasterSkill();
     renderCheckboxes(); renderRotations();
@@ -694,7 +858,7 @@ function initializeApp() {
         }
     } catch(e) {}
     
-    updateTracker(); 
+    updateTeamDisplayCount(); // 觸發隱藏邏輯
     updateToggleButtons(); 
     document.querySelectorAll('.tab-btn')[0].click(); 
     translateDOM(document.body);
