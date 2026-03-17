@@ -68,14 +68,13 @@ let bossHPMap = {};
 let bossHPHistory = {};
 let customRotations = [];
 
-// 🚀 核心更新：智慧判斷並切換「紅綠燈」按鈕樣式
 function updateToggleButtons() {
     const rBoxes = Array.from(document.querySelectorAll('#roster-setup .checkbox-item')).filter(l => l.style.display !== 'none').map(l => l.querySelector('input'));
     const rAnyChecked = rBoxes.some(i => i.checked);
     let rBtn = document.getElementById('roster-switch');
     if(rBtn) {
         rBtn.innerHTML = rAnyChecked ? "🗑️ 清空角色勾選" : "☑️ 全選可見角色";
-        rBtn.className = rAnyChecked ? "btn-action-clear" : "btn-action-all";
+        rBtn.className = rAnyChecked ? "btn-action-clear ratio-71" : "btn-action-all ratio-71";
     }
 
     const rotBoxes = Array.from(document.querySelectorAll('#rotation-setup input[type="checkbox"]')).filter(i => i.closest('div').style.display !== 'none');
@@ -83,7 +82,7 @@ function updateToggleButtons() {
     let rotBtn = document.getElementById('rot-all-btn');
     if(rotBtn) {
         rotBtn.innerHTML = rotAnyChecked ? "🗑️ 清空可見排軸" : "☑️ 全選可見排軸";
-        rotBtn.className = rotAnyChecked ? "btn-action-clear" : "btn-action-all";
+        rotBtn.className = rotAnyChecked ? "btn-action-clear ratio-71" : "btn-action-all ratio-71";
     }
 }
 
@@ -167,7 +166,7 @@ function openDataManager() {
         <div style="margin-bottom:20px;">
             <p style="color:#aaa; font-size:0.9em;">包含角色、排軸、自訂編隊、血量校正紀錄。</p>
             <textarea id="dm-code" rows="3" style="width:100%; padding:10px; background:rgba(0,0,0,0.5); color:var(--neon-green); border:1px solid var(--border-glass); border-radius:8px; resize:none;"></textarea>
-            <div style="display:flex; gap:10px; margin-top:10px;"><button onclick="generateExportCode()" class="btn-apply" style="flex:1; background:var(--neon-green); color:#000;">📥 產生代碼</button><button onclick="importFromCode()" class="btn-action-all" style="flex:1;">📤 還原設定</button></div>
+            <div style="display:flex; gap:10px; margin-top:10px;"><button onclick="generateExportCode()" class="btn-action-all" style="flex:1;">📥 產生代碼</button><button onclick="importFromCode()" class="btn-action-clear" style="flex:1; background:#ff9800; border-color:#ff9800;">📤 還原設定</button></div>
         </div>
         <div style="border-top:1px dashed var(--border-glass); padding-top:15px;"><h4 style="color:var(--gold); margin-top:0;">📝 自訂編隊管理</h4><div id="dm-teams"></div></div>
     `;
@@ -462,7 +461,7 @@ function buildOptionsHTML(slotType, v1, v2, v3, curRaw, used, teamBases) {
         let match = hasContext ? ((slotType === 1 || !v1 || d.c1 === v1) && (slotType === 2 || !v2 || d.c2 === v2) && (slotType === 3 || !v3 || d.c3 === v3)) : checkedRotations.has(d.id);
         if(match) {
             let target = slotType==1 ? d.c1 : slotType==2 ? d.c2 : d.c3;
-            let isBlacklisted = false; // 移除會導致報錯的 noRecChars
+            let isBlacklisted = false;
             if(availableDisplayChars.includes(target) && !isBlacklisted) {
                 let c1Avail = (slotType === 1) || (d.c1 === v1 || (used[getBase(d.c1)]||0) < (charData[getBase(d.c1)]?.max||1));
                 let c2Avail = (slotType === 2) || (d.c2 === v2 || (used[getBase(d.c2)]||0) < (charData[getBase(d.c2)]?.max||1));
@@ -509,7 +508,9 @@ function renderRotations() {
         html += `<div style="margin-bottom:15px; padding:12px; background:rgba(0,0,0,0.3); border-radius:12px; border-left: 4px solid var(--gold);"><strong style="color: var(--gold);">🎯 ${t(c1)}</strong><div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:8px;">`;
         groups[c1].sort((a,b) => getRotDpsRange(b).min - getRotDpsRange(a).min).forEach(d => {
             let r = getRotDpsRange(d), dpsStr = (r.max > 0 || r.isCustom) ? `[${r.min.toFixed(2)}~${r.max.toFixed(2)}w]` : t('[無DPS]'), colorStyle = r.isCustom ? 'color:var(--neon-green); text-decoration:underline dashed;' : (r.min < r.max ? 'color:var(--gold);' : 'color:#fff;');
-            html += `<div style="background:rgba(255,255,255,0.05); padding:8px 12px; border-radius:8px; font-size:0.9em; border: 1px solid var(--border-glass); display:flex; align-items:center; gap:8px;">
+            // 🚀 核心更新：加入 data-search 屬性，包含主C、副C、生存、難度與軸名，支援全域搜索
+            let searchStr = `${t(d.c1)} ${t(d.c2)} ${t(d.c3)} ${t(d.rot)} ${t(d.diff)}`.toLowerCase();
+            html += `<div class="rot-row" data-search="${searchStr}" style="background:rgba(255,255,255,0.05); padding:8px 12px; border-radius:8px; font-size:0.9em; border: 1px solid var(--border-glass); display:inline-flex; align-items:center; gap:8px;">
                         <input type="checkbox" value="${d.id}" ${checkedRotations.has(d.id)?'checked':''} onchange="updateRotationState()">
                         <span style="color:#aaa;">${t(d.diff)}</span><span onclick="openStatsModal(event, '${d.id}')" style="cursor:pointer; font-weight:bold; ${colorStyle};">${dpsStr}</span><span style="color:#eee;">${d.isUserCustom?'<b style="color:var(--neon-green)">[自訂]</b> ':''}${t(d.c2)}/${t(d.c3)} (${t(d.rot)})</span>
                     </div>`;
@@ -519,10 +520,16 @@ function renderRotations() {
     container.innerHTML = html;
 }
 
+// 🚀 核心更新：使用 data-search 實現包含主C的高精度搜索
 const debouncedFilterRotations = debounce(() => {
     let q = document.getElementById('rot-search').value.toLowerCase();
-    document.querySelectorAll('#rotation-setup input[type="checkbox"]').forEach(i => { let c = i.closest('div'); c.style.display = c.innerText.toLowerCase().includes(q) ? 'flex' : 'none'; });
-    document.querySelectorAll('#rotation-setup > div').forEach(g => { g.style.display = Array.from(g.querySelectorAll('div > div')).some(l => l.style.display !== 'none') ? 'block' : 'none'; });
+    document.querySelectorAll('#rotation-setup .rot-row').forEach(row => { 
+        row.style.display = row.getAttribute('data-search').includes(q) ? 'inline-flex' : 'none'; 
+    });
+    // 如果該主C底下的排軸全部被隱藏，則隱藏整個主C區塊
+    document.querySelectorAll('#rotation-setup > div').forEach(g => { 
+        g.style.display = Array.from(g.querySelectorAll('.rot-row')).some(l => l.style.display !== 'none') ? 'block' : 'none'; 
+    });
     updateToggleButtons();
 }, 150);
 
@@ -688,10 +695,10 @@ function initializeApp() {
     } catch(e) {}
     
     updateTracker(); 
-    updateToggleButtons(); // 啟動時強制同步一次按鈕文字
+    updateToggleButtons(); 
     document.querySelectorAll('.tab-btn')[0].click(); 
     translateDOM(document.body);
 }
 
-// 啟動程式
+// 啟動
 initializeApp();
