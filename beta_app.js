@@ -1,6 +1,6 @@
 // ==========================================
 // 鳴潮矩陣編隊工具 - Beta 測試版核心邏輯
-// 獨立檔案：beta_app.js (無資料庫版)
+// 獨立檔案：beta_app.js (無資料庫版，已修復變數衝突)
 // ==========================================
 
 if (typeof phraseDict !== 'undefined') phraseDict.sort((a, b) => b[0].length - a[0].length);
@@ -55,10 +55,10 @@ function switchTab(pageId, btnElement) {
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
     document.getElementById(pageId).classList.add('active');
     btnElement.classList.add('active');
-    window.scrollTo(0, 0); // 切換分頁時回到頂部，適合手機
+    window.scrollTo(0, 0);
 }
 
-// 變數狀態
+// 變數狀態 (已移除會導致衝突的 const noRecChars)
 let dpsData = [];
 let rotIdCounter = 0;
 let ownedCharacters = new Set();
@@ -69,9 +69,6 @@ let diffStability = { '⚠️': 100, '⭐': 100, '🔵': 100, '🟩': 100, '🧩
 let bossHPMap = {};
 let bossHPHistory = {};
 let customRotations = [];
-
-// 【關鍵修復】：補回遺失的黑名單變數
-const noRecChars = new Set(["莫特斐", "秧秧", "桃祈", "淵武", "釉瑚"]);
 
 const debouncedRenderAndTrack = debounce(() => { renderRotations(); updateTracker(); }, 150);
 
@@ -101,13 +98,12 @@ function loadCustomRotations() {
     });
 }
 
-// === Modals & Data Manager 簡略 (保留原本邏輯) ===
 function openCustomTeamModal() {
     let m = document.getElementById('custom-team-modal');
     if(typeof charData === 'undefined') return;
     let charOpts = Object.keys(charData).map(n => `<option value="${n}">${t(n)}</option>`).join('');
     m.innerHTML = `
-        <div style="background:var(--bg-panel); backdrop-filter:blur(20px); padding:25px; border-radius:16px; border:1px solid var(--gold); width:340px;">
+        <div style="background:var(--bg-panel); backdrop-filter:blur(20px); padding:25px; border-radius:16px; border:1px solid var(--gold); width:340px; max-width:90%;">
             <h3 style="margin-top:0; color:var(--gold); text-align:center;">➕ 新增自訂編隊</h3>
             <select id="ct-c1" class="char-select" style="margin-bottom:10px;"><option value="">-- 選擇主輸出 --</option>${charOpts}</select>
             <select id="ct-c2" class="char-select" style="margin-bottom:10px;"><option value="">-- 選擇副C/輔助 --</option>${charOpts}</select>
@@ -169,11 +165,9 @@ function deleteCustomTeam(index) {
     dpsData = dpsData.filter(d => d.id !== 'custom_rot_' + cr.id); debouncedRenderAndTrack(); openDataManager(); 
 }
 
-// === 畫面渲染與 UI ===
 function toggleRarity(s) { s == 5 ? show5Star = !show5Star : show4Star = !show4Star; document.getElementById(`btn-${s}star`).classList.toggle(`active-${s}star`, s==5?show5Star:show4Star); filterCharacters(); }
 function toggleGen(g) { if(g==1) showG1=!showG1; if(g==2) showG2=!showG2; if(g==3) showG3=!showG3; document.getElementById(`btn-g${g}`).classList.toggle('active-gen', g==1?showG1:g==2?showG2:showG3); filterCharacters(); }
 
-// 【關鍵修復】：確保角色標籤預設顯示，並強制呼叫過濾
 function renderCheckboxes() {
     if(typeof characterOrder === 'undefined' || typeof charData === 'undefined') return;
     const grid = document.getElementById('roster-setup');
@@ -184,11 +178,11 @@ function renderCheckboxes() {
         let label = document.createElement('label');
         label.className = 'checkbox-item';
         label.style.borderLeft = charData[name].rarity === 5 ? '4px solid var(--gold)' : '4px solid #9b59b6';
-        label.style.display = 'flex'; // 強制預設顯示
+        label.style.display = 'flex'; 
         label.innerHTML = `<input type="checkbox" value="${name}" ${ownedCharacters.has(name)?'checked':''} onchange="updateOwnedCharacters()"> ${t(name)}`;
         container.appendChild(label);
     });
-    filterCharacters(); // 確保套用按鈕的預設篩選狀態
+    filterCharacters();
 }
 
 const debouncedFilterCharacters = debounce(() => {
@@ -258,7 +252,6 @@ function saveStatsModal() {
     closeStatsModal();
 }
 
-// === 拖曳與表格初始化 ===
 function updateRowNumbers() { document.querySelectorAll('#team-board tr').forEach((row, idx) => { const td = row.querySelector('td:first-child'); if(td) td.innerHTML = `${t("第")} ${idx + 1} ${t("隊")}`; }); }
 
 function initBoard() {
@@ -267,11 +260,25 @@ function initBoard() {
     let idxOpts = `<option value="">${t("號?")}</option>` + [1,2,3,4].map(idx=>`<option value="${idx}">${idx}</option>`).join('');
     for(let i=1; i<=16; i++) {
         let tr = document.createElement('tr'); tr.className = 'draggable-row'; tr.draggable = true; 
+        // 【關鍵修復】：加入 flex-wrap: wrap，防止小螢幕被撐破
         tr.innerHTML = `<td>${t("第")} ${i} ${t("隊")}</td>
                         <td data-label="⚔️ ${t('主C')}："><select class="char-select" onchange="updateTracker()"></select></td>
                         <td data-label="🗡️ ${t('副C')}："><select class="char-select" onchange="updateTracker()"></select></td>
                         <td data-label="🛡️ ${t('生存')}："><select class="char-select" onchange="updateTracker()"></select><button onclick="resetRowDps(this)" class="btn-reset-dps">🔄 Reset DPS</button></td>
-                        <td data-label="📊 ${t('實戰得分')} 與 ${t('設定')}："><input type="number" class="score-input" placeholder="${t('實戰得分')}"><br><div class="res-chk-group"><span>🎯終:</span><select class="hp-calc-select end-boss-r">${rOpts}</select><span>-</span><select class="hp-calc-select end-boss-idx">${idxOpts}</select><span>🩸剩:</span><input type="number" class="hp-calc-input end-boss-hp" placeholder="%" onblur="clampHpPct(this)"></div><div class="res-chk-group"><label><input type="checkbox" class="res-chk-1" onchange="updateTracker()">[1]</label><label><input type="checkbox" class="res-chk-2" onchange="updateTracker()">[2]</label><label><input type="checkbox" class="res-chk-3" onchange="updateTracker()">[3]</label><label><input type="checkbox" class="res-chk-4" onchange="updateTracker()">[4]</label></div></td>
+                        <td data-label="📊 ${t('實戰得分')} 與 ${t('設定')}：">
+                            <input type="number" class="score-input" placeholder="${t('實戰得分')}"><br>
+                            <div style="display:flex; justify-content:center; align-items:center; gap:4px; flex-wrap:wrap; margin-bottom:6px; background:rgba(0,0,0,0.3); padding:8px; border-radius:6px; border:1px solid var(--neon-green);">
+                                <span>🎯終:</span><select class="hp-calc-select end-boss-r">${rOpts}</select>
+                                <span>-</span><select class="hp-calc-select end-boss-idx">${idxOpts}</select>
+                                <span>🩸剩:</span><input type="number" class="hp-calc-input end-boss-hp" placeholder="%" onblur="clampHpPct(this)">
+                            </div>
+                            <div class="res-chk-group" style="flex-wrap: wrap;">
+                                <label><input type="checkbox" class="res-chk-1" onchange="updateTracker()">[1]</label>
+                                <label><input type="checkbox" class="res-chk-2" onchange="updateTracker()">[2]</label>
+                                <label><input type="checkbox" class="res-chk-3" onchange="updateTracker()">[3]</label>
+                                <label><input type="checkbox" class="res-chk-4" onchange="updateTracker()">[4]</label>
+                            </div>
+                        </td>
                         <td data-label="🏁 ${t('推演戰果')}：" class="relay-result">-</td>`;
         b.appendChild(tr);
     }
@@ -288,7 +295,6 @@ function initBoard() {
     b.addEventListener('dragend', e => { if(draggedRow) draggedRow.classList.remove('dragging'); draggedRow = null; updateRowNumbers(); debouncedRenderAndTrack(); });
 }
 
-// === 核心推演與選項計算 ===
 function updateTracker() {
     initBossHPMap();
     let used = {}; for(let n in charData) used[n] = 0;
@@ -390,7 +396,9 @@ function buildOptionsHTML(slotType, v1, v2, v3, curRaw, used, teamBases) {
         let match = hasContext ? ((slotType === 1 || !v1 || d.c1 === v1) && (slotType === 2 || !v2 || d.c2 === v2) && (slotType === 3 || !v3 || d.c3 === v3)) : checkedRotations.has(d.id);
         if(match) {
             let target = slotType==1 ? d.c1 : slotType==2 ? d.c2 : d.c3;
-            if(availableDisplayChars.includes(target) && !(slotType === 1 && typeof noRecChars !== 'undefined' && noRecChars.has(target))) {
+            // 【修復黑名單判斷】不再依賴外部遺失變數
+            let isBlacklisted = (slotType === 1) && (target === "莫特斐" || target === "秧秧" || target === "桃祈" || target === "淵武" || target === "釉瑚");
+            if(availableDisplayChars.includes(target) && !isBlacklisted) {
                 let c1Avail = (slotType === 1) || (d.c1 === v1 || (used[getBase(d.c1)]||0) < (charData[getBase(d.c1)]?.max||1));
                 let c2Avail = (slotType === 2) || (d.c2 === v2 || (used[getBase(d.c2)]||0) < (charData[getBase(d.c2)]?.max||1));
                 let c3Avail = (slotType === 3) || (d.c3 === v3 || (used[getBase(d.c3)]||0) < (charData[getBase(d.c3)]?.max||1));
