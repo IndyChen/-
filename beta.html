@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>鳴潮矩陣編隊工具(測試版)</title>
+    <title>鳴潮矩陣編隊工具 v4.8-Beta (測試版)</title>
     
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-FYW9EX8V5G"></script>
     <script>
@@ -42,11 +42,11 @@
         .checkbox-item:hover { background: #4f4f60; filter: brightness(1.2); }
         input[type="checkbox"] { cursor: pointer; transform: scale(1.2); }
         
-        /* 表格區塊與拖曳特效 */
+        /* 表格區塊與拖曳特效 (優化電腦版寬度) */
         .table-responsive { width: 100%; overflow-x: auto; border-radius: 5px; }
-        table { width: 100%; border-collapse: collapse; margin-top: 15px; min-width: 1150px; }
-        th, td { border: 1px solid #444; padding: 12px 8px; text-align: center; vertical-align: middle; }
-        th { background-color: #3f3f4e; color: #d4af37; white-space: nowrap; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; min-width: 800px; }
+        th, td { border: 1px solid #444; padding: 10px 6px; text-align: center; vertical-align: middle; }
+        th { background-color: #3f3f4e; color: #d4af37; }
         
         .draggable-row { cursor: grab; transition: background-color 0.2s; }
         .draggable-row:active { cursor: grabbing; }
@@ -131,11 +131,55 @@
         ::-webkit-scrollbar-thumb { background: #555; border-radius: 4px; }
         ::-webkit-scrollbar-thumb:hover { background: #777; }
 
+        /* ==========================================
+           🌟 終極手機版：卡片式表格佈局 (Card Layout) + data-label
+           ========================================== */
         @media (max-width: 768px) {
             .container { flex-direction: column; }
             .pool-panel { width: 100%; position: static; max-height: 350px; }
             #lang-toggle { top: 15px; right: 15px; padding: 8px 16px; font-size: 1em; }
             .btn-data-manager { top: 15px; right: 100px; padding: 8px 12px; font-size: 0.9em; }
+            
+            .header-actions { flex-direction: column; align-items: stretch; }
+            .header-actions > div { display: flex; flex-wrap: wrap; justify-content: center; width: 100%; gap: 5px; }
+            .header-actions .btn-reset, .header-actions input[type="text"] { width: 100%; margin-left: 0; max-width: none; }
+            #roster-grid { grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); }
+            .checkbox-item { font-size: 0.85em; padding: 6px 8px; }
+
+            /* 徹底關閉橫向滾動條，轉為直向卡片 */
+            .table-responsive { overflow-x: hidden; } 
+            table, thead, tbody, th, td, tr { display: block; width: 100%; }
+            thead { display: none; } 
+            
+            .draggable-row { 
+                margin-bottom: 15px; 
+                border: 1px solid #00ffaa; 
+                border-radius: 8px; 
+                background: #2b2b36; 
+                overflow: hidden; 
+                box-shadow: 0 4px 8px rgba(0,0,0,0.4);
+            }
+            td { 
+                text-align: left !important; 
+                border: none !important; 
+                border-bottom: 1px dashed #444 !important; 
+                padding: 12px 15px !important; 
+                position: relative; 
+            }
+            td:last-child { border-bottom: none !important; }
+            
+            /* 針對手機版動態產生欄位標題 (透過 data-label 接收 JS 的翻譯) */
+            td:nth-child(1) { background: #1e2b24; color: #00ffaa; font-size: 1.1em; text-align: center !important; padding: 10px !important; font-weight: bold; }
+            
+            /* 共用 attr(data-label) */
+            td:nth-child(2)::before, td:nth-child(3)::before, td:nth-child(4)::before, td:nth-child(5)::before, td:nth-child(6)::before {
+                content: attr(data-label);
+                display: block; margin-bottom: 6px; font-size: 0.85em; font-weight: bold;
+            }
+            td:nth-child(2)::before, td:nth-child(3)::before, td:nth-child(4)::before { color: #d4af37; }
+            td:nth-child(5)::before { color: #aaa; margin-bottom: 8px; }
+            td:nth-child(6)::before { color: #00ffaa; margin-bottom: 8px; }
+            td:nth-child(6) { background: rgba(0, 255, 170, 0.05); }
         }
     </style>
 </head>
@@ -144,7 +188,7 @@
     <button id="lang-toggle" onclick="toggleLang()">简 / 繁</button>
     <button class="btn-data-manager" onclick="openDataManager()">⚙️ 數據總管與備份</button>
     
-    <h2>鳴潮矩陣編隊工具 <span style="font-size: 0.5em; color: #cf00ff;">vBeta (測試版)</span></h2>
+    <h2>鳴潮矩陣編隊工具 <span style="font-size: 0.5em; color: #cf00ff;">v4.8-Beta (測試版)</span></h2>
     
     <div class="data-source">
         <span>📊 數據庫設計與邏輯：AI架構 / 數據提供：QuichilOvO、南邊 / 整理：Kolton / 流量統計：Google Analytics</span>
@@ -187,7 +231,7 @@
                             您目前正在使用的是實驗性質的 <strong>v4.8-Beta</strong>！我們在這個版本實裝了最硬核的系統：<br>
                             1. <strong>【數據總管與備份】(右上角按鈕)</strong>：支援全設定檔的匯出/匯入代碼，並能手動剔除錯誤的王血量校正樣本。<br>
                             2. <strong>【拖曳式排兵布陣】</strong>：在第二頁的編隊表格，您可以直接用滑鼠「按住並拖曳」隊伍來交換順序！<br>
-                            3. <strong>【新增自訂編隊】</strong>：允許您將自己開發的隊伍與測出的 DPS 永久存入系統中。
+                            3. <strong>【雙模式推演引擎】</strong>：支援「🔥自動推演」與「🗺️手動排刀區間算分」模式切換！
                         </div>
                     </div>
                 </div>
@@ -417,7 +461,7 @@
 
                 <div style="background:#2b2b36; padding:15px; border-radius:8px; margin-bottom:15px; border:1px solid #444; box-shadow: inset 0 2px 5px rgba(0,0,0,0.3);">
                     <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap: wrap; gap: 10px;">
-                        <span style="color:#00ffaa; font-weight:bold; font-size:1.1em;">⚔️ 當前編隊 矩陣接力推演總分：</span>
+                        <span style="color:#00ffaa; font-weight:bold; font-size:1.1em;">⚔️ 當前編隊 矩陣推演總分：</span>
                         <span id="matrix-total-score" style="color:#cf00ff; font-weight:bold; font-size:1.4em; text-shadow:0 0 8px rgba(207,0,255,0.6);">0 分</span>
                     </div>
                 </div>
@@ -492,16 +536,13 @@
                 <h2 style="margin: 0; color: #00ffaa;">⚙️ 數據總管與備份</h2>
                 <button onclick="closeDataManager()" style="background:#d9534f; color:#fff; border:none; padding:8px 15px; border-radius:5px; font-weight:bold; cursor:pointer;">關閉</button>
             </div>
-            
             <div id="data-manager-content"></div>
-            
         </div>
     </div>
 
-    <div id="custom-team-modal" class="modal-overlay">
-        </div>
+    <div id="custom-team-modal" class="modal-overlay"></div>
 
-        <script src="beta_data.js"></script>
+    <script src="beta_data.js"></script>
     <script src="beta_app.js"></script>
 </body>
 </html>
