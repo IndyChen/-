@@ -1,6 +1,6 @@
 // ==========================================
 // 鳴潮矩陣編隊工具 - Beta 測試版核心邏輯
-// 獨立檔案：beta_app.js (無資料庫版，已修復變數衝突)
+// 獨立檔案：beta_app.js (已移除會衝突的全域 const 宣告)
 // ==========================================
 
 if (typeof phraseDict !== 'undefined') phraseDict.sort((a, b) => b[0].length - a[0].length);
@@ -58,7 +58,7 @@ function switchTab(pageId, btnElement) {
     window.scrollTo(0, 0);
 }
 
-// 變數狀態 (已移除會導致衝突的 const noRecChars)
+// 變數狀態 (已徹底移除 noRecChars 宣告)
 let dpsData = [];
 let rotIdCounter = 0;
 let ownedCharacters = new Set();
@@ -260,7 +260,6 @@ function initBoard() {
     let idxOpts = `<option value="">${t("號?")}</option>` + [1,2,3,4].map(idx=>`<option value="${idx}">${idx}</option>`).join('');
     for(let i=1; i<=16; i++) {
         let tr = document.createElement('tr'); tr.className = 'draggable-row'; tr.draggable = true; 
-        // 【關鍵修復】：加入 flex-wrap: wrap，防止小螢幕被撐破
         tr.innerHTML = `<td>${t("第")} ${i} ${t("隊")}</td>
                         <td data-label="⚔️ ${t('主C')}："><select class="char-select" onchange="updateTracker()"></select></td>
                         <td data-label="🗡️ ${t('副C')}："><select class="char-select" onchange="updateTracker()"></select></td>
@@ -396,7 +395,7 @@ function buildOptionsHTML(slotType, v1, v2, v3, curRaw, used, teamBases) {
         let match = hasContext ? ((slotType === 1 || !v1 || d.c1 === v1) && (slotType === 2 || !v2 || d.c2 === v2) && (slotType === 3 || !v3 || d.c3 === v3)) : checkedRotations.has(d.id);
         if(match) {
             let target = slotType==1 ? d.c1 : slotType==2 ? d.c2 : d.c3;
-            // 【修復黑名單判斷】不再依賴外部遺失變數
+            // 修正為安全判斷，不依賴外部陣列
             let isBlacklisted = (slotType === 1) && (target === "莫特斐" || target === "秧秧" || target === "桃祈" || target === "淵武" || target === "釉瑚");
             if(availableDisplayChars.includes(target) && !isBlacklisted) {
                 let c1Avail = (slotType === 1) || (d.c1 === v1 || (used[getBase(d.c1)]||0) < (charData[getBase(d.c1)]?.max||1));
@@ -421,7 +420,7 @@ function buildOptionsHTML(slotType, v1, v2, v3, curRaw, used, teamBases) {
     
     html += `<optgroup label="🔸 ${t('其他角色')}">`;
     let validOthers = availableDisplayChars.filter(name => !recs.has(name) && !(used[getBase(name)] >= (charData[getBase(name)]?.max || 1) && getBase(curRaw) !== getBase(name)));
-    validOthers.sort((a, b) => (slotType === 3 && charData[getBase(a)]?.type !== charData[getBase(b)]?.type) ? (charData[getBase(b)]?.type.includes("生存") ? 1 : -1) : (characterOrder.indexOf(getBase(a)) - characterOrder.indexOf(getBase(b))));
+    validOthers.sort((a, b) => (slotType === 3 && charData[getBase(a)]?.type !== charData[getBase(b)]?.type) ? (charData[getBase(b)]?.type.includes("生存") ? 1 : -1) : (typeof characterOrder !== 'undefined' ? characterOrder.indexOf(getBase(a)) - characterOrder.indexOf(getBase(b)) : 0));
     validOthers.forEach(name => { let inTeam = teamBases.has(getBase(name)) && getBase(curRaw)!==getBase(name); html += `<option value="${name}" ${inTeam?'disabled':''}>${t(name)}${inTeam?` 🛑[在隊]`:''}</option>`; });
     html += '</optgroup>'; return html;
 }
