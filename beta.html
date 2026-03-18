@@ -230,16 +230,19 @@
                 <div class="guide-detail-content" style="display: none; font-size: 0.95em; color: #ddd; line-height: 1.6; animation: fadeIn 0.3s;">
                     <strong style="color: #fff; font-size: 1.05em;">【角色勾選與快捷過濾】</strong>
                     <ul style="margin: 5px 0 10px 20px; padding: 0; color: #ccc;">
-                        <li><strong>運作方式：</strong>系統內建全角色「耐力值」（一般 1 次，部分生存 2 次）。</li>
-                        <li><strong>UI 操作：</strong>點擊「🗑️ 清空/全選」可一鍵批次操作。</li>
+                        <li><strong>運作方式：</strong>系統內建全角色的「耐力值」(一般角色 1 次，部分生存位 2 次)。您可利用上方的「🌟星級」與「世代」過濾器，或直接在「🔍 搜尋框」輸入名字快速找人。點擊「🗑️ 清空/全選」可一鍵批次操作。</li>
                     </ul>
                     <strong style="color: var(--gold); font-size: 1.05em;">【排軸難度與自訂功能】</strong>
                     <ul style="margin: 5px 0 10px 20px; padding: 0; color: #ccc;">
-                        <li><strong>📊 單一排軸自訂加權：</strong>點擊卡片上的 [DPS數字]，可手動覆寫該隊的真實 DPS、穩定性，及設定「🌟當期屬性增傷加權(%)」。</li>
+                        <li><strong>運作方式：</strong>內建各大佬測算的理論排軸，分為 🟩輪椅 到 ⚠️極難 五個檔次。關閉特定難度後，該排軸將不會參與下一頁的推演。</li>
+                        <li><strong>➕ 新增自訂：</strong>允許手動綁定主C、副C、生存並賦予 DPS 與難度，永久寫入瀏覽器本機。</li>
+                        <li><strong>📊 單一排軸自訂加權：</strong>點擊排軸卡片上的 [DPS數字]，可直接手動覆寫該隊的真實 DPS、穩定性，甚至設定「🌟 當期屬性增傷加權(%)」(例如本期深塔冷凝傷害+20%)。</li>
                     </ul>
                     <strong style="color: var(--neon-purple); font-size: 1.05em;">【🎯 達成率拉桿與穩定性計算】</strong>
                     <ul style="margin: 5px 0 10px 20px; padding: 0; color: #ccc;">
-                        <li><strong>運算公式：</strong><code>各難度折損率 = 100 - (100 - 全局設定值) × 難度權重</code></li>
+                        <li><strong>運算公式：</strong><code>各難度折損率 = 100 - (100 - 全局設定值) × 難度權重</code>。您也可點開下方的摺疊面板，單獨對「⚠️ 極難」或「🟩 輪椅」進行微調。</li>
+                        <li><strong>結果事例：</strong>【今汐隊】理論 DPS 為 6w (⭐進階)。若您將拉桿設為 80%，該排軸的真實達成率為 <code>100-(100-80)×1.4 = 72%</code>。系統會將該隊實戰 DPS 下修為 <strong>4.32w</strong>，防止分數預估膨脹。</li>
+                        <li><strong>⏱️ 內建軸穩定性計算器：</strong>輸入排軸的「標準耗時」與您去全像實測的 3 次「實際耗時」。系統會用標準差(σ)算出您的真實穩定度，點擊即可一鍵套用至拉桿。</li>
                     </ul>
                 </div>
             </div>
@@ -371,18 +374,38 @@
                 <div class="guide-detail-content" style="display: none; font-size: 0.95em; color: #ddd; line-height: 1.6; animation: fadeIn 0.3s;">
                     <strong style="color: #fff; font-size: 1.05em;">【⚙️ 雙軌推演模式 (環境設定)】</strong>
                     <ul style="margin: 5px 0 10px 20px; padding: 0; color: #ccc;">
-                        <li><strong>🔥 自動推演：</strong>依據理論上限與操作達成率，給出 <strong><code>[保底得分 ~ 理論極限分]</code></strong> 推演區間。</li>
-                        <li><strong>🗺️ 手動編隊：</strong>根據尾王與殘血反推預估得分，並計算「📈單排置信度」抓出失誤。</li>
+                        <li>點開「🌌 矩陣實戰接力推演與環境設定」可切換兩種核心運算模式：
+                            <ol style="margin: 5px 0 5px 20px; color: #aaa;">
+                                <li><strong>🔥 自動推演 (依DPS接力)：</strong>系統純看各隊 DPS 下限/上限，自動推算能打穿幾隻王，並給出理論總分區間。</li>
+                                <li><strong>🗺️ 手動編隊 (殘血反算總分)：</strong>根據您在表格輸入的「🎯尾王」與「🩸剩(%)」，系統反推您該隊的預估得分。若您同時填寫了「實戰得分」，系統還會計算「📈單排置信度」，幫您抓出是否填錯或嚴重失誤。</li>
+                            </ol>
+                        </li>
+                    </ul>
+                    <strong style="color: var(--gold); font-size: 1.05em;">【🔥 一鍵極限編制 (理論推演)】</strong>
+                    <ul style="margin: 5px 0 10px 20px; padding: 0; color: #ccc;">
+                        <li>系統採用「貪婪演算法」，掃描您的角色庫與排軸，優先排滿能產生最高總 DPS 的陣容。您可透過右上角的「顯示隊伍數」下拉選單 (3~16隊)，精簡沙盤空間。</li>
                     </ul>
                     <strong style="color: #00ffaa; font-size: 1.05em;">【🔄 實戰反推與無損洗牌 (硬核最佳化)】</strong>
                     <ul style="margin: 5px 0 10px 20px; padding: 0; color: #ccc;">
-                        <li><strong>運算公式：</strong><code>真實 DPS = 等效總傷害 ÷ 真實戰鬥時間</code></li>
-                        <li><strong>結果事例：</strong>【忌炎隊】打 10000 分，遭遇 [1] 號抗性王 (50%抗)。帳面打 400w，實際消耗等效傷害 <code>400w ÷ (1 - 0.5) = 800w</code>。</li>
+                        <li><strong>運算公式：</strong><code>真實 DPS = 等效總傷害 ÷ 真實戰鬥時間</code>。系統會精準扣除您在環境設定中的「轉場耗時」與「抗性減傷」。</li>
+                        <li><strong>結果事例：</strong>您的第一隊【忌炎隊】打出 <strong>10000 分</strong> (1000 萬總傷害)，勾選遭遇 <strong>[1]</strong> 號抗性王 (抗性50%)。假設 R1 每隻王均血 400 萬。
+                            <ul style="margin: 5px 0 5px 20px; color: #aaa; list-style-type: circle;">
+                                <li><strong>R1-1 (400w血，50%抗性)：</strong>帳面上打掉 400w 血，但因抗性實際消耗了忌炎隊 <code>400w ÷ (1 - 0.5) = 800w</code> 的「等效傷害」。剩餘傷害量為 600w。</li>
+                                <li><strong>R1-2 (無抗) / R1-3 (無抗)：</strong>打死 R1-2 消耗 400w 等效傷害。剩下的 200w 打在 R1-3 身上，剛好讓王剩下 <strong>50%</strong> 血量。</li>
+                                <li>【忌炎隊】的等效總傷害為 <code>800w + 400w + 200w = 1400w</code>。戰鬥時間為 <code>120s - (2隻擊殺 × 1.5s轉場) = 117s</code>。</li>
+                                <li>反推真實 DPS 為 <strong>11.96w</strong> (1400 ÷ 117)。系統會保留您的隊員，將高達 11.96w 的忌炎隊「無損洗牌」調度至後期高壓波次！</li>
+                            </ul>
+                        </li>
+                        <li><strong>🔄 重設預設 DPS：</strong>反推會自動修改該隊伍的自訂 DPS，點擊各隊生存位下方的按鈕即可清除覆寫。</li>
                     </ul>
-                    <strong style="color: #ffaa00; font-size: 1.05em;">【🧮 代數反解與王血量校正】</strong>
+                    <strong style="color: #ffaa00; font-size: 1.05em;">【🧮 隱藏功能：代數反解與王血量校正】</strong>
                     <ul style="margin: 5px 0 10px 20px; padding: 0; color: #ccc;">
-                        <li><strong>運算公式：</strong><code>真實尾王總血量 = 傷害量 ÷ (1 - 剩餘血量%)</code></li>
-                        <li><strong>⚠️ 套用校正：</strong>收集滿 3 筆且偏差 <strong>> 5%</strong>，進階面板將彈出校正按鈕。</li>
+                        <li><strong>結果事例：</strong>延續上題，您剩下 200w 傷害打在 R1-3 身上，但您發現遊戲裡王只剩下了 <strong>45%</strong> 血。您填入「🎯尾王: R1-3，🩸剩: 45%」。
+                            <ul style="margin: 5px 0 5px 20px; color: #aaa; list-style-type: circle;">
+                                <li>代數反解 R1-3 真實總血量 = <code>200w ÷ (100% - 45%) ≈ 363.6萬</code>。</li>
+                                <li>若系統收集滿 3 筆資料，發現算出的 363.6w 與預設的 400w 偏差超過 <strong>5%</strong>，下方的「進階校正面板」就會彈出「⚠️ 套用校正」按鈕。您也可以直接在該面板手動覆寫特例王的血量。</li>
+                            </ul>
+                        </li>
                     </ul>
                 </div>
             </div>
