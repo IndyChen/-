@@ -3,6 +3,31 @@
 // 檔案：beta_core.js
 // 職責：資料存取、數學推演、DPS 計算、狀態管理
 // ==========================================
+// --- 0. 全域崩潰攔截系統 ---
+let currentErrorInfo = null;
+
+window.onerror = function(message, source, lineno, colno, error) {
+    currentErrorInfo = {
+        message: message,
+        location: `${source} (行: ${lineno}, 列: ${colno})`,
+        stack: error && error.stack ? error.stack.substring(0, 600) : '無堆疊追蹤',
+        userAgent: navigator.userAgent,
+        time: new Date().toLocaleString()
+    };
+    if (typeof showErrorModal === 'function') showErrorModal(currentErrorInfo);
+    return false; 
+};
+
+window.addEventListener('unhandledrejection', function(event) {
+    currentErrorInfo = {
+        message: 'Promise 錯誤: ' + (event.reason ? event.reason.message || event.reason : '未知錯誤'),
+        location: '非同步運算 (Async Rejection)',
+        stack: event.reason && event.reason.stack ? event.reason.stack.substring(0, 600) : '無堆疊追蹤',
+        userAgent: navigator.userAgent,
+        time: new Date().toLocaleString()
+    };
+    if (typeof showErrorModal === 'function') showErrorModal(currentErrorInfo);
+});
 
 // --- 1. 全域狀態 (State) ---
 let isSimp = false;
