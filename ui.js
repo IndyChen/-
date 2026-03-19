@@ -569,9 +569,10 @@ function reverseInferAndOptimize() {
                 
                 while (dmg_left > 0 && loopGuard < 50) {
                     loopGuard++;
-                    // 🌟 若屬性被剋，套用環境減傷
+                    // 🌟 動態判斷「當下被打死的這隻王 (tmp_idx)」是否有抗性
+                    let isResisted = teamAttr && teamAttr === env.resTags[tmp_idx - 1];
                     let r_factor = isResisted ? (1 - env.resPenalty / 100) : 1; 
-                    if (r_factor <= 0) r_factor = 0.1; 
+                    if (r_factor <= 0) r_factor = 0.1;
                     
                     if (dmg_left >= tmp_hp) { 
                         dmg_left -= tmp_hp; dmgDealtToKilledBosses += tmp_hp; effective_dmg_sum += (tmp_hp / r_factor); 
@@ -645,6 +646,8 @@ function reverseInferAndOptimize() {
                 let simLoopGuard = 0;
                 while (t_left > 0 && simLoopGuard < 50) {
                     simLoopGuard++;
+                    // 🌟 同理，推演未來也要精確對應
+                    let isResisted = teamAttr && teamAttr === env.resTags[start_idx - 1];
                     let eff_dps = Math.max(0.0001, dps * (isResisted ? (1 - env.resPenalty / 100) : 1)); 
                     let ttk = start_hp / eff_dps;
                     if (ttk <= t_left) { 
@@ -1081,10 +1084,11 @@ function exportImage() {
         const rows = document.querySelectorAll('#team-board tr'); let completed = [];
         let env = typeof getEnvSettings === 'function' ? getEnvSettings() : {};
         let globalResInfo = [];
-        if(env.resTag1) globalResInfo.push(env.resTag1);
-        if(env.resTag2) globalResInfo.push(env.resTag2);
-        let envResStr = globalResInfo.length > 0 ? ` 🛡️ 遭遇環境抗性: ${globalResInfo.join(",")}` : '';
-
+        if(env.resTags[0]) globalResInfo.push(`[1]${env.resTags[0]}`);
+        if(env.resTags[1]) globalResInfo.push(`[2]${env.resTags[1]}`);
+        if(env.resTags[2]) globalResInfo.push(`[3]${env.resTags[2]}`);
+        if(env.resTags[3]) globalResInfo.push(`[4]${env.resTags[3]}`);
+        let envResStr = globalResInfo.length > 0 ? ` 🛡️ 各王抗性: ${globalResInfo.join(", ")}` : '';
         rows.forEach((r, i) => {
             if (r.classList.contains('hidden-row')) return;
             let ss = r.querySelectorAll('select.char-select'), resTd = r.querySelector('.relay-result');
@@ -1133,8 +1137,9 @@ function submitToGoogleForm() {
                 }
                 
                 let effective_time = env.battleTime - (kills * env.transTime), trueBaseDps = effective_time > 0 ? (effective_dmg_sum / effective_time) : 0;
-                // 用 0,0,0,0 填補舊版抗性表單欄位，避免欄位錯位
-                dataParams.push(`${ss[0].value},${ss[1].value},${ss[2].value},${score},${trueBaseDps.toFixed(2)},${ebR||''},${ebIdx||''},${ebHp||''},${calculatedTotalHP ? calculatedTotalHP.toFixed(2) : ''},0,0,0,0`);
+                // 🌟 準確回報這 4 隻王的抗性設定
+                let t1 = env.resTags[0]||'無', t2 = env.resTags[1]||'無', t3 = env.resTags[2]||'無', t4 = env.resTags[3]||'無';
+                dataParams.push(`${ss[0].value},${ss[1].value},${ss[2].value},${score},${trueBaseDps.toFixed(2)},${ebR||''},${ebIdx||''},${ebHp||''},${calculatedTotalHP ? calculatedTotalHP.toFixed(2) : ''},${t1},${t2},${t3},${t4}`);
             }
         });
         if (dataParams.length === 1) return alert(t("請先在編隊表中填寫【實戰得分】！"));
