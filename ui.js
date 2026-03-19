@@ -656,10 +656,21 @@ function saveCustomTeam() {
     let c1 = document.getElementById('ct-c1').value, c2 = document.getElementById('ct-c2').value, c3 = document.getElementById('ct-c3').value;
     let dps = parseFloat(document.getElementById('ct-dps').value) || 0, diff = document.getElementById('ct-diff').value;
     if (!c1 || !c2 || !c3) return alert(t('請完整選擇三名角色！'));
-    let newId = Date.now(); let newRot = { id: newId, c1: c1, c2: c2, c3: c3, dps: dps, rot: "自訂", diff: diff };
-    customRotations.push(newRot); safeStorageSet('ww_custom_rotations_v2', customRotations);
-    dpsData.push({ id: 'custom_rot_' + newId, c1: c1, c2: c2, c3: c3, dps: dps, rot: "自訂", diff: diff, gen: charData[c1]?charData[c1].gen:1, isUserCustom: true });
-    document.getElementById('custom-team-modal').style.display = 'none'; debouncedRenderAndTrack(); alert(t('自訂編隊已成功加入。'));
+    let newId = Date.now(); 
+    let newRot = { id: newId, c1: c1, c2: c2, c3: c3, dps: dps, rot: "自訂", diff: diff };
+    let internalId = 'custom_rot_' + newId; // 系統內部追蹤用的 ID
+    
+    customRotations.push(newRot); 
+    safeStorageSet('ww_custom_rotations_v2', customRotations);
+    dpsData.push({ id: internalId, c1: c1, c2: c2, c3: c3, dps: dps, rot: "自訂", diff: diff, gen: charData[c1]?charData[c1].gen:1, isUserCustom: true });
+    
+    //新增完畢後，強制將這個自訂編隊「打勾啟用」！
+    checkedRotations.add(internalId);
+    safeStorageSet('ww_rotations', [...checkedRotations]);
+
+    document.getElementById('custom-team-modal').style.display = 'none'; 
+    debouncedRenderAndTrack(); 
+    alert(t('自訂編隊已成功加入。'));
 }
 
 function openStatsModal(e, rotId) {
