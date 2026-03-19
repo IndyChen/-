@@ -594,7 +594,7 @@ function autoBuildMaxDpsTeams() {
     let kFactorial = 1; for(let i = 1; i <= k; i++) kFactorial *= i;
     estValidCombos = Math.max(0, Math.floor(estValidCombos / kFactorial));
 
-    let opsPerSec = 2000000;
+    let opsPerSec = getDeviceBenchmark();
     let fullSearchSeconds = (estValidCombos / opsPerSec).toFixed(2);
     let defaultBeamWidth = 500;
     let beamSearchOps = k * defaultBeamWidth * n;
