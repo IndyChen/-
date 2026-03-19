@@ -549,7 +549,25 @@ function reverseInferAndOptimize() {
         // ==========================================
         // 🧠 全新升級：穿插式 Beam Search 排序引擎
         // ==========================================
-        let beamWidth = 500; 
+        let n = poolToPermute.length;
+        let estValidCombos = 1;
+        for (let i = 1; i <= n; i++) estValidCombos *= i; // 計算排列組合數 (N階乘)
+
+        let opsPerSec = 2000000;
+        let fullSearchSeconds = (estValidCombos / opsPerSec).toFixed(2);
+        let comboString = estValidCombos > 100000000 ? (estValidCombos / 100000000).toFixed(2) + t(" 億") : 
+                          (estValidCombos > 10000 ? (estValidCombos / 10000).toFixed(2) + t(" 萬") : estValidCombos);
+        let fullTimeString = fullSearchSeconds < 0.1 ? t("小於 0.1 秒") + t(" (低階設備約 1 秒)") : fullSearchSeconds + t(" 秒");
+
+        let suggestedDepth = estValidCombos <= 5000 ? estValidCombos : 500;
+        
+        let widthChoice = prompt(t(`洗牌引擎準備就緒！預計穿插重排 ${n} 隊。\n理論排列組合數約為：【${comboString}】種。\n全域搜索約需 ${fullTimeString}。\n\n請輸入搜尋深度 (Beam Width)。\n建議值：${suggestedDepth}。\n(註：若輸入大於組合數將執行全域搜索)：`), suggestedDepth.toString());
+        
+        if (widthChoice === null) return; // 使用者按取消，終止洗牌
+        
+        let beamWidth = parseInt(widthChoice);
+        if (isNaN(beamWidth) || beamWidth <= 0) beamWidth = 500;
+
         let states = [{
             score: 0,
             sequence: [],
