@@ -388,55 +388,60 @@
                     <button class="btn-guide-detail" onclick="toggleGuideMode('detail')" style="background: transparent; color: #aaa; border: 1px solid #555; padding: 6px 20px; border-radius: 20px; font-weight: bold; cursor: pointer; transition: 0.2s;">🔍 詳細版 (模塊原理解析)</button>
                 </div>
                 <div class="guide-brief-content" style="display: block; font-size: 0.95em; color: #ddd; line-height: 1.6; animation: fadeIn 0.3s;">
-                    <strong style="color: #fff; font-size: 1.05em;">【兩大推演模式】</strong>
+                    <strong style="color: #fff; font-size: 1.05em;">【左側面板：可用資源掌控】</strong>
                     <ul style="margin: 5px 0 10px 20px; padding: 0; color: #ccc;">
-                        <li><strong>模式一 (抄作業)：</strong>點擊「🔥 一鍵極限編制」，系統會自動滿編目前最高總分的隊伍。</li>
+                        <li><strong>⏳ 剩餘次數追蹤：</strong>隨時盯緊左側清單，排入沙盤的角色會即時扣除可用次數，幫助您掌控隊伍調度。</li>
+                    </ul>
+                    <strong style="color: #fff; font-size: 1.05em;">【右側沙盤：兩大推演模式】</strong>
+                    <ul style="margin: 5px 0 10px 20px; padding: 0; color: #ccc;">
+                        <li><strong>模式一 (抄作業)：</strong>點擊沙盤上方的「🔥 一鍵極限編制」，系統會自動滿編目前最高總分的隊伍。</li>
                         <li><strong>模式二 (優化現有)：</strong>排好出戰隊伍並填寫「實戰得分」。接著點擊「🔄 無損洗牌反推」，系統會自動排序最佳出戰順序！</li>
                     </ul>
-                    <strong style="color: var(--gold); font-size: 1.05em; margin-top: 10px; display: inline-block;">【沙盤快捷按鈕與功能】</strong>
+                    <strong style="color: var(--gold); font-size: 1.05em; margin-top: 10px; display: inline-block;">【右側面板：快捷與環境設定】</strong>
                     <ul style="margin: 5px 0 0 20px; padding: 0; color: #ccc;">
-                        <li><strong>⚙️ 雙軌模式切換：</strong>在「環境設定」內可隨時切換「🔥自動推演」與「🗺️手動編隊」。</li>
+                        <li><strong>⚙️ 雙軌模式切換：</strong>在沙盤下方的「環境設定」內，可隨時切換「🔥自動推演」與「🗺️手動編隊」。</li>
+                        <li><strong>🌌 環境參數微調：</strong>您可展開環境設定，自訂各王血量、轉場耗時與各序列專屬抗性，讓推演更貼近當期真實環境。</li>
                         <li><strong>⚡ 快速填入：</strong>利用沙盤上方的屬性篩選，一鍵將推薦配隊填入空位。</li>
-                        <li><strong>💾 記憶 / 📂 讀取：</strong>儲存您的深塔愛用陣容，隨時無縫切換。</li>
-                        <li><strong>⚙️ 數據總管(右上角)：</strong>管理自訂資料，產生備份代碼以實現跨裝置同步。</li>
-                        <li><strong>🌐 簡/繁切換 (全域)：</strong>一鍵無縫切換繁簡中文介面。</li>
+                        <li><strong>💾 記憶 / 📂 讀取：</strong>儲存您的矩陣愛用陣容，隨時無縫切換。</li>
                     </ul>
                 </div>
                 <div class="guide-detail-content" style="display: none; font-size: 0.95em; color: #ddd; line-height: 1.6; animation: fadeIn 0.3s;">
-                    <strong style="color: #fff; font-size: 1.05em;">【⚙️ 雙軌推演模式 (環境設定)】</strong>
+                    <strong style="color: #fff; font-size: 1.05em;">【左側面板：⏳ 剩餘可用次數 (疲勞值追蹤)】</strong>
                     <ul style="margin: 5px 0 10px 20px; padding: 0; color: #ccc;">
-                        <li>點開「🌌 矩陣實戰接力推演與環境設定」可切換兩種核心運算模式：
+                        <li><strong>動態扣除：</strong>左側面板會即時掃描您的沙盤。當您將角色排入隊伍，對應的可用次數就會減少（一般角色 1 次，部分生存位 2 次）。</li>
+                        <li><strong>防呆提示：</strong>耗盡次數的角色會標記為「耗盡」；若您強行將已耗盡的角色排入隊伍，沙盤上的選單會亮起紅框警告。</li>
+                    </ul>
+                    <strong style="color: #fff; font-size: 1.05em;">【右側面板：🌌 矩陣環境設定與雙軌模式】</strong>
+                    <ul style="margin: 5px 0 10px 20px; padding: 0; color: #ccc;">
+                        <li>點開沙盤區的「🌌 矩陣實戰接力推演與環境設定」，此處為核心推演引擎的參數控制台：
                             <ol style="margin: 5px 0 5px 20px; color: #aaa;">
-                                <li><strong>🔥 自動推演 (依DPS接力)：</strong>系統純看各隊 DPS 下限/上限，自動推算能打穿幾隻王，並給出理論總分區間。</li>
-                                <li><strong>🗺️ 手動編隊 (殘血反算總分)：</strong>根據您在表格輸入的「🎯尾王」與「🩸剩(%)」，系統反推您該隊的預估得分。若您同時填寫了「實戰得分」，系統還會計算「📈單排置信度」，幫您抓出是否填錯或嚴重失誤。</li>
+                                <li><strong>⚙️ 雙軌推演模式切換：</strong>可切換「🔥自動推演」或「🗺️手動編隊」(根據殘血反算總分與置信度)。</li>
+                                <li><strong>📊 底層數值微調：</strong>包含「比例(分/萬)」、「各階段均血 (R1~R3)」、「血量後續成長(%)」、「轉場耗時(秒)」與「單隊時限(秒)」。決定了系統如何精確計算等效傷害與預估分數。</li>
+                                <li><strong>🛡️ 各序列 Boss 抗性標籤：</strong>可為 1~4 號王獨立標註屬性抗性。系統推演時會自動比對隊伍主C屬性，精準結算減傷。</li>
                             </ol>
                         </li>
                     </ul>
-                    <strong style="color: var(--gold); font-size: 1.05em;">【🔥 一鍵極限編制 (理論推演)】</strong>
+                    <strong style="color: var(--gold); font-size: 1.05em;">【右側推演按鈕：🔥 一鍵編制 (Beam Search) 與參數設定】</strong>
                     <ul style="margin: 5px 0 10px 20px; padding: 0; color: #ccc;">
-                        <li>系統採用「貪婪演算法」，掃描您的角色庫與排軸，優先排滿能產生最高總 DPS 的陣容。您可透過右上角的「顯示隊伍數」下拉選單 (3~16隊)，精簡沙盤空間。</li>
+                        <li><strong>原理：</strong>系統採用束式搜索，同時展開多條分支推演，確保 16 隊加總最高，並將高火力隊伍壓軸。</li>
+                        <li><strong>彈窗操作 1 (選擇策略)：</strong>點擊執行後，系統會彈出視窗報告「預估運算時間」。請在輸入框輸入 1 (追求下限穩定度最高) 或 2 (追求上限理論值最高)。</li>
+                        <li><strong>彈窗操作 2 (搜尋深度)：</strong>接著系統會請您輸入「Beam Width (搜尋深度)」。數值越大越精準，若輸入大於組合總數，系統將啟動窮舉全域搜索。</li>
                     </ul>
-                    <strong style="color: #00ffaa; font-size: 1.05em;">【🔄 實戰反推與無損洗牌 (硬核最佳化)】</strong>
+                    <strong style="color: #00ffaa; font-size: 1.05em;">【右側推演按鈕：🔄 實戰反推與無損洗牌 (硬核最佳化)】</strong>
                     <ul style="margin: 5px 0 10px 20px; padding: 0; color: #ccc;">
-                        <li><strong>運算公式：</strong><code>真實 DPS = 等效總傷害 ÷ 真實戰鬥時間</code>。系統會精準扣除您在環境設定中的「轉場耗時」與「抗性減傷」。</li>
-                        <li><strong>結果事例：</strong>您的第一隊【忌炎隊】打出 <strong>10000 分</strong> (1000 萬總傷害)，勾選遭遇 <strong>[1]</strong> 號抗性王 (抗性50%)。假設 R1 每隻王均血 400 萬。
-                            <ul style="margin: 5px 0 5px 20px; color: #aaa; list-style-type: circle;">
-                                <li><strong>R1-1 (400w血，50%抗性)：</strong>帳面上打掉 400w 血，但因抗性實際消耗了忌炎隊 <code>400w ÷ (1 - 0.5) = 800w</code> 的「等效傷害」。剩餘傷害量為 600w。</li>
-                                <li><strong>R1-2 (無抗) / R1-3 (無抗)：</strong>打死 R1-2 消耗 400w 等效傷害。剩下的 200w 打在 R1-3 身上，剛好讓王剩下 <strong>50%</strong> 血量。</li>
-                                <li>【忌炎隊】的等效總傷害為 <code>800w + 400w + 200w = 1400w</code>。戰鬥時間為 <code>120s - (2隻擊殺 × 1.5s轉場) = 117s</code>。</li>
-                                <li>反推真實 DPS 為 <strong>11.96w</strong> (1400 ÷ 117)。系統會保留您的隊員，將高達 11.96w 的忌炎隊「無損洗牌」調度至後期高壓波次！</li>
-                            </ul>
-                        </li>
-                        <li><strong>🔄 重設預設 DPS：</strong>反推會自動修改該隊伍的自訂 DPS，點擊各隊生存位下方的按鈕即可清除覆寫。</li>
+                        <li><strong>運算公式：</strong><code>真實 DPS = 等效總傷害 ÷ 真實戰鬥時間</code>。系統會精準扣除您在環境設定中的「轉場耗時」與各王的「獨立抗性減傷」。</li>
+                        <li><strong>抗性扣除事例：</strong>您將 [1] 號王設為「❄️冷凝」(抗性50%)。當【凌陽隊(冷凝主C)】打出 1000 萬實際扣血，系統反推擊殺第 1 隻王時，會判定其消耗了 <code>400w ÷ (1 - 0.5) = 800w</code> 的等效傷害。系統會還原真實火力並重新排序！</li>
+                        <li><strong>彈窗操作 (自動填補)：</strong>洗牌完成後彈出確認視窗。若點選「確定」，系統會自動從資料庫抓取最高分且不衝突的排軸，填滿剩下的沙盤空位。</li>
                     </ul>
-                    <strong style="color: #ffaa00; font-size: 1.05em;">【🧮 隱藏功能：代數反解與王血量校正】</strong>
+                    <strong style="color: #ffaa00; font-size: 1.05em;">【右側隱藏機制：🧮 代數反解與王血量校正】</strong>
                     <ul style="margin: 5px 0 10px 20px; padding: 0; color: #ccc;">
-                        <li><strong>結果事例：</strong>延續上題，您剩下 200w 傷害打在 R1-3 身上，但您發現遊戲裡王只剩下了 <strong>45%</strong> 血。您填入「🎯尾王: R1-3，🩸剩: 45%」。
-                            <ul style="margin: 5px 0 5px 20px; color: #aaa; list-style-type: circle;">
-                                <li>代數反解 R1-3 真實總血量 = <code>200w ÷ (100% - 45%) ≈ 363.6萬</code>。</li>
-                                <li>若系統收集滿 3 筆資料，發現算出的 363.6w 與預設的 400w 偏差超過 <strong>5%</strong>，下方的「進階校正面板」就會彈出「⚠️ 套用校正」按鈕。您也可以直接在該面板手動覆寫特例王的血量。</li>
-                            </ul>
-                        </li>
+                        <li><strong>原理：</strong>當您在「手動編隊」模式下填寫了分數與準確的尾王殘血，系統會代數反解該隻王的真實總血量。若收集滿樣本且偏差大於 5%，會於環境設定內的「進階校正面板」提示您一鍵校正底層參數。</li>
+                    </ul>
+                    <strong style="color: var(--neon-purple); font-size: 1.05em;">【全域視窗：🪟 沙盤進階管理與互動】</strong>
+                    <ul style="margin: 5px 0 10px 20px; padding: 0; color: #ccc;">
+                        <li><strong>💾 記憶與 📂 讀取編隊：</strong>點擊「記憶」可將整盤陣容輸入名稱存檔（最多10組）。點擊「讀取」一鍵無縫載入沙盤。</li>
+                        <li><strong>⚙️ 數據總管與跨裝置備份 (右上角)：</strong>可一覽已解鎖角色與記憶存檔。點擊「📥 產生備份代碼」生成專屬密碼；在另一台裝置點擊「📤 匯入存檔代碼」即可完全覆寫同步。</li>
+                        <li><strong>⚠️ 系統防呆與報錯：</strong>遭遇未預期錯誤時系統會彈出報錯視窗，您可點擊「📧 寄出錯誤報告」發送給開發者協助修復。</li>
                     </ul>
                 </div>
             </div>
