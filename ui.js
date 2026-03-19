@@ -726,23 +726,102 @@ function reverseInferAndOptimize() {
 }
 
 function autoBuildMaxDpsTeams() {
-    if(!confirm(t("將清空當前編隊並自動生成極限陣容，確定執行？"))) return;
-    let validTeams = dpsData.filter(d => checkedRotations.has(d.id) && isOwned(d.c1) && isOwned(d.c2) && isOwned(d.c3));
-    validTeams.sort((a, b) => getRotDpsRange(b).min - getRotDpsRange(a).min);
-    let charUsageCount = {}; for(let n in charData) charUsageCount[n] = 0;
-    let finalOptimizedTeams = [];
     let maxAllowed = parseInt(document.getElementById('team-count-select').value) || 16;
+    let validTeams = dpsData.filter(d => checkedRotations.has(d.id) && isOwned(d.c1) && isOwned(d.c2) && isOwned(d.c3));
     
-    for (let team of validTeams) {
-        let b1 = getBase(team.c1), b2 = getBase(team.c2), b3 = getBase(team.c3), u1 = charUsageCount[b1] || 0, u2 = charUsageCount[b2] || 0, u3 = charUsageCount[b3] || 0;
-        if (u1 < (charData[b1]?.max||1) && u2 < (charData[b2]?.max||1) && u3 < (charData[b3]?.max||1)) { if (b1 === b2 || b1 === b3 || b2 === b3) continue; finalOptimizedTeams.push(team); charUsageCount[b1]=u1+1; charUsageCount[b2]=u2+1; charUsageCount[b3]=u3+1; }
-        if (finalOptimizedTeams.length >= maxAllowed) break; 
+    if (validTeams.length === 0) return alert(t("沒有可用的排軸！請確認已勾選角色與排軸。"));
+
+    let n = validTeams.length;
+    let k = Math.min(maxAllowed, getMaxTeams({})); 
+
+    let conflictCount = 0;
+    let totalPairs = (n * (n - 1)) / 2;
+    for (let i = 0; i < n; i++) {
+        let t1 = validTeams[i], b1_1 = getBase(t1.c1), b1_2 = getBase(t1.c2), b1_3 = getBase(t1.c3);
+        for (let j = i + 1; j < n; j++) {
+            let t2 = validTeams[j], b2_1 = getBase(t2.c1), b2_2 = getBase(t2.c2), b2_3 = getBase(t2.c3);
+            if ([b1_1, b1_2, b1_3].some(char => [b2_1, b2_2, b2_3].includes(char))) conflictCount++;
+        }
     }
+    let conflictRate = totalPairs > 0 ? conflictCount / totalPairs : 0;
+    
+    let estValidCombos = 1, currentAvail = n;
+    for (let i = 0; i < k; i++) {
+        if (currentAvail <= 0) { estValidCombos = 0; break; }
+        estValidCombos *= currentAvail;
+        currentAvail -= (1 + conflictRate * currentAvail);
+    }
+    let kFactorial = 1; for(let i = 1; i <= k; i++) kFactorial *= i;
+    estValidCombos = Math.max(0, Math.floor(estValidCombos / kFactorial));
+
+    let opsPerSec = 2000000;
+    let fullSearchSeconds = (estValidCombos / opsPerSec).toFixed(2);
+    let defaultBeamWidth = 500;
+    let beamSearchOps = k * defaultBeamWidth * n;
+    let beamSearchSeconds = (beamSearchOps / opsPerSec).toFixed(2);
+
+    let comboString = estValidCombos > 100000000 ? (estValidCombos / 100000000).toFixed(2) + t(" 億") : 
+                      (estValidCombos > 10000 ? (estValidCombos / 10000).toFixed(2) + t(" 萬") : estValidCombos);
+    let fullTimeString = fullSearchSeconds < 0.1 ? t("小於 0.1 秒") : fullSearchSeconds + t(" 秒");
+    let beamTimeString = beamSearchSeconds < 0.1 ? t("小於 0.1 秒") : beamSearchSeconds + t(" 秒");
+
+    let modeChoice = prompt(t(`系統偵測到 ${n} 組可用排軸，預計編排 ${k} 隊。\n理論有效組合數約為：【${comboString}】種。\n\n⏳ 運算時間預估：\n- 全域搜索 (窮舉)：約需 ${fullTimeString}\n- 預設深度 (500)：約需 ${beamTimeString}\n\n請選擇編制策略：\n輸入 1 ➔ 追求【下限穩定度最高】\n輸入 2 ➔ 追求【上限理論值最高】\n輸入任意其他字元取消。`), "1");
+    if (modeChoice !== "1" && modeChoice !== "2") return;
+    
+    let suggestedDepth = estValidCombos < 5000 && estValidCombos > 0 ? estValidCombos : 500;
+    let widthChoice = prompt(t(`請輸入搜尋深度 (Beam Width)。\n\n建議值：${suggestedDepth}。\n(註：數值越大運算越久。若輸入大於組合數將執行全域搜索，請根據上方時間預估與設備效能斟酌)：`), suggestedDepth.toString());
+    
+    let beamWidth = parseInt(widthChoice);
+    if (isNaN(beamWidth) || beamWidth <= 0) beamWidth = 500;
+    
+    let strategy = modeChoice === "1" ? 'min' : 'max';
+
+    let states = [{ score: 0, teams: [], usage: {} }];
+    let teamsWithScore = validTeams.map(t => ({
+        team: t,
+        score: strategy === 'min' ? getRotDpsRange(t).min : getRotDpsRange(t).max
+    })).filter(t => t.score > 0);
+    
+    teamsWithScore.sort((a, b) => b.score - a.score);
+    
+    for (let {team, score} of teamsWithScore) {
+        let nextStates = [];
+        let b1 = getBase(team.c1), b2 = getBase(team.c2), b3 = getBase(team.c3);
+        let limit1 = charData[b1]?.max || 1, limit2 = charData[b2]?.max || 1, limit3 = charData[b3]?.max || 1;
+        
+        for (let state of states) {
+            nextStates.push(state);
+            if (state.teams.length < maxAllowed) {
+                let u1 = state.usage[b1] || 0, u2 = state.usage[b2] || 0, u3 = state.usage[b3] || 0;
+                if (u1 < limit1 && u2 < limit2 && u3 < limit3 && b1 !== b2 && b1 !== b3 && b2 !== b3) {
+                    let newUsage = { ...state.usage };
+                    newUsage[b1] = u1 + 1; newUsage[b2] = u2 + 1; newUsage[b3] = u3 + 1;
+                    nextStates.push({ score: state.score + score, teams: [...state.teams, team], usage: newUsage });
+                }
+            }
+        }
+        nextStates.sort((a, b) => b.score - a.score);
+        states = nextStates.slice(0, beamWidth);
+    }
+    
+    let finalOptimizedTeams = states[0].teams; 
+    finalOptimizedTeams.reverse(); 
+
     document.querySelectorAll('.char-select, .score-input, .end-boss-hp, .end-boss-r, .end-boss-idx').forEach(el => el.value=""); 
     document.querySelectorAll('input[type="checkbox"][class^="res-chk"]').forEach(c => c.checked=false);
     let rows = document.querySelectorAll('#team-board tr');
-    finalOptimizedTeams.forEach((tData, index) => { if(rows[index] && index < maxAllowed) { let ss = rows[index].querySelectorAll('select.char-select'); ss[0].innerHTML = `<option value="${tData.c1}">${tData.c1}</option>`; ss[1].innerHTML = `<option value="${tData.c2}">${tData.c2}</option>`; ss[2].innerHTML = `<option value="${tData.c3}">${tData.c3}</option>`; ss[0].value = tData.c1; ss[1].value = tData.c2; ss[2].value = tData.c3; } });
-    updateTracker(); alert(t(`一鍵配置完成！共組建 `) + finalOptimizedTeams.length + t(` 隊。`));
+    
+    finalOptimizedTeams.forEach((tData, index) => { 
+        if(rows[index] && index < maxAllowed) { 
+            let ss = rows[index].querySelectorAll('select.char-select'); 
+            ss[0].innerHTML = `<option value="${tData.c1}">${tData.c1}</option>`; ss[1].innerHTML = `<option value="${tData.c2}">${tData.c2}</option>`; ss[2].innerHTML = `<option value="${tData.c3}">${tData.c3}</option>`; 
+            ss[0].value = tData.c1; ss[1].value = tData.c2; ss[2].value = tData.c3; 
+        } 
+    });
+    
+    updateTracker(); 
+    let strategyName = strategy === 'min' ? t('下限穩定度') : t('上限理論值');
+    alert(t(`配置完成！目標：[${strategyName}最高]。共組建 `) + finalOptimizedTeams.length + t(` 隊。`));
 }
 
 function applyPreset() {
@@ -953,8 +1032,10 @@ function saveCurrentLineup() {
         if (r.classList.contains('hidden-row')) return;
         let ss = r.querySelectorAll('select.char-select'), scoreInput = r.querySelector('.score-input').value, score = parseFloat(scoreInput) || 0;
         let ebR = r.querySelector('.end-boss-r').value, ebIdx = r.querySelector('.end-boss-idx').value, ebHp = r.querySelector('.end-boss-hp').value;
-        let res1 = r.querySelector('.res-chk-1') ? r.querySelector('.res-chk-1').checked : false, res2 = r.querySelector('.res-chk-2') ? r.querySelector('.res-chk-2').checked : false, res3 = r.querySelector('.res-chk-3') ? r.querySelector('.res-chk-3').checked : false, res4 = r.querySelector('.res-chk-4') ? r.querySelector('.res-chk-4').checked : false;
-        if (ss[0].value || ss[1].value || ss[2].value) { teams.push({ c1: ss[0].value, c2: ss[1].value, c3: ss[2].value, scoreInput: scoreInput, score: score, ebR: ebR, ebIdx: ebIdx, ebHp: ebHp, res: [res1, res2, res3, res4] }); totalActualScore += score; }
+        if (ss[0].value || ss[1].value || ss[2].value) { 
+            teams.push({ c1: ss[0].value, c2: ss[1].value, c3: ss[2].value, scoreInput: scoreInput, score: score, ebR: ebR, ebIdx: ebIdx, ebHp: ebHp }); 
+            totalActualScore += score; 
+        }
     });
     if (teams.length === 0) return alert(t("編隊為空，無法記憶！請先編排隊伍。"));
     let name = prompt(t("請為此實戰編隊輸入記憶名稱："), `${new Date().toLocaleDateString()} 實戰`); if (!name) return;
@@ -976,7 +1057,7 @@ function openLineupModal() {
 function loadLineup(index) {
     if(!confirm(t("將清空當前沙盤畫面並載入該記憶編隊，確定？"))) return;
     let lineup = savedLineups[index];
-    document.querySelectorAll('.char-select, .score-input, .end-boss-r, .end-boss-idx, .end-boss-hp').forEach(el => el.value = ""); document.querySelectorAll('input[type="checkbox"][class^="res-chk"]').forEach(c => c.checked = false);
+    document.querySelectorAll('.char-select, .score-input, .end-boss-r, .end-boss-idx, .end-boss-hp').forEach(el => el.value = ""); 
     let rows = document.querySelectorAll('#team-board tr');
     lineup.teams.forEach((tData, i) => {
         if (rows[i]) {
@@ -986,7 +1067,6 @@ function loadLineup(index) {
             if(tData.c3 && ss[2].querySelector(`option[value="${tData.c3}"]`) == null) ss[2].innerHTML += `<option value="${tData.c3}">${tData.c3}</option>`;
             if (tData.c1) ss[0].value = tData.c1; if (tData.c2) ss[1].value = tData.c2; if (tData.c3) ss[2].value = tData.c3;
             rows[i].querySelector('.score-input').value = tData.scoreInput || ""; rows[i].querySelector('.end-boss-r').value = tData.ebR || ""; rows[i].querySelector('.end-boss-idx').value = tData.ebIdx || ""; rows[i].querySelector('.end-boss-hp').value = tData.ebHp || "";
-            if (tData.res) { if(rows[i].querySelector('.res-chk-1')) rows[i].querySelector('.res-chk-1').checked = tData.res[0]; if(rows[i].querySelector('.res-chk-2')) rows[i].querySelector('.res-chk-2').checked = tData.res[1]; if(rows[i].querySelector('.res-chk-3')) rows[i].querySelector('.res-chk-3').checked = tData.res[2]; if(rows[i].querySelector('.res-chk-4')) rows[i].querySelector('.res-chk-4').checked = tData.res[3]; }
         }
     });
     document.getElementById('lineup-modal').style.display = 'none';
@@ -999,6 +1079,12 @@ function deleteLineup(index) { if(!confirm(t("確定刪除此紀錄？"))) retur
 function exportImage() {
     try {
         const rows = document.querySelectorAll('#team-board tr'); let completed = [];
+        let env = typeof getEnvSettings === 'function' ? getEnvSettings() : {};
+        let globalResInfo = [];
+        if(env.resTag1) globalResInfo.push(env.resTag1);
+        if(env.resTag2) globalResInfo.push(env.resTag2);
+        let envResStr = globalResInfo.length > 0 ? ` 🛡️ 遭遇環境抗性: ${globalResInfo.join(",")}` : '';
+
         rows.forEach((r, i) => {
             if (r.classList.contains('hidden-row')) return;
             let ss = r.querySelectorAll('select.char-select'), resTd = r.querySelector('.relay-result');
@@ -1006,9 +1092,6 @@ function exportImage() {
             if(ss.length >= 3 && ss[0].value && ss[1].value && ss[2].value) {
                 let resText = resTd ? resTd.innerText.replace(/\n/g, ' | ') : '';
                 let score = scoreInput ? scoreInput.value : ''; let finalScore = score ? `🎯 ${t('實得分')}: ${score}` : resText;
-                let resInfo = [];
-                if(r.querySelector('.res-chk-1') && r.querySelector('.res-chk-1').checked) resInfo.push("[1]"); if(r.querySelector('.res-chk-2') && r.querySelector('.res-chk-2').checked) resInfo.push("[2]"); if(r.querySelector('.res-chk-3') && r.querySelector('.res-chk-3').checked) resInfo.push("[3]"); if(r.querySelector('.res-chk-4') && r.querySelector('.res-chk-4').checked) resInfo.push("[4]");
-                if(resInfo.length > 0) finalScore += ` ⚠️ ${t('抗性')}: ${resInfo.join(",")}`;
                 if(ebR && ebIdx && ebHp) finalScore += ` 🩸 ${t('終點')}: R${ebR}-${ebIdx}(${t('剩')}${ebHp}%)`;
                 completed.push({id: i+1, c1: ss[0].value, c2: ss[1].value, c3: ss[2].value, res: finalScore});
             }
@@ -1019,7 +1102,7 @@ function exportImage() {
         h += `<tr style="background:#3f3f4e; color:#d4af37;"><th>${t("關卡")}</th><th>${t("主輸出")}</th><th>${t("副C/輔助")}</th><th>${t("生存/輔助")}</th><th style="color:#00ffaa;">${t("推演戰果 / 實戰與環境資訊")}</th></tr>`;
         completed.forEach(tData => h += `<tr><td style="border:1px solid #555; padding:15px; font-weight:bold; color:#4caf50;">${t("第")} ${tData.id} ${t("隊")}</td><td style="border:1px solid #555; padding:15px;">${t(tData.c1)}</td><td style="border:1px solid #555; padding:15px;">${t(tData.c2)}</td><td style="border:1px solid #555; padding:15px;">${t(tData.c3)}</td><td style="border:1px solid #555; padding:15px; font-size:0.85em; text-align:left;">${tData.res}</td></tr>`);
         let scoreElem = document.getElementById('dashboard-scores'); let currentScore = scoreElem ? scoreElem.innerText.replace(/\n/g, '  ') : '0 分';
-        box.innerHTML = h + `</table><div style="margin-top:20px; text-align:right; color:#888; font-size:0.9em;">${t("全局數據統計")}：${currentScore} | ${t("生成時間")}：${new Date().toLocaleString()}</div>`;
+        box.innerHTML = h + `</table><div style="margin-top:20px; text-align:right; color:#888; font-size:0.9em;">${t("全局數據統計")}：${currentScore}${envResStr} | ${t("生成時間")}：${new Date().toLocaleString()}</div>`;
         document.body.appendChild(box); html2canvas(box, { backgroundColor: '#1e1e24', scale: 2 }).then(c => { let l = document.createElement('a'); l.download = '鳴潮矩陣推演編隊表.png'; l.href = c.toDataURL('image/png'); l.click(); document.body.removeChild(box); });
     } catch(err) { alert(t("截圖失敗，請確定隊伍資料填寫完整。錯誤資訊：") + err.message); }
 }
@@ -1034,16 +1117,24 @@ function submitToGoogleForm() {
             let ss = r.querySelectorAll('select.char-select'), scoreInput = r.querySelector('.score-input');
             let score = scoreInput ? parseFloat(scoreInput.value) : NaN, ebR = parseInt(r.querySelector('.end-boss-r').value), ebIdx = parseInt(r.querySelector('.end-boss-idx').value), ebHp = parseFloat(r.querySelector('.end-boss-hp').value);
             if(ss.length >= 3 && ss[0].value && ss[1].value && ss[2].value && !isNaN(score)) {
-                let res1 = r.querySelector('.res-chk-1') && r.querySelector('.res-chk-1').checked ? 1 : 0, res2 = r.querySelector('.res-chk-2') && r.querySelector('.res-chk-2').checked ? 1 : 0, res3 = r.querySelector('.res-chk-3') && r.querySelector('.res-chk-3').checked ? 1 : 0, res4 = r.querySelector('.res-chk-4') && r.querySelector('.res-chk-4').checked ? 1 : 0;
+                let c1 = ss[0].value;
+                let teamAttr = typeof charAttrMap !== 'undefined' ? charAttrMap[c1] : null;
+                let isResisted = teamAttr && (teamAttr === env.resTag1 || teamAttr === env.resTag2);
+
                 let dmg_left = score / Math.max(0.0001, env.scoreRatio), kills = 0, effective_dmg_sum = 0, tmp_r = 1, tmp_idx = 1, tmp_hp = getBossMaxHP(1, 1), dmgDealtToKilledBosses = 0;
-                let chk_res = [res1, res2, res3, res4], calculatedTotalHP = 0, loopGuard = 0;
+                let calculatedTotalHP = 0, loopGuard = 0;
+                
                 while (dmg_left > 0 && loopGuard < 50) { 
-                    loopGuard++; let r_factor = chk_res[tmp_idx - 1] ? (1 - env.resPenalty / 100) : 1; if (r_factor <= 0) r_factor = 0.1; 
+                    loopGuard++; 
+                    let r_factor = isResisted ? (1 - env.resPenalty / 100) : 1; 
+                    if (r_factor <= 0) r_factor = 0.1; 
                     if (dmg_left >= tmp_hp) { dmg_left -= tmp_hp; dmgDealtToKilledBosses += tmp_hp; effective_dmg_sum += (tmp_hp / r_factor); kills++; tmp_idx++; if (tmp_idx > 4) { tmp_r++; tmp_idx = 1; } tmp_hp = getBossMaxHP(tmp_r, tmp_idx); } 
                     else { effective_dmg_sum += (dmg_left / r_factor); if (!isNaN(ebR) && !isNaN(ebIdx) && !isNaN(ebHp) && ebR === tmp_r && ebIdx === tmp_idx) { let dmgDoneToEndBoss = (score / env.scoreRatio) - dmgDealtToKilledBosses; let hp_factor = 1 - (ebHp / 100); if (hp_factor <= 0) hp_factor = 0.0001; calculatedTotalHP = dmgDoneToEndBoss / hp_factor; } dmg_left = 0; }
                 }
+                
                 let effective_time = env.battleTime - (kills * env.transTime), trueBaseDps = effective_time > 0 ? (effective_dmg_sum / effective_time) : 0;
-                dataParams.push(`${ss[0].value},${ss[1].value},${ss[2].value},${score},${trueBaseDps.toFixed(2)},${ebR||''},${ebIdx||''},${ebHp||''},${calculatedTotalHP ? calculatedTotalHP.toFixed(2) : ''},${res1},${res2},${res3},${res4}`);
+                // 用 0,0,0,0 填補舊版抗性表單欄位，避免欄位錯位
+                dataParams.push(`${ss[0].value},${ss[1].value},${ss[2].value},${score},${trueBaseDps.toFixed(2)},${ebR||''},${ebIdx||''},${ebHp||''},${calculatedTotalHP ? calculatedTotalHP.toFixed(2) : ''},0,0,0,0`);
             }
         });
         if (dataParams.length === 1) return alert(t("請先在編隊表中填寫【實戰得分】！"));
