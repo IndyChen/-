@@ -8,25 +8,13 @@
 let currentErrorInfo = null;
 
 window.onerror = function(message, source, lineno, colno, error) {
-    currentErrorInfo = {
-        message: message,
-        location: `${source} (行: ${lineno}, 列: ${colno})`,
-        stack: error && error.stack ? error.stack.substring(0, 600) : '無堆疊追蹤',
-        userAgent: navigator.userAgent,
-        time: new Date().toLocaleString()
-    };
+    currentErrorInfo = { message: message, location: `${source} (行: ${lineno}, 列: ${colno})`, stack: error && error.stack ? error.stack.substring(0, 600) : '無堆疊追蹤', userAgent: navigator.userAgent, time: new Date().toLocaleString() };
     if (typeof showErrorModal === 'function') showErrorModal(currentErrorInfo);
     return false; 
 };
 
 window.addEventListener('unhandledrejection', function(event) {
-    currentErrorInfo = {
-        message: 'Promise 錯誤: ' + (event.reason ? event.reason.message || event.reason : '未知錯誤'),
-        location: '非同步運算 (Async Rejection)',
-        stack: event.reason && event.reason.stack ? event.reason.stack.substring(0, 600) : '無堆疊追蹤',
-        userAgent: navigator.userAgent,
-        time: new Date().toLocaleString()
-    };
+    currentErrorInfo = { message: 'Promise 錯誤: ' + (event.reason ? event.reason.message || event.reason : '未知錯誤'), location: '非同步運算 (Async Rejection)', stack: event.reason && event.reason.stack ? event.reason.stack.substring(0, 600) : '無堆疊追蹤', userAgent: navigator.userAgent, time: new Date().toLocaleString() };
     if (typeof showErrorModal === 'function') showErrorModal(currentErrorInfo);
 });
 
@@ -59,25 +47,15 @@ function t(str) {
 
 function debounce(func, wait) {
     let timeout;
-    return function(...args) { 
-        clearTimeout(timeout); 
-        timeout = setTimeout(() => func.apply(this, args), wait); 
-    };
+    return function(...args) { clearTimeout(timeout); timeout = setTimeout(() => func.apply(this, args), wait); };
 }
 
 function safeStorageGet(key, fallback = null) {
-    try {
-        let item = localStorage.getItem(key);
-        return item ? JSON.parse(item) : fallback;
-    } catch(e) {
-        console.warn(`Storage Parse Error for ${key}:`, e);
-        return fallback;
-    }
+    try { let item = localStorage.getItem(key); return item ? JSON.parse(item) : fallback; } catch(e) { return fallback; }
 }
 
 function safeStorageSet(key, value) {
-    try { localStorage.setItem(key, JSON.stringify(value)); } 
-    catch(e) { console.warn(`Storage Save Error for ${key}:`, e); }
+    try { localStorage.setItem(key, JSON.stringify(value)); } catch(e) {}
 }
 
 function clampHpPct(el) {
@@ -90,6 +68,34 @@ function clampHpPct(el) {
 
 function getBase(n) { return ['光主', '暗主', '風主'].includes(n) ? '漂泊者' : n; }
 function isOwned(n) { return ['光主', '暗主', '風主'].includes(n) ? ownedCharacters.has('漂泊者') : ownedCharacters.has(n); }
+
+// ==========================================
+// 🛡️ 核心特權過濾器 (確保自訂隊伍不被忽略)
+// ==========================================
+function getBestPossibleRots(c1, c2, c3) {
+    let possibleRots = dpsData.filter(d => d.c1 === c1 && d.c2 === c2 && d.c3 === c3 && checkedRotations.has(d.id));
+    possibleRots.sort((a, b) => {
+        if (a.isUserCustom && !b.isUserCustom) return -1; // 自訂優先
+        if (!a.isUserCustom && b.isUserCustom) return 1;
+        return getRotDpsRange(b).min - getRotDpsRange(a).min;
+    });
+    return possibleRots;
+}
+
+function getUniqueValidTeams() {
+    let validTeams = dpsData.filter(d => checkedRotations.has(d.id) && isOwned(d.c1) && isOwned(d.c2) && isOwned(d.c3));
+    let map = new Map();
+    validTeams.forEach(t => {
+        let key = `${t.c1}-${t.c2}-${t.c3}`;
+        if (!map.has(key)) map.set(key, t);
+        else {
+            let existing = map.get(key);
+            if (t.isUserCustom && !existing.isUserCustom) map.set(key, t); // 自訂優先
+            else if (t.isUserCustom === existing.isUserCustom && getRotDpsRange(t).min > getRotDpsRange(existing).min) map.set(key, t);
+        }
+    });
+    return Array.from(map.values());
+}
 
 // --- 3. 資料初始化與存取 (Data Init & Storage) ---
 function initCoreData() {
@@ -171,10 +177,7 @@ function initBossHPMap() {
         for (let i = 1; i <= 4; i++) { 
             let key = `R${r}-${i}`; 
             if (!bossHPMap[key] || bossHPMap[key].isDefault) { 
-                bossHPMap[key] = { 
-                    value: (r === 1) ? env.r1_hp : (r === 2 && i === 1) ? 546.67 : (r === 2) ? env.r2_hp : (r === 3) ? env.r3_hp : env.r3_hp * (1 + env.growth * ((r - 4) * 4 + i)), 
-                    isDefault: true 
-                }; 
+                bossHPMap[key] = { value: (r === 1) ? env.r1_hp : (r === 2 && i === 1) ? 546.67 : (r === 2) ? env.r2_hp : (r === 3) ? env.r3_hp : env.r3_hp * (1 + env.growth * ((r - 4) * 4 + i)), isDefault: true }; 
             } 
         } 
     }
@@ -212,9 +215,7 @@ function getUsedCharacters() {
     let used = {}; 
     for(let n in charData) used[n] = 0;
     document.querySelectorAll('.char-select').forEach(s => { 
-        if(s.value && s.closest('tr') && !s.closest('tr').classList.contains('hidden-row')) {
-            used[getBase(s.value)]++; 
-        }
+        if(s.value && s.closest('tr') && !s.closest('tr').classList.contains('hidden-row')) used[getBase(s.value)]++; 
     });
     return used;
 }
@@ -223,28 +224,17 @@ function getMaxTeams(usedObj) {
     let baseRemains = {};
     for(let name of ownedCharacters) { 
         let b = getBase(name); 
-        if(charData[b]) { 
-            let r = charData[b].max - (usedObj[b]||0); 
-            if(r>0) baseRemains[b] = r; 
-        } 
+        if(charData[b]) { let r = charData[b].max - (usedObj[b]||0); if(r>0) baseRemains[b] = r; } 
     }
     let counts = Object.values(baseRemains), teams = 0;
-    while(counts.length >= 3) { 
-        counts.sort((a,b)=>b-a); 
-        counts[0]--; counts[1]--; counts[2]--; 
-        teams++; 
-        counts = counts.filter(c=>c>0); 
-    }
+    while(counts.length >= 3) { counts.sort((a,b)=>b-a); counts[0]--; counts[1]--; counts[2]--; teams++; counts = counts.filter(c=>c>0); }
     return Math.min(16, teams);
 }
 
 // --- 5. 核心推演引擎 (The Simulation Engine) ---
 function runSimulations(env) {
     let simMode = document.getElementById('sim-mode') ? document.getElementById('sim-mode').value : 'auto';
-    let results = {
-        totalMatrixScoreMin: 0, totalMatrixScoreMax: 0, actualTotalScore: 0,
-        totalManualBaseScore: 0, totalManualMaxScore: 0, simMode: simMode, rowsData: []
-    };
+    let results = { totalMatrixScoreMin: 0, totalMatrixScoreMax: 0, actualTotalScore: 0, totalManualBaseScore: 0, totalManualMaxScore: 0, simMode: simMode, rowsData: [] };
 
     let auto_r_min = 1, auto_idx_min = 1, auto_hp_min = getBossMaxHP(1, 1);
     let auto_r_max = 1, auto_idx_max = 1, auto_hp_max = getBossMaxHP(1, 1);
@@ -256,8 +246,7 @@ function runSimulations(env) {
             let maxJ = (i === r) ? idx : 4;
             for (let j = 1; j <= maxJ; j++) {
                 let maxHp = getBossMaxHP(i, j);
-                if (i === r && j === idx) dmg += maxHp * (1 - hpPct / 100);
-                else dmg += maxHp;
+                if (i === r && j === idx) dmg += maxHp * (1 - hpPct / 100); else dmg += maxHp;
             }
         }
         return dmg;
@@ -281,9 +270,8 @@ function runSimulations(env) {
             if (!isNaN(scoreInputVal)) results.actualTotalScore += scoreInputVal;
 
             if (simMode === 'auto') {
-                let possibleRots = dpsData.filter(d => d.c1 === c1 && d.c2 === c2 && d.c3 === c3 && checkedRotations.has(d.id));
+                let possibleRots = getBestPossibleRots(c1, c2, c3); // 🛡️ 使用特權過濾器
                 if (possibleRots.length > 0) {
-                    possibleRots.sort((a,b) => getRotDpsRange(b).min - getRotDpsRange(a).min);
                     let dpsRange = getRotDpsRange(possibleRots[0]);
                     
                     if (dpsRange.max <= 0) { 
@@ -297,13 +285,8 @@ function runSimulations(env) {
                                 let isResisted = teamAttr && teamAttr === env.resTags[idx - 1];
                                 let eff_dps = Math.max(0.0001, dps * (isResisted ? (1 - env.resPenalty / 100) : 1)); 
                                 let ttk = hp / eff_dps;
-                                if (ttk <= t_left) { 
-                                    dmg += hp; t_left -= (ttk + env.transTime); 
-                                    idx++; if (idx > 4) { r++; idx = 1; } 
-                                    hp = getBossMaxHP(r, idx); 
-                                } else { 
-                                    dmg += eff_dps * t_left; hp -= eff_dps * t_left; t_left = 0; 
-                                }
+                                if (ttk <= t_left) { dmg += hp; t_left -= (ttk + env.transTime); idx++; if (idx > 4) { r++; idx = 1; } hp = getBossMaxHP(r, idx); } 
+                                else { dmg += eff_dps * t_left; hp -= eff_dps * t_left; t_left = 0; }
                             }
                             return { hp, r, idx, dmg, endStr: `R${r}-${idx}(${(hp/getBossMaxHP(r,idx)*100).toFixed(0)}%)`, startStr };
                         };
@@ -326,13 +309,10 @@ function runSimulations(env) {
                     let endDmg = getCumDmg(ebRInt, ebIdxInt, ebHpPct);
                     let rowDmg = Math.max(0, endDmg - startDmg);
                     let baseScore = Math.floor(rowDmg * env.scoreRatio);
-                    
                     let stagesCleared = (ebRInt - man_start_r) * 4 + (ebIdxInt - man_start_idx);
                     let maxScore = baseScore + Math.max(0, stagesCleared * 100 + 50);
                     
-                    results.totalManualBaseScore += baseScore;
-                    results.totalManualMaxScore += maxScore;
-                    
+                    results.totalManualBaseScore += baseScore; results.totalManualMaxScore += maxScore;
                     let startStr = `R${man_start_r}-${man_start_idx}(${man_start_hp_pct === 100 ? '100%' : t('剩')+man_start_hp_pct.toFixed(2)+'%'})`;
                     let endStr = `R${ebRInt}-${ebIdxInt}(${t('剩')}${ebHpPct.toFixed(2)}%)`;
                     
@@ -342,23 +322,10 @@ function runSimulations(env) {
                         let cColor = conf >= 80 ? "var(--neon-green)" : "#ff5252";
                         let cIcon = conf >= 80 ? "✅" : "⚠️";
                         confHtml = `<div style="margin-top: 5px; color:${cColor}; font-size:0.9em;">${cIcon} ${t('單排置信度')}: <strong>${conf.toFixed(1)}%</strong></div>`;
-                        if (conf < 70) {
-                            confHtml += `<div style="color:#ff5252; font-size:0.8em;">⚠️ ${t('偏差過大，請確認血量或實戰得分')}</div>`;
-                        }
+                        if (conf < 70) confHtml += `<div style="color:#ff5252; font-size:0.8em;">⚠️ ${t('偏差過大，請確認血量或實戰得分')}</div>`;
                     }
-                    
-                    rowResult.html = `
-                        <div style="text-align: left; padding: 4px;">
-                            <div style="color:var(--neon-green); font-size: 1.05em;">✅ ${t('預估得分')}：<strong>${baseScore}</strong></div>
-                            <div style="color:#aaa; font-size: 0.85em; margin: 4px 0;">📊 ${t('推演區間')}：${baseScore} ~ ${maxScore}</div>
-                            <div style="color:var(--gold); font-size: 0.9em;">🎯 ${t('擊殺進度')}：<br>${startStr} ➔ ${endStr}</div>
-                            ${confHtml}
-                        </div>
-                    `;
-                    
-                    man_start_r = ebRInt;
-                    man_start_idx = ebIdxInt;
-                    man_start_hp_pct = ebHpPct;
+                    rowResult.html = `<div style="text-align: left; padding: 4px;"><div style="color:var(--neon-green); font-size: 1.05em;">✅ ${t('預估得分')}：<strong>${baseScore}</strong></div><div style="color:#aaa; font-size: 0.85em; margin: 4px 0;">📊 ${t('推演區間')}：${baseScore} ~ ${maxScore}</div><div style="color:var(--gold); font-size: 0.9em;">🎯 ${t('擊殺進度')}：<br>${startStr} ➔ ${endStr}</div>${confHtml}</div>`;
+                    man_start_r = ebRInt; man_start_idx = ebIdxInt; man_start_hp_pct = ebHpPct;
                 } else {
                     rowResult.html = `<span style="color:#ffaa00;">⚠️ ${t('需設定終點王與血量')}</span>`;
                 }
@@ -378,7 +345,6 @@ function reverseInferAndOptimize() {
     let rows = document.querySelectorAll('#team-board tr');
     let start_r = 1, start_idx = 1, start_hp = getBossMaxHP(1, 1);
     
-    // 1. 萃取現有隊伍的「真實 DPS」
     rows.forEach((row) => {
         if (row.classList.contains('hidden-row')) return;
         let ss = row.querySelectorAll('select.char-select');
@@ -393,16 +359,8 @@ function reverseInferAndOptimize() {
             let calculatedMinDps = 0; 
             
             let rotId = null;
-            let possibleRots = dpsData.filter(d => d.c1 === c1 && d.c2 === c2 && d.c3 === c3 && checkedRotations.has(d.id));
-            if (possibleRots.length > 0) {
-                //如果有自訂編隊，優先把反推 DPS 存回自訂編隊；否則才找最高分的
-                possibleRots.sort((a, b) => {
-                    if (a.isUserCustom && !b.isUserCustom) return -1;
-                    if (!a.isUserCustom && b.isUserCustom) return 1;
-                    return getRotDpsRange(b).min - getRotDpsRange(a).min;
-                });
-                rotId = possibleRots[0].id;
-            }
+            let possibleRots = getBestPossibleRots(c1, c2, c3); // 🛡️ 使用特權過濾器
+            if (possibleRots.length > 0) rotId = possibleRots[0].id;
 
             if (!isNaN(actualScore) && actualScore > 0 && possibleRots.length > 0) {
                 let dmg_left = actualScore / Math.max(0.0001, env.scoreRatio), kills = 0, effective_dmg_sum = 0, tmp_r = start_r, tmp_idx = start_idx, tmp_hp = start_hp, dmgDealtToKilledBosses = 0;
@@ -464,12 +422,7 @@ function reverseInferAndOptimize() {
                 
                 let sim_dmg = actualScore / Math.max(0.0001, env.scoreRatio), sim_r = start_r, sim_idx = start_idx, sim_hp = start_hp;
                 let simLoopGuard = 0;
-                while (sim_dmg >= sim_hp && simLoopGuard < 50) {
-                    simLoopGuard++;
-                    sim_dmg -= sim_hp; sim_idx++; 
-                    if (sim_idx > 4) { sim_r++; sim_idx = 1; } 
-                    sim_hp = getBossMaxHP(sim_r, sim_idx);
-                }
+                while (sim_dmg >= sim_hp && simLoopGuard < 50) { simLoopGuard++; sim_dmg -= sim_hp; sim_idx++; if (sim_idx > 4) { sim_r++; sim_idx = 1; } sim_hp = getBossMaxHP(sim_r, sim_idx); }
                 if (sim_dmg > 0) sim_hp -= sim_dmg;
                 start_r = sim_r; start_idx = sim_idx; start_hp = sim_hp;
 
@@ -486,43 +439,31 @@ function reverseInferAndOptimize() {
                     let isResisted = teamAttr && teamAttr === env.resTags[start_idx - 1];
                     let eff_dps = Math.max(0.0001, dps * (isResisted ? (1 - env.resPenalty / 100) : 1)); 
                     let ttk = start_hp / eff_dps;
-                    if (ttk <= t_left) { 
-                        t_left -= (ttk + env.transTime); 
-                        start_idx++; if (start_idx > 4) { start_r++; start_idx = 1; } 
-                        start_hp = getBossMaxHP(start_r, start_idx); 
-                    } else { 
-                        start_hp -= eff_dps * t_left; t_left = 0; 
-                    }
+                    if (ttk <= t_left) { t_left -= (ttk + env.transTime); start_idx++; if (start_idx > 4) { start_r++; start_idx = 1; } start_hp = getBossMaxHP(start_r, start_idx); } 
+                    else { start_hp -= eff_dps * t_left; t_left = 0; }
                 }
             }
 
-            currentTeams.push({ 
-                c1: c1, c2: c2, c3: c3, scoreInput: scoreInput, ebR: ebR, ebIdx: ebIdx, ebHp: ebHp,
-                calculatedMinDps: calculatedMinDps 
-            });
+            currentTeams.push({ c1: c1, c2: c2, c3: c3, scoreInput: scoreInput, ebR: ebR, ebIdx: ebIdx, ebHp: ebHp, calculatedMinDps: calculatedMinDps });
         }
     });
 
-    // 將所有反推出來的真實 DPS，強制寫入硬碟永久保存！
-    safeStorageSet('ww_custom_stats', customStatsMap);
-    
+    safeStorageSet('ww_custom_stats', customStatsMap); // ⚠️ 強制寫入硬碟永久保存
+
     if (currentTeams.length > 0) {
         let maxAllowed = parseInt(document.getElementById('team-count-select').value) || 16;
         let fillFromDB = confirm(t("是否要從資料庫自動填補剩下的空位？\n\n[確定]：保留現有隊伍，並自動用最高分隊伍填滿剩下的空位。\n[取消]：僅針對當前已有隊伍進行重新排序。"));
         
-        let poolToPermute = [...currentTeams]; // 準備拿來洗牌的陣容池
+        let poolToPermute = [...currentTeams];
 
-        // 2. 處理資料庫自動填補
         if (fillFromDB) {
             let tempUsage = {};
             currentTeams.forEach(tData => {
                 let b1 = getBase(tData.c1), b2 = getBase(tData.c2), b3 = getBase(tData.c3);
-                tempUsage[b1] = (tempUsage[b1] || 0) + 1;
-                tempUsage[b2] = (tempUsage[b2] || 0) + 1;
-                tempUsage[b3] = (tempUsage[b3] || 0) + 1;
+                tempUsage[b1] = (tempUsage[b1] || 0) + 1; tempUsage[b2] = (tempUsage[b2] || 0) + 1; tempUsage[b3] = (tempUsage[b3] || 0) + 1;
             });
             
-            let validDBTeams = dpsData.filter(d => checkedRotations.has(d.id) && isOwned(d.c1) && isOwned(d.c2) && isOwned(d.c3));
+            let validDBTeams = getUniqueValidTeams(); // 🛡️ 使用特權過濾器去重
             validDBTeams.sort((a,b) => getRotDpsRange(b).min - getRotDpsRange(a).min); 
             
             for (let dbTeam of validDBTeams) {
@@ -537,56 +478,37 @@ function reverseInferAndOptimize() {
                     if (!isDuplicate) {
                         tempUsage[b1] = u1 + 1; tempUsage[b2] = u2 + 1; tempUsage[b3] = u3 + 1;
                         poolToPermute.push({
-                            c1: dbTeam.c1, c2: dbTeam.c2, c3: dbTeam.c3,
-                            scoreInput: "", ebR: "", ebIdx: "", ebHp: "",
-                            calculatedMinDps: getRotDpsRange(dbTeam).min 
+                            c1: dbTeam.c1, c2: dbTeam.c2, c3: dbTeam.c3, scoreInput: "", ebR: "", ebIdx: "", ebHp: "", calculatedMinDps: getRotDpsRange(dbTeam).min 
                         });
                     }
                 }
             }
         }
 
-        // ==========================================
-        // 🧠 全新升級：穿插式 Beam Search 排序引擎
-        // ==========================================
         let n = poolToPermute.length;
         let estValidCombos = 1;
-        for (let i = 1; i <= n; i++) estValidCombos *= i; // 計算排列組合數 (N階乘)
+        for (let i = 1; i <= n; i++) estValidCombos *= i;
 
         let opsPerSec = 2000000;
         let fullSearchSeconds = (estValidCombos / opsPerSec).toFixed(2);
-        let comboString = estValidCombos > 100000000 ? (estValidCombos / 100000000).toFixed(2) + t(" 億") : 
-                          (estValidCombos > 10000 ? (estValidCombos / 10000).toFixed(2) + t(" 萬") : estValidCombos);
+        let comboString = estValidCombos > 100000000 ? (estValidCombos / 100000000).toFixed(2) + t(" 億") : (estValidCombos > 10000 ? (estValidCombos / 10000).toFixed(2) + t(" 萬") : estValidCombos);
         let fullTimeString = fullSearchSeconds < 0.1 ? t("小於 0.1 秒") + t(" (低階設備約 1 秒)") : fullSearchSeconds + t(" 秒");
 
         let suggestedDepth = estValidCombos <= 5000 ? estValidCombos : 500;
-        
         let widthChoice = prompt(t(`洗牌引擎準備就緒！預計穿插重排 ${n} 隊。\n理論排列組合數約為：【${comboString}】種。\n全域搜索約需 ${fullTimeString}。\n\n請輸入搜尋深度 (Beam Width)。\n建議值：${suggestedDepth}。\n(註：若輸入大於組合數將執行全域搜索)：`), suggestedDepth.toString());
-        
-        if (widthChoice === null) return; // 使用者按取消，終止洗牌
+        if (widthChoice === null) return; 
         
         let beamWidth = parseInt(widthChoice);
         if (isNaN(beamWidth) || beamWidth <= 0) beamWidth = 500;
 
-        let states = [{
-            score: 0,
-            sequence: [],
-            remaining: poolToPermute,
-            r: 1,
-            idx: 1,
-            hp: getBossMaxHP(1, 1)
-        }];
+        let states = [{ score: 0, sequence: [], remaining: poolToPermute, r: 1, idx: 1, hp: getBossMaxHP(1, 1) }];
 
         for (let step = 0; step < n; step++) {
             let nextStates = [];
             for (let state of states) {
                 for (let i = 0; i < state.remaining.length; i++) {
                     let team = state.remaining[i];
-
-                    // 模擬這支隊伍在當前王與血量下的戰鬥 (精算轉場與抗性)
-                    let t_left = env.battleTime;
-                    let dmgDone = 0;
-                    let tmp_r = state.r, tmp_idx = state.idx, tmp_hp = state.hp;
+                    let t_left = env.battleTime, dmgDone = 0, tmp_r = state.r, tmp_idx = state.idx, tmp_hp = state.hp;
                     let teamAttr = typeof charAttrMap !== 'undefined' ? charAttrMap[team.c1] : null;
                     let loopGuard = 0;
 
@@ -597,30 +519,13 @@ function reverseInferAndOptimize() {
                         let eff_dps = Math.max(0.0001, team.calculatedMinDps * r_factor);
                         let ttk = tmp_hp / eff_dps;
 
-                        if (ttk <= t_left) {
-                            dmgDone += tmp_hp;
-                            t_left -= (ttk + env.transTime); // 扣除轉場耗時
-                            tmp_idx++;
-                            if (tmp_idx > 4) { tmp_r++; tmp_idx = 1; }
-                            tmp_hp = getBossMaxHP(tmp_r, tmp_idx);
-                        } else {
-                            dmgDone += eff_dps * t_left;
-                            tmp_hp -= eff_dps * t_left;
-                            t_left = 0;
-                        }
+                        if (ttk <= t_left) { dmgDone += tmp_hp; t_left -= (ttk + env.transTime); tmp_idx++; if (tmp_idx > 4) { tmp_r++; tmp_idx = 1; } tmp_hp = getBossMaxHP(tmp_r, tmp_idx); } 
+                        else { dmgDone += eff_dps * t_left; tmp_hp -= eff_dps * t_left; t_left = 0; }
                     }
 
                     let newRemaining = [...state.remaining];
                     newRemaining.splice(i, 1); 
-
-                    nextStates.push({
-                        score: state.score + dmgDone,
-                        sequence: [...state.sequence, team],
-                        remaining: newRemaining,
-                        r: tmp_r,
-                        idx: tmp_idx,
-                        hp: tmp_hp
-                    });
+                    nextStates.push({ score: state.score + dmgDone, sequence: [...state.sequence, team], remaining: newRemaining, r: tmp_r, idx: tmp_idx, hp: tmp_hp });
                 }
             }
             nextStates.sort((a, b) => b.score - a.score);
@@ -628,20 +533,14 @@ function reverseInferAndOptimize() {
         }
 
         let bestSequence = states[0].sequence;
-        
-        // 4. 清空欄位並將最佳穿插順序渲染回畫面
         document.querySelectorAll('.char-select, .score-input, .end-boss-r, .end-boss-idx, .end-boss-hp').forEach(el => el.value = ""); 
         
         bestSequence.forEach((tData, index) => {
             if (index < maxAllowed && rows[index]) {
                 let row = rows[index];
                 let ss = row.querySelectorAll('select.char-select');
-                ss[0].innerHTML = `<option value="${tData.c1}">${tData.c1}</option>`; 
-                ss[1].innerHTML = `<option value="${tData.c2}">${tData.c2}</option>`; 
-                ss[2].innerHTML = `<option value="${tData.c3}">${tData.c3}</option>`;
-                ss[0].value = tData.c1; 
-                ss[1].value = tData.c2; 
-                ss[2].value = tData.c3;
+                ss[0].innerHTML = `<option value="${tData.c1}">${tData.c1}</option>`; ss[1].innerHTML = `<option value="${tData.c2}">${tData.c2}</option>`; ss[2].innerHTML = `<option value="${tData.c3}">${tData.c3}</option>`;
+                ss[0].value = tData.c1; ss[1].value = tData.c2; ss[2].value = tData.c3;
             }
         });
         
@@ -653,7 +552,7 @@ function reverseInferAndOptimize() {
 
 function autoBuildMaxDpsTeams() {
     let maxAllowed = parseInt(document.getElementById('team-count-select').value) || 16;
-    let validTeams = dpsData.filter(d => checkedRotations.has(d.id) && isOwned(d.c1) && isOwned(d.c2) && isOwned(d.c3));
+    let validTeams = getUniqueValidTeams(); // 🛡️ 使用特權過濾器
     
     if (validTeams.length === 0) return alert(t("沒有可用的排軸！請確認已勾選角色與排軸。"));
 
@@ -686,8 +585,7 @@ function autoBuildMaxDpsTeams() {
     let beamSearchOps = k * defaultBeamWidth * n;
     let beamSearchSeconds = (beamSearchOps / opsPerSec).toFixed(2);
 
-    let comboString = estValidCombos > 100000000 ? (estValidCombos / 100000000).toFixed(2) + t(" 億") : 
-                      (estValidCombos > 10000 ? (estValidCombos / 10000).toFixed(2) + t(" 萬") : estValidCombos);
+    let comboString = estValidCombos > 100000000 ? (estValidCombos / 100000000).toFixed(2) + t(" 億") : (estValidCombos > 10000 ? (estValidCombos / 10000).toFixed(2) + t(" 萬") : estValidCombos);
     let fullTimeString = fullSearchSeconds < 0.1 ? t("小於 0.1 秒") + t(" (低階設備約 1 秒)") : fullSearchSeconds + t(" 秒");
     let beamTimeString = beamSearchSeconds < 0.1 ? t("小於 0.1 秒") + t(" (低階設備約 1 秒)") : beamSearchSeconds + t(" 秒");
 
@@ -703,10 +601,7 @@ function autoBuildMaxDpsTeams() {
     let strategy = modeChoice === "1" ? 'min' : 'max';
 
     let states = [{ score: 0, teams: [], usage: {} }];
-    let teamsWithScore = validTeams.map(t => ({
-        team: t,
-        score: strategy === 'min' ? getRotDpsRange(t).min : getRotDpsRange(t).max
-    })).filter(t => t.score > 0);
+    let teamsWithScore = validTeams.map(t => ({ team: t, score: strategy === 'min' ? getRotDpsRange(t).min : getRotDpsRange(t).max })).filter(t => t.score > 0);
     
     teamsWithScore.sort((a, b) => b.score - a.score);
     
