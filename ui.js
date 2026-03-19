@@ -186,12 +186,6 @@ function initBoard() {
                                 <span>🩸剩(%):</span><input type="number" class="hp-calc-input end-boss-hp" placeholder="99.99~0" step="0.01" onchange="clampHpPct(this); updateTracker();">
                             </div>
                             <div style="font-size:0.7em; color:#888; text-align:center; margin-bottom:6px;">(範圍限制: 99.99 ~ 0.00%)</div>
-                            <div class="res-chk-group" style="flex-wrap: wrap;">
-                                <label><input type="checkbox" class="res-chk-1" onchange="updateTracker()">[1]</label>
-                                <label><input type="checkbox" class="res-chk-2" onchange="updateTracker()">[2]</label>
-                                <label><input type="checkbox" class="res-chk-3" onchange="updateTracker()">[3]</label>
-                                <label><input type="checkbox" class="res-chk-4" onchange="updateTracker()">[4]</label>
-                            </div>
                         </td>
                         <td data-label="🏁 ${t('推演戰果')}：" class="relay-result">-</td>`;
         b.appendChild(tr);
@@ -553,56 +547,166 @@ function updateTeamDisplayCount() {
 // --- 8. 進階推演與編隊功能 ---
 function reverseInferAndOptimize() {
     initBossHPMap(); let env = getEnvSettings(), currentTeams = [], rows = document.querySelectorAll('#team-board tr'), start_r = 1, start_idx = 1, start_hp = getBossMaxHP(1, 1);
+    
     rows.forEach((row) => {
         if (row.classList.contains('hidden-row')) return;
         let ss = row.querySelectorAll('select.char-select'), c1 = ss[0].value, c2 = ss[1].value, c3 = ss[2].value, scoreInput = row.querySelector('.score-input').value, ebR = row.querySelector('.end-boss-r').value, ebIdx = row.querySelector('.end-boss-idx').value, ebHp = row.querySelector('.end-boss-hp').value;
-        let chk_res = [
-            row.querySelector('.res-chk-1') ? row.querySelector('.res-chk-1').checked : false, 
-            row.querySelector('.res-chk-2') ? row.querySelector('.res-chk-2').checked : false, 
-            row.querySelector('.res-chk-3') ? row.querySelector('.res-chk-3').checked : false, 
-            row.querySelector('.res-chk-4') ? row.querySelector('.res-chk-4').checked : false
-        ];
+
         if (c1) { 
-            let rotId = null, calculatedMinDps = 0, possibleRots = dpsData.filter(d => d.c1 === c1 && d.c2 === c2 && d.c3 === c3 && checkedRotations.has(d.id));
-            if (possibleRots.length > 0) { possibleRots.sort((a,b) => getRotDpsRange(b).min - getRotDpsRange(a).min); rotId = possibleRots[0].id; }
-            let actualScore = parseFloat(scoreInput);
-            if (!isNaN(actualScore) && actualScore > 0 && rotId) {
+            let actualScore = parseFloat(scoreInput), ebRInt = parseInt(ebR), ebIdxInt = parseInt(ebIdx), ebHpPct = parseFloat(ebHp);
+            let calculatedMinDps = 0; 
+            let rotId = getRotId(c1, c2, c3); 
+            let possibleRots = dpsData.filter(d => d.c1 === c1 && d.c2 === c2 && d.c3 === c3 && checkedRotations.has(d.id));
+            if (possibleRots.length > 0) possibleRots.sort((a,b) => getRotDpsRange(b).min - getRotDpsRange(a).min);
+
+            if (!isNaN(actualScore) && actualScore > 0 && possibleRots.length > 0) {
                 let dmg_left = actualScore / Math.max(0.0001, env.scoreRatio), kills = 0, effective_dmg_sum = 0, tmp_r = start_r, tmp_idx = start_idx, tmp_hp = start_hp, dmgDealtToKilledBosses = 0;
+                
+                // 🌟 自動判斷主C屬性是否吻合環境抗性標籤
+                let teamAttr = charAttrMap[c1];
+                let isResisted = teamAttr && (teamAttr === env.resTag1 || teamAttr === env.resTag2);
                 let loopGuard = 0;
+                
                 while (dmg_left > 0 && loopGuard < 50) {
                     loopGuard++;
-                    let r_factor = chk_res[tmp_idx - 1] ? (1 - env.resPenalty / 100) : 1; if (r_factor <= 0) r_factor = 0.1; 
-                    if (dmg_left >= tmp_hp) { dmg_left -= tmp_hp; dmgDealtToKilledBosses += tmp_hp; effective_dmg_sum += (tmp_hp / r_factor); kills++; tmp_idx++; if (tmp_idx > 4) { tmp_r++; tmp_idx = 1; } tmp_hp = getBossMaxHP(tmp_r, tmp_idx); } 
-                    else {
+                    // 🌟 若屬性被剋，套用環境減傷
+                    let r_factor = isResisted ? (1 - env.resPenalty / 100) : 1; 
+                    if (r_factor <= 0) r_factor = 0.1; 
+                    
+                    if (dmg_left >= tmp_hp) { 
+                        dmg_left -= tmp_hp; dmgDealtToKilledBosses += tmp_hp; effective_dmg_sum += (tmp_hp / r_factor); 
+                        kills++; tmp_idx++; if (tmp_idx > 4) { tmp_r++; tmp_idx = 1; } tmp_hp = getBossMaxHP(tmp_r, tmp_idx); 
+                    } else {
                         effective_dmg_sum += (dmg_left / r_factor);
-                        if (!isNaN(ebR) && !isNaN(ebIdx) && !isNaN(ebHp) && ebR === tmp_r && ebIdx === tmp_idx) {
-                            let dmgDoneToEndBoss = (score / env.scoreRatio) - dmgDealtToKilledBosses;
-                            let hp_factor = 1 - (ebHp / 100);
+                        if (!isNaN(ebRInt) && !isNaN(ebIdxInt) && !isNaN(ebHpPct) && ebRInt === tmp_r && ebIdxInt === tmp_idx) {
+                            let dmgDoneToEndBoss = (actualScore / env.scoreRatio) - dmgDealtToKilledBosses;
+                            let hp_factor = 1 - (ebHpPct / 100);
                             if (hp_factor <= 0) hp_factor = 0.0001; 
+                            let calculatedTotalHP = dmgDoneToEndBoss / hp_factor;
                             bossHPHistory[`R${ebRInt}-${ebIdxInt}`] = bossHPHistory[`R${ebRInt}-${ebIdxInt}`] || [];
-                            bossHPHistory[`R${ebRInt}-${ebIdxInt}`].push({ dmg: (actualScore / env.scoreRatio) - dmgDealtToKilledBosses, pct: hp_factor });
+                            bossHPHistory[`R${ebRInt}-${ebIdxInt}`].push({ dmg: calculatedTotalHP, rawScore: actualScore });
                         }
                         tmp_hp -= dmg_left; dmg_left = 0;
                     }
                 }
+
                 let effective_time = env.battleTime - (kills * env.transTime), trueBaseDps = effective_time > 0 ? (effective_dmg_sum / effective_time) : 0;
-                if (trueBaseDps > 0) { let currStats = customStatsMap[rotId] || { stability: 100, buff: 0 }; customStatsMap[rotId] = { dps: trueBaseDps, stability: currStats.stability, buff: currStats.buff }; calculatedMinDps = trueBaseDps * (currStats.stability / 100); }
-                start_r = tmp_r; start_idx = tmp_idx; start_hp = tmp_hp;
-            } else if (rotId) { calculatedMinDps = getRotDpsRange(possibleRots[0]).min; }
-            currentTeams.push({ c1, c2, c3, scoreInput, ebR, ebIdx, ebHp, chk_res, calculatedMinDps });
+                if (trueBaseDps > 0) { 
+                    let currStats = customStatsMap[rotId] || { stability: null, buff: 0, dps: null }; 
+                    let buffMult = 1 + ((currStats.buff || 0) / 100);
+                    let restoredBaseDps = trueBaseDps / buffMult;
+                    
+                    let originalBaseDps = currStats.dps || possibleRots[0].dps;
+                    let diffKey = possibleRots[0].diff.includes('⚠️') ? '⚠️' : possibleRots[0].diff.includes('⭐') ? '⭐' : possibleRots[0].diff.includes('🔵') ? '🔵' : possibleRots[0].diff.includes('🟩') ? '🟩' : '🧩';
+                    let currentStab = (currStats.stability !== null && currStats.stability !== undefined) ? currStats.stability : (diffStability[diffKey] !== undefined ? diffStability[diffKey] : 100);
+                    
+                    let minDps = originalBaseDps * (currentStab / 100);
+                    let maxDps = originalBaseDps;
+                    let newDps = originalBaseDps, newStab = currentStab;
+
+                    if (originalBaseDps <= 0) {
+                        newDps = restoredBaseDps; newStab = 100;
+                    } else if (restoredBaseDps >= minDps && restoredBaseDps <= maxDps) {
+                        newDps = originalBaseDps; newStab = currentStab;
+                    } else if (restoredBaseDps > maxDps) {
+                        newDps = restoredBaseDps; newStab = 100;
+                    } else if (restoredBaseDps < minDps) {
+                        newDps = originalBaseDps; newStab = (restoredBaseDps / originalBaseDps) * 100;
+                    }
+                    
+                    customStatsMap[rotId] = { dps: newDps, stability: newStab, buff: currStats.buff || 0 }; 
+                    calculatedMinDps = trueBaseDps; 
+                } else if (rotId) { 
+                    calculatedMinDps = getRotDpsRange(possibleRots[0]).min; 
+                }
+                
+                // 模擬打完推進度
+                let sim_dmg = actualScore / Math.max(0.0001, env.scoreRatio), sim_r = start_r, sim_idx = start_idx, sim_hp = start_hp;
+                let simLoopGuard = 0;
+                while (sim_dmg >= sim_hp && simLoopGuard < 50) {
+                    simLoopGuard++;
+                    sim_dmg -= sim_hp; sim_idx++; 
+                    if (sim_idx > 4) { sim_r++; sim_idx = 1; } 
+                    sim_hp = getBossMaxHP(sim_r, sim_idx);
+                }
+                if (sim_dmg > 0) sim_hp -= sim_dmg;
+                start_r = sim_r; start_idx = sim_idx; start_hp = sim_hp;
+
+            } else if (rotId) {
+                calculatedMinDps = getRotDpsRange(possibleRots[0]).min;
+                let dpsRange = getRotDpsRange(possibleRots[0]);
+                let dps = dpsRange.min;
+                
+                // 🌟 自動推演也要判斷屬性
+                let teamAttr = charAttrMap[c1];
+                let isResisted = teamAttr && (teamAttr === env.resTag1 || teamAttr === env.resTag2);
+
+                let t_left = env.battleTime;
+                let simLoopGuard = 0;
+                while (t_left > 0 && simLoopGuard < 50) {
+                    simLoopGuard++;
+                    let eff_dps = Math.max(0.0001, dps * (isResisted ? (1 - env.resPenalty / 100) : 1)); 
+                    let ttk = start_hp / eff_dps;
+                    if (ttk <= t_left) { 
+                        t_left -= (ttk + env.transTime); 
+                        start_idx++; if (start_idx > 4) { start_r++; start_idx = 1; } 
+                        start_hp = getBossMaxHP(start_r, start_idx); 
+                    } else { 
+                        start_hp -= eff_dps * t_left; t_left = 0; 
+                    }
+                }
+            }
+
+            // 🗑️ 舊版的 chk_res 陣列已經從這裡移除了
+            currentTeams.push({ 
+                c1: c1, c2: c2, c3: c3, scoreInput: scoreInput, ebR: ebR, ebIdx: ebIdx, ebHp: ebHp,
+                calculatedMinDps: calculatedMinDps 
+            });
         }
     });
-    
-    safeStorageSet('ww_custom_stats', customStatsMap); 
-    safeStorageSet('ww_boss_hp_history', bossHPHistory);
-    renderIndividualHPPanel(); renderRotations();
-    
+
     if (currentTeams.length > 0) {
-        currentTeams.sort((a, b) => b.calculatedMinDps - a.calculatedMinDps);
-        document.querySelectorAll('.char-select, .score-input, .end-boss-r, .end-boss-idx, .end-boss-hp').forEach(el => el.value = ""); 
-        document.querySelectorAll('input[type="checkbox"][class^="res-chk"]').forEach(c => c.checked = false);
-        
+        let fillFromDB = confirm(t("是否要從資料庫自動填補剩下的空位？\n\n[確定]：保留現有隊伍，並自動用最高分隊伍填滿剩下的空位。\n[取消]：僅針對當前已有隊伍進行重新排序。"));
         let maxAllowed = parseInt(document.getElementById('team-count-select').value) || 16;
+        
+        if (fillFromDB) {
+            let tempUsage = {};
+            currentTeams.forEach(tData => {
+                let b1 = getBase(tData.c1), b2 = getBase(tData.c2), b3 = getBase(tData.c3);
+                tempUsage[b1] = (tempUsage[b1] || 0) + 1;
+                tempUsage[b2] = (tempUsage[b2] || 0) + 1;
+                tempUsage[b3] = (tempUsage[b3] || 0) + 1;
+            });
+            
+            let validDBTeams = dpsData.filter(d => checkedRotations.has(d.id) && isOwned(d.c1) && isOwned(d.c2) && isOwned(d.c3));
+            validDBTeams.sort((a,b) => getRotDpsRange(b).min - getRotDpsRange(a).min); 
+            
+            for (let dbTeam of validDBTeams) {
+                if (currentTeams.length >= maxAllowed) break;
+                
+                let b1 = getBase(dbTeam.c1), b2 = getBase(dbTeam.c2), b3 = getBase(dbTeam.c3);
+                let limit1 = charData[b1]?.max || 1, limit2 = charData[b2]?.max || 1, limit3 = charData[b3]?.max || 1;
+                let u1 = tempUsage[b1] || 0, u2 = tempUsage[b2] || 0, u3 = tempUsage[b3] || 0;
+                
+                if (u1 < limit1 && u2 < limit2 && u3 < limit3 && b1 !== b2 && b1 !== b3 && b2 !== b3) {
+                    let isDuplicate = currentTeams.some(ct => ct.c1 === dbTeam.c1 && ct.c2 === dbTeam.c2 && ct.c3 === dbTeam.c3);
+                    if (!isDuplicate) {
+                        tempUsage[b1] = u1 + 1; tempUsage[b2] = u2 + 1; tempUsage[b3] = u3 + 1;
+                        currentTeams.push({
+                            c1: dbTeam.c1, c2: dbTeam.c2, c3: dbTeam.c3,
+                            scoreInput: "", ebR: "", ebIdx: "", ebHp: "",
+                            calculatedMinDps: getRotDpsRange(dbTeam).min 
+                        });
+                    }
+                }
+            }
+        }
+
+        currentTeams.sort((a, b) => b.calculatedMinDps - a.calculatedMinDps);
+        
+        // 🗑️ 刪除了清空 checkbox 的舊語法
+        document.querySelectorAll('.char-select, .score-input, .end-boss-r, .end-boss-idx, .end-boss-hp').forEach(el => el.value = ""); 
+        
         currentTeams.forEach((tData, index) => {
             if (index < maxAllowed && rows[index]) {
                 let row = rows[index];
@@ -610,13 +714,13 @@ function reverseInferAndOptimize() {
                 ss[0].innerHTML = `<option value="${tData.c1}">${tData.c1}</option>`; ss[1].innerHTML = `<option value="${tData.c2}">${tData.c2}</option>`; ss[2].innerHTML = `<option value="${tData.c3}">${tData.c3}</option>`;
                 ss[0].value = tData.c1; ss[1].value = tData.c2; ss[2].value = tData.c3;
                 row.querySelector('.score-input').value = tData.scoreInput || ""; row.querySelector('.end-boss-r').value = tData.ebR || ""; row.querySelector('.end-boss-idx').value = tData.ebIdx || ""; row.querySelector('.end-boss-hp').value = tData.ebHp || "";
-                tData.chk_res.forEach((res, i) => {
-                    let chk = row.querySelector(`.res-chk-${i+1}`);
-                    if(chk) chk.checked = res;
-                });
+                
+                // 🗑️ 刪除了把 checkbox 打勾的舊渲染語法
             }
         });
-        alert(t("✅ 實戰反推與無損洗牌完成！"));
+        
+        let successMsg = fillFromDB ? t("✅ 實戰反推完成，並已自動填補剩餘空位！") : t("✅ 實戰反推完成，僅重排現有隊伍！");
+        alert(successMsg);
     }
     updateTracker();
 }
