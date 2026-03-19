@@ -1,6 +1,6 @@
 // ==========================================
-// 鳴潮矩陣編隊工具 - Beta 測試版 [畫面渲染與互動模組]
-// 檔案：beta_ui.js
+// 鳴潮矩陣編隊工具v4.7.6版 [畫面渲染與互動模組]
+// 檔案：ui.js
 // 職責：DOM 操作、事件監聽、畫面更新、圖表與彈窗
 // ==========================================
 
@@ -42,7 +42,6 @@ function translateDOM(node) {
             el.setAttribute('data-label', isSimp ? t(el.originalDataLabel) : el.originalDataLabel);
         }
     });
-    // 翻譯瀏覽器標籤
     if (document.originalTitle === undefined) document.originalTitle = document.title;
     document.title = isSimp ? t(document.originalTitle) : document.originalTitle;
 }
@@ -61,7 +60,7 @@ function switchTab(pageId, btnElement) {
     window.scrollTo(0, 0);
 }
 
-// --- 3. UI 按鈕與篩選器狀態控制 (補回遺失的部分) ---
+// --- 3. UI 按鈕與篩選器狀態控制 ---
 function toggleRarity(s) { 
     s == 5 ? show5Star = !show5Star : show4Star = !show4Star; 
     document.getElementById(`btn-${s}star`).classList.toggle(`active-${s}star`, s==5?show5Star:show4Star); 
@@ -129,7 +128,7 @@ function updateToggleButtons() {
 
 // --- 4. 畫面初始化 (App Bootstrapper) ---
 function initializeApp() {
-    initCoreData(); // 呼叫 core.js 的資料初始化
+    initCoreData(); 
     initBoard(); 
     
     if (isSimp) document.getElementById('lang-toggle').innerText = "🌐 繁 / 简";
@@ -144,7 +143,6 @@ function initializeApp() {
     renderCheckboxes(); 
     renderRotations();
     
-    // 恢復表格內容
     const savedTeams = safeStorageGet('ww_teams', null);
     if (Array.isArray(savedTeams)) {
         document.querySelectorAll('#team-board tr').forEach((r, i) => {
@@ -161,7 +159,6 @@ function initializeApp() {
     updateToggleButtons(); 
     document.querySelectorAll('.tab-btn')[0].click(); 
     translateDOM(document.body);
-    // 翻譯完成後，掀開隱形斗篷
     requestAnimationFrame(() => {
         document.body.classList.add('loaded');
     });
@@ -315,15 +312,14 @@ function renderIndividualHPPanel() {
 // --- 6. Tracker 與儀表板更新 (Dashboard Updates) ---
 function updateTracker() {
     initBossHPMap();
-    renderIndividualHPPanel(); //呼叫畫出個別血量面板
+    renderIndividualHPPanel();
     
     let env = getEnvSettings();
     let usedCharacters = getUsedCharacters();
 
     updateRosterAndSelects(usedCharacters);
-    let simResults = runSimulations(env); // 呼叫 Core 運算
+    let simResults = runSimulations(env);
     
-    // 更新 DOM
     document.querySelectorAll('#team-board tr').forEach((row, index) => {
         if (!row.classList.contains('hidden-row') && simResults.rowsData[index]) {
             let resTd = row.querySelector('.relay-result');
@@ -485,7 +481,6 @@ function manualUpdateHP(key) { let val = parseFloat(document.getElementById(`hp_
 function applyCalibratedHP(key, avgValue) { bossHPMap[key] = { value: avgValue, isDefault: false }; safeStorageSet('ww_boss_hp', bossHPMap); renderIndividualHPPanel(); updateTracker(); alert(t(`已成功校正為平均值`) + `：${avgValue.toFixed(2)} ` + t(`萬`) + `！`); }
 function resetIndividualHP() { bossHPMap = {}; bossHPHistory = {}; try { localStorage.removeItem('ww_boss_hp'); localStorage.removeItem('ww_boss_hp_history'); } catch(e) {} initBossHPMap(); renderIndividualHPPanel(); updateTracker(); }
 
-// 拉桿微調邏輯 (全局 + 個別)
 function updateMasterSkill() {
     let val = parseInt(document.getElementById('skill-slider').value); 
     document.getElementById('skill-display').innerText = val + '%';
@@ -534,7 +529,6 @@ function updateTeamDisplayCount() {
                     row.querySelector('.end-boss-r').value = "";
                     row.querySelector('.end-boss-idx').value = "";
                     row.querySelector('.end-boss-hp').value = "";
-                    row.querySelectorAll('input[type="checkbox"][class^="res-chk"]').forEach(c => c.checked = false);
                     needsTrackerUpdate = true;
                 }
             }
@@ -550,26 +544,27 @@ function reverseInferAndOptimize() {
     
     rows.forEach((row) => {
         if (row.classList.contains('hidden-row')) return;
-        let ss = row.querySelectorAll('select.char-select'), c1 = ss[0].value, c2 = ss[1].value, c3 = ss[2].value, scoreInput = row.querySelector('.score-input').value, ebR = row.querySelector('.end-boss-r').value, ebIdx = row.querySelector('.end-boss-idx').value, ebHp = row.querySelector('.end-boss-hp').value;
+        let ss = row.querySelectorAll('select.char-select'), c1 = ss[0].value, c2 = ss[1].value, c3 = ss[2].value;
+        let scoreInput = row.querySelector('.score-input').value, ebR = row.querySelector('.end-boss-r').value, ebIdx = row.querySelector('.end-boss-idx').value, ebHp = row.querySelector('.end-boss-hp').value;
 
         if (c1) { 
             let actualScore = parseFloat(scoreInput), ebRInt = parseInt(ebR), ebIdxInt = parseInt(ebIdx), ebHpPct = parseFloat(ebHp);
             let calculatedMinDps = 0; 
-            let rotId = getRotId(c1, c2, c3); 
+            
+            let rotId = null;
             let possibleRots = dpsData.filter(d => d.c1 === c1 && d.c2 === c2 && d.c3 === c3 && checkedRotations.has(d.id));
-            if (possibleRots.length > 0) possibleRots.sort((a,b) => getRotDpsRange(b).min - getRotDpsRange(a).min);
+            if (possibleRots.length > 0) {
+                possibleRots.sort((a,b) => getRotDpsRange(b).min - getRotDpsRange(a).min);
+                rotId = possibleRots[0].id;
+            }
 
             if (!isNaN(actualScore) && actualScore > 0 && possibleRots.length > 0) {
                 let dmg_left = actualScore / Math.max(0.0001, env.scoreRatio), kills = 0, effective_dmg_sum = 0, tmp_r = start_r, tmp_idx = start_idx, tmp_hp = start_hp, dmgDealtToKilledBosses = 0;
-                
-                // 🌟 自動判斷主C屬性是否吻合環境抗性標籤
                 let teamAttr = charAttrMap[c1];
-                let isResisted = teamAttr && (teamAttr === env.resTag1 || teamAttr === env.resTag2);
                 let loopGuard = 0;
                 
                 while (dmg_left > 0 && loopGuard < 50) {
                     loopGuard++;
-                    // 🌟 動態判斷「當下被打死的這隻王 (tmp_idx)」是否有抗性
                     let isResisted = teamAttr && teamAttr === env.resTags[tmp_idx - 1];
                     let r_factor = isResisted ? (1 - env.resPenalty / 100) : 1; 
                     if (r_factor <= 0) r_factor = 0.1;
@@ -621,7 +616,6 @@ function reverseInferAndOptimize() {
                     calculatedMinDps = getRotDpsRange(possibleRots[0]).min; 
                 }
                 
-                // 模擬打完推進度
                 let sim_dmg = actualScore / Math.max(0.0001, env.scoreRatio), sim_r = start_r, sim_idx = start_idx, sim_hp = start_hp;
                 let simLoopGuard = 0;
                 while (sim_dmg >= sim_hp && simLoopGuard < 50) {
@@ -637,16 +631,12 @@ function reverseInferAndOptimize() {
                 calculatedMinDps = getRotDpsRange(possibleRots[0]).min;
                 let dpsRange = getRotDpsRange(possibleRots[0]);
                 let dps = dpsRange.min;
-                
-                // 🌟 自動推演也要判斷屬性
                 let teamAttr = charAttrMap[c1];
-                let isResisted = teamAttr && (teamAttr === env.resTag1 || teamAttr === env.resTag2);
 
                 let t_left = env.battleTime;
                 let simLoopGuard = 0;
                 while (t_left > 0 && simLoopGuard < 50) {
                     simLoopGuard++;
-                    // 🌟 同理，推演未來也要精確對應
                     let isResisted = teamAttr && teamAttr === env.resTags[start_idx - 1];
                     let eff_dps = Math.max(0.0001, dps * (isResisted ? (1 - env.resPenalty / 100) : 1)); 
                     let ttk = start_hp / eff_dps;
@@ -660,7 +650,6 @@ function reverseInferAndOptimize() {
                 }
             }
 
-            // 🗑️ 舊版的 chk_res 陣列已經從這裡移除了
             currentTeams.push({ 
                 c1: c1, c2: c2, c3: c3, scoreInput: scoreInput, ebR: ebR, ebIdx: ebIdx, ebHp: ebHp,
                 calculatedMinDps: calculatedMinDps 
@@ -707,7 +696,6 @@ function reverseInferAndOptimize() {
 
         currentTeams.sort((a, b) => b.calculatedMinDps - a.calculatedMinDps);
         
-        // 🗑️ 刪除了清空 checkbox 的舊語法
         document.querySelectorAll('.char-select, .score-input, .end-boss-r, .end-boss-idx, .end-boss-hp').forEach(el => el.value = ""); 
         
         currentTeams.forEach((tData, index) => {
@@ -717,8 +705,6 @@ function reverseInferAndOptimize() {
                 ss[0].innerHTML = `<option value="${tData.c1}">${tData.c1}</option>`; ss[1].innerHTML = `<option value="${tData.c2}">${tData.c2}</option>`; ss[2].innerHTML = `<option value="${tData.c3}">${tData.c3}</option>`;
                 ss[0].value = tData.c1; ss[1].value = tData.c2; ss[2].value = tData.c3;
                 row.querySelector('.score-input').value = tData.scoreInput || ""; row.querySelector('.end-boss-r').value = tData.ebR || ""; row.querySelector('.end-boss-idx').value = tData.ebIdx || ""; row.querySelector('.end-boss-hp').value = tData.ebHp || "";
-                
-                // 🗑️ 刪除了把 checkbox 打勾的舊渲染語法
             }
         });
         
@@ -811,7 +797,6 @@ function autoBuildMaxDpsTeams() {
     finalOptimizedTeams.reverse(); 
 
     document.querySelectorAll('.char-select, .score-input, .end-boss-hp, .end-boss-r, .end-boss-idx').forEach(el => el.value=""); 
-    document.querySelectorAll('input[type="checkbox"][class^="res-chk"]').forEach(c => c.checked=false);
     let rows = document.querySelectorAll('#team-board tr');
     
     finalOptimizedTeams.forEach((tData, index) => { 
@@ -839,7 +824,11 @@ function applyPreset() {
     if(!applied) alert(t("當前顯示的隊伍中已經沒有空位了！")); updateTracker();
 }
 
-function resetTeams() { if(!confirm(t("確定清空編隊表嗎？"))) return; document.querySelectorAll('.char-select, .score-input, .end-boss-hp, .end-boss-r, .end-boss-idx').forEach(el => el.value=""); document.querySelectorAll('input[type="checkbox"][class^="res-chk"]').forEach(c => c.checked=false); updateTracker(); }
+function resetTeams() { 
+    if(!confirm(t("確定清空編隊表嗎？"))) return; 
+    document.querySelectorAll('.char-select, .score-input, .end-boss-hp, .end-boss-r, .end-boss-idx').forEach(el => el.value=""); 
+    updateTracker(); 
+}
 
 function resetRowDps(btn) {
     let row = btn.closest('tr'); let ss = row.querySelectorAll('select.char-select');
@@ -850,22 +839,14 @@ function resetRowDps(btn) {
 }
 
 // --- 9. Modals (彈窗與資料管理) ---
-let speedTestCallback = null; //記住是誰呼叫了計算器
-let lastCalculatedStability = 100;//宣告全域變數
-/**
- * 打開穩定性計算機彈窗
- * @param {Function} callback - 計算完畢後要執行的動作（用來套用分數到特定隊伍）
- */
+let speedTestCallback = null; 
+let lastCalculatedStability = 100;
+
 function openCalcModal(callback = null) { 
-    // 1. 暫存 callback，供後續按下「套用」時呼叫
     speedTestCallback = callback; 
-    
-    // 2. 顯示計算機彈窗，並設定最高層級以防止被其他面板遮擋
     let modal = document.getElementById('calc-modal');
     modal.style.display = 'flex'; 
     modal.style.zIndex = '2050'; 
-    
-    // 3. 重置彈窗狀態：隱藏先前的計算結果，並清空輸入框
     document.getElementById('calc-result').style.display = 'none'; 
     document.getElementById('calc-base-time').value = '';
     document.getElementById('calc-times').value = '';
@@ -873,7 +854,7 @@ function openCalcModal(callback = null) {
 
 function closeCalcModal() { 
     document.getElementById('calc-modal').style.display = 'none'; 
-    speedTestCallback = null; // 清除紀錄
+    speedTestCallback = null; 
 }
 
 function calculateStability() {
@@ -889,10 +870,8 @@ function calculateStability() {
 
 function applyCalculatedStability() { 
     if (typeof speedTestCallback === 'function') {
-        // 🌟 如果有指定對象（例如點了特定隊伍的按鈕），就把算好的值丟給它
         speedTestCallback(lastCalculatedStability);
     } else {
-        // 否則照舊，套用到全局拉桿
         document.getElementById('skill-slider').value = lastCalculatedStability; 
         if(typeof updateMasterSkill === 'function') updateMasterSkill(); 
     }
@@ -900,7 +879,6 @@ function applyCalculatedStability() {
 }
 
 function openCustomTeamModal() {
-    //抓取彈窗元素並生成角色下拉選單 ===
     let m = document.getElementById('custom-team-modal');
     if (typeof charData === 'undefined') return;
     
@@ -916,39 +894,18 @@ function openCustomTeamModal() {
                 charOpts += `<option value="${n}">${t(n)}</option>`; 
             } 
         });
-    } else {
-        charOpts = Object.keys(charData).map(n => `<option value="${n}">${t(n)}</option>`).join('');
     }
 
-    // 利用反引號 (`) 讓 HTML 可以自由換行縮排，增強可讀性
     m.innerHTML = `
         <div style="background:var(--bg-panel); backdrop-filter:blur(20px); padding:25px; border-radius:16px; border:1px solid var(--gold); width:420px; max-width:90%;">
-            
-            <h3 style="margin-top:0; color:var(--gold); text-align:center;">
-                ➕ ${t('新增自訂編隊')}
-            </h3>
-            
-            <select id="ct-c1" class="char-select" style="margin-bottom:10px;">
-                <option value="">-- ${t('選擇主輸出')} --</option>
-                ${charOpts}
-            </select>
-            
-            <select id="ct-c2" class="char-select" style="margin-bottom:10px;">
-                <option value="">-- ${t('選擇副C/輔助')} --</option>
-                ${charOpts}
-            </select>
-            
-            <select id="ct-c3" class="char-select" style="margin-bottom:10px;">
-                <option value="">-- ${t('選擇生存/輔助')} --</option>
-                ${charOpts}
-            </select>
+            <h3 style="margin-top:0; color:var(--gold); text-align:center;">➕ ${t('新增自訂編隊')}</h3>
+            <select id="ct-c1" class="char-select" style="margin-bottom:10px;"><option value="">-- ${t('選擇主輸出')} --</option>${charOpts}</select>
+            <select id="ct-c2" class="char-select" style="margin-bottom:10px;"><option value="">-- ${t('選擇副C/輔助')} --</option>${charOpts}</select>
+            <select id="ct-c3" class="char-select" style="margin-bottom:10px;"><option value="">-- ${t('選擇生存/輔助')} --</option>${charOpts}</select>
             
             <div style="display:flex; gap:8px; margin-bottom:10px; align-items: stretch;">
                 <input type="number" id="ct-dps" placeholder="${t('預設理論 DPS (萬)')}" class="score-input" style="margin-bottom:0; flex: 1; min-width: 0;">
-                
-                <button onclick="openCalcModal()" type="button" style="background:var(--neon-purple); color:#fff; border:none; padding:0 12px; border-radius:8px; cursor:pointer; font-weight:bold; font-size:0.9em; white-space:nowrap; box-shadow:0 0 10px rgba(207,0,255,0.4);" title="${t('打開穩定度計算機')}">
-                    🧮 ${t('測算穩定度')}
-                </button>
+                <button onclick="openCalcModal()" type="button" style="background:var(--neon-purple); color:#fff; border:none; padding:0 12px; border-radius:8px; cursor:pointer; font-weight:bold; font-size:0.9em; white-space:nowrap; box-shadow:0 0 10px rgba(207,0,255,0.4);" title="${t('打開穩定度計算機')}">🧮 ${t('測算穩定度')}</button>
             </div>
             
             <select id="ct-diff" class="char-select" style="margin-bottom:20px;">
@@ -960,18 +917,14 @@ function openCustomTeamModal() {
             </select>
             
             <div style="display:flex; gap:10px;">
-                <button onclick="document.getElementById('custom-team-modal').style.display='none'" class="btn-action-clear" style="flex:1; background:#555; border:none;">
-                    ${t('取消')}
-                </button>
-                <button onclick="saveCustomTeam()" class="btn-action-all" style="flex:1;">
-                    ${t('儲存')}
-                </button>
+                <button onclick="document.getElementById('custom-team-modal').style.display='none'" class="btn-action-clear" style="flex:1; background:#555; border:none;">${t('取消')}</button>
+                <button onclick="saveCustomTeam()" class="btn-action-all" style="flex:1;">${t('儲存')}</button>
             </div>
-            
         </div>
     `;
     m.style.display = 'flex';
 }
+
 function saveCustomTeam() {
     let c1 = document.getElementById('ct-c1').value, c2 = document.getElementById('ct-c2').value, c3 = document.getElementById('ct-c3').value;
     let dps = parseFloat(document.getElementById('ct-dps').value) || 0, diff = document.getElementById('ct-diff').value;
@@ -1004,6 +957,7 @@ function openDataManager() {
     document.getElementById('dm-teams').innerHTML = customRotations.length === 0 ? `<p style="color:#666; text-align:center;">${t('無自訂資料')}</p>` : customRotations.map((cr, i) => `<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; background:rgba(0,0,0,0.3); padding:10px 12px; border-radius:8px; border: 1px solid var(--border-glass);"><span style="color:#ddd; font-size: 0.95em;">${cr.diff} <span style="color:var(--gold); font-weight:bold;">${t(cr.c1)} + ${t(cr.c2)} + ${t(cr.c3)}</span> (DPS: ${cr.dps}w)</span><button onclick="deleteCustomTeam(${i})" class="btn-action-clear" style="padding:4px 10px; font-size:0.85em; border-radius:6px; box-shadow:none;">❌ ${t('刪除')}</button></div>`).join('');
     document.getElementById('data-manager-modal').style.display = 'flex';
 }
+
 function closeDataManager() { document.getElementById('data-manager-modal').style.display = 'none'; }
 function generateExportCode() {
     let data = { roster: [...ownedCharacters], rotations: [...checkedRotations], customStats: customStatsMap, bossHp: bossHPHistory, customTeams: customRotations, savedLineups: savedLineups, bossHPMap: bossHPMap };
@@ -1077,6 +1031,7 @@ function loadLineup(index) {
     if(parseInt(document.getElementById('team-count-select').value) < neededCount) { document.getElementById('team-count-select').value = neededCount; }
     updateTeamDisplayCount(); alert(t("✅ 記憶編隊載入成功！"));
 }
+
 function deleteLineup(index) { if(!confirm(t("確定刪除此紀錄？"))) return; savedLineups.splice(index, 1); safeStorageSet('ww_saved_lineups', savedLineups); openLineupModal(); }
 
 function exportImage() {
@@ -1084,11 +1039,12 @@ function exportImage() {
         const rows = document.querySelectorAll('#team-board tr'); let completed = [];
         let env = typeof getEnvSettings === 'function' ? getEnvSettings() : {};
         let globalResInfo = [];
-        if(env.resTags[0]) globalResInfo.push(`[1]${env.resTags[0]}`);
-        if(env.resTags[1]) globalResInfo.push(`[2]${env.resTags[1]}`);
-        if(env.resTags[2]) globalResInfo.push(`[3]${env.resTags[2]}`);
-        if(env.resTags[3]) globalResInfo.push(`[4]${env.resTags[3]}`);
+        if(env.resTags && env.resTags[0]) globalResInfo.push(`[1]${env.resTags[0]}`);
+        if(env.resTags && env.resTags[1]) globalResInfo.push(`[2]${env.resTags[1]}`);
+        if(env.resTags && env.resTags[2]) globalResInfo.push(`[3]${env.resTags[2]}`);
+        if(env.resTags && env.resTags[3]) globalResInfo.push(`[4]${env.resTags[3]}`);
         let envResStr = globalResInfo.length > 0 ? ` 🛡️ 各王抗性: ${globalResInfo.join(", ")}` : '';
+
         rows.forEach((r, i) => {
             if (r.classList.contains('hidden-row')) return;
             let ss = r.querySelectorAll('select.char-select'), resTd = r.querySelector('.relay-result');
@@ -1123,13 +1079,13 @@ function submitToGoogleForm() {
             if(ss.length >= 3 && ss[0].value && ss[1].value && ss[2].value && !isNaN(score)) {
                 let c1 = ss[0].value;
                 let teamAttr = typeof charAttrMap !== 'undefined' ? charAttrMap[c1] : null;
-                let isResisted = teamAttr && (teamAttr === env.resTag1 || teamAttr === env.resTag2);
 
                 let dmg_left = score / Math.max(0.0001, env.scoreRatio), kills = 0, effective_dmg_sum = 0, tmp_r = 1, tmp_idx = 1, tmp_hp = getBossMaxHP(1, 1), dmgDealtToKilledBosses = 0;
                 let calculatedTotalHP = 0, loopGuard = 0;
                 
                 while (dmg_left > 0 && loopGuard < 50) { 
                     loopGuard++; 
+                    let isResisted = teamAttr && teamAttr === env.resTags[tmp_idx - 1];
                     let r_factor = isResisted ? (1 - env.resPenalty / 100) : 1; 
                     if (r_factor <= 0) r_factor = 0.1; 
                     if (dmg_left >= tmp_hp) { dmg_left -= tmp_hp; dmgDealtToKilledBosses += tmp_hp; effective_dmg_sum += (tmp_hp / r_factor); kills++; tmp_idx++; if (tmp_idx > 4) { tmp_r++; tmp_idx = 1; } tmp_hp = getBossMaxHP(tmp_r, tmp_idx); } 
@@ -1137,8 +1093,10 @@ function submitToGoogleForm() {
                 }
                 
                 let effective_time = env.battleTime - (kills * env.transTime), trueBaseDps = effective_time > 0 ? (effective_dmg_sum / effective_time) : 0;
-                // 🌟 準確回報這 4 隻王的抗性設定
-                let t1 = env.resTags[0]||'無', t2 = env.resTags[1]||'無', t3 = env.resTags[2]||'無', t4 = env.resTags[3]||'無';
+                let t1 = env.resTags && env.resTags[0] ? env.resTags[0] : '無';
+                let t2 = env.resTags && env.resTags[1] ? env.resTags[1] : '無';
+                let t3 = env.resTags && env.resTags[2] ? env.resTags[2] : '無';
+                let t4 = env.resTags && env.resTags[3] ? env.resTags[3] : '無';
                 dataParams.push(`${ss[0].value},${ss[1].value},${ss[2].value},${score},${trueBaseDps.toFixed(2)},${ebR||''},${ebIdx||''},${ebHp||''},${calculatedTotalHP ? calculatedTotalHP.toFixed(2) : ''},${t1},${t2},${t3},${t4}`);
             }
         });
