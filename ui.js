@@ -540,12 +540,21 @@ function updateTeamDisplayCount() {
 
 // --- 8. 進階推演與編隊功能 ---
 function reverseInferAndOptimize() {
-    initBossHPMap(); let env = getEnvSettings(), currentTeams = [], rows = document.querySelectorAll('#team-board tr'), start_r = 1, start_idx = 1, start_hp = getBossMaxHP(1, 1);
+    initBossHPMap(); 
+    let env = getEnvSettings();
+    let currentTeams = []; 
+    let rows = document.querySelectorAll('#team-board tr');
+    let start_r = 1, start_idx = 1, start_hp = getBossMaxHP(1, 1);
     
+    // 1. 萃取現有隊伍的「真實 DPS」
     rows.forEach((row) => {
         if (row.classList.contains('hidden-row')) return;
-        let ss = row.querySelectorAll('select.char-select'), c1 = ss[0].value, c2 = ss[1].value, c3 = ss[2].value;
-        let scoreInput = row.querySelector('.score-input').value, ebR = row.querySelector('.end-boss-r').value, ebIdx = row.querySelector('.end-boss-idx').value, ebHp = row.querySelector('.end-boss-hp').value;
+        let ss = row.querySelectorAll('select.char-select');
+        let c1 = ss[0].value, c2 = ss[1].value, c3 = ss[2].value;
+        let scoreInput = row.querySelector('.score-input').value;
+        let ebR = row.querySelector('.end-boss-r').value;
+        let ebIdx = row.querySelector('.end-boss-idx').value;
+        let ebHp = row.querySelector('.end-boss-hp').value;
 
         if (c1) { 
             let actualScore = parseFloat(scoreInput), ebRInt = parseInt(ebR), ebIdxInt = parseInt(ebIdx), ebHpPct = parseFloat(ebHp);
@@ -658,9 +667,12 @@ function reverseInferAndOptimize() {
     });
 
     if (currentTeams.length > 0) {
-        let fillFromDB = confirm(t("是否要從資料庫自動填補剩下的空位？\n\n[確定]：保留現有隊伍，並自動用最高分隊伍填滿剩下的空位。\n[取消]：僅針對當前已有隊伍進行重新排序。"));
         let maxAllowed = parseInt(document.getElementById('team-count-select').value) || 16;
+        let fillFromDB = confirm(t("是否要從資料庫自動填補剩下的空位？\n\n[確定]：保留現有隊伍，並自動用最高分隊伍填滿剩下的空位。\n[取消]：僅針對當前已有隊伍進行重新排序。"));
         
+        let poolToPermute = [...currentTeams]; // 準備拿來洗牌的陣容池
+
+        // 2. 處理資料庫自動填補
         if (fillFromDB) {
             let tempUsage = {};
             currentTeams.forEach(tData => {
@@ -674,17 +686,17 @@ function reverseInferAndOptimize() {
             validDBTeams.sort((a,b) => getRotDpsRange(b).min - getRotDpsRange(a).min); 
             
             for (let dbTeam of validDBTeams) {
-                if (currentTeams.length >= maxAllowed) break;
+                if (poolToPermute.length >= maxAllowed) break;
                 
                 let b1 = getBase(dbTeam.c1), b2 = getBase(dbTeam.c2), b3 = getBase(dbTeam.c3);
                 let limit1 = charData[b1]?.max || 1, limit2 = charData[b2]?.max || 1, limit3 = charData[b3]?.max || 1;
                 let u1 = tempUsage[b1] || 0, u2 = tempUsage[b2] || 0, u3 = tempUsage[b3] || 0;
                 
                 if (u1 < limit1 && u2 < limit2 && u3 < limit3 && b1 !== b2 && b1 !== b3 && b2 !== b3) {
-                    let isDuplicate = currentTeams.some(ct => ct.c1 === dbTeam.c1 && ct.c2 === dbTeam.c2 && ct.c3 === dbTeam.c3);
+                    let isDuplicate = poolToPermute.some(ct => ct.c1 === dbTeam.c1 && ct.c2 === dbTeam.c2 && ct.c3 === dbTeam.c3);
                     if (!isDuplicate) {
                         tempUsage[b1] = u1 + 1; tempUsage[b2] = u2 + 1; tempUsage[b3] = u3 + 1;
-                        currentTeams.push({
+                        poolToPermute.push({
                             c1: dbTeam.c1, c2: dbTeam.c2, c3: dbTeam.c3,
                             scoreInput: "", ebR: "", ebIdx: "", ebHp: "",
                             calculatedMinDps: getRotDpsRange(dbTeam).min 
@@ -694,21 +706,89 @@ function reverseInferAndOptimize() {
             }
         }
 
-        currentTeams.sort((a, b) => b.calculatedMinDps - a.calculatedMinDps);
+        // ==========================================
+        // 🧠 全新升級：穿插式 Beam Search 排序引擎
+        // ==========================================
+        let beamWidth = 500; 
+        let states = [{
+            score: 0,
+            sequence: [],
+            remaining: poolToPermute,
+            r: 1,
+            idx: 1,
+            hp: getBossMaxHP(1, 1)
+        }];
+
+        let n = poolToPermute.length;
+        for (let step = 0; step < n; step++) {
+            let nextStates = [];
+            for (let state of states) {
+                for (let i = 0; i < state.remaining.length; i++) {
+                    let team = state.remaining[i];
+
+                    // 模擬這支隊伍在當前王與血量下的戰鬥 (精算轉場與抗性)
+                    let t_left = env.battleTime;
+                    let dmgDone = 0;
+                    let tmp_r = state.r, tmp_idx = state.idx, tmp_hp = state.hp;
+                    let teamAttr = charAttrMap[team.c1];
+                    let loopGuard = 0;
+
+                    while (t_left > 0 && loopGuard < 50) {
+                        loopGuard++;
+                        let isResisted = teamAttr && teamAttr === env.resTags[tmp_idx - 1];
+                        let r_factor = isResisted ? (1 - env.resPenalty / 100) : 1;
+                        let eff_dps = Math.max(0.0001, team.calculatedMinDps * r_factor);
+                        let ttk = tmp_hp / eff_dps;
+
+                        if (ttk <= t_left) {
+                            dmgDone += tmp_hp;
+                            t_left -= (ttk + env.transTime); // 扣除轉場耗時
+                            tmp_idx++;
+                            if (tmp_idx > 4) { tmp_r++; tmp_idx = 1; }
+                            tmp_hp = getBossMaxHP(tmp_r, tmp_idx);
+                        } else {
+                            dmgDone += eff_dps * t_left;
+                            tmp_hp -= eff_dps * t_left;
+                            t_left = 0;
+                        }
+                    }
+
+                    let newRemaining = [...state.remaining];
+                    newRemaining.splice(i, 1); 
+
+                    nextStates.push({
+                        score: state.score + dmgDone,
+                        sequence: [...state.sequence, team],
+                        remaining: newRemaining,
+                        r: tmp_r,
+                        idx: tmp_idx,
+                        hp: tmp_hp
+                    });
+                }
+            }
+            nextStates.sort((a, b) => b.score - a.score);
+            states = nextStates.slice(0, beamWidth);
+        }
+
+        let bestSequence = states[0].sequence;
         
+        // 4. 清空欄位並將最佳穿插順序渲染回畫面
         document.querySelectorAll('.char-select, .score-input, .end-boss-r, .end-boss-idx, .end-boss-hp').forEach(el => el.value = ""); 
         
-        currentTeams.forEach((tData, index) => {
+        bestSequence.forEach((tData, index) => {
             if (index < maxAllowed && rows[index]) {
                 let row = rows[index];
                 let ss = row.querySelectorAll('select.char-select');
-                ss[0].innerHTML = `<option value="${tData.c1}">${tData.c1}</option>`; ss[1].innerHTML = `<option value="${tData.c2}">${tData.c2}</option>`; ss[2].innerHTML = `<option value="${tData.c3}">${tData.c3}</option>`;
-                ss[0].value = tData.c1; ss[1].value = tData.c2; ss[2].value = tData.c3;
-                row.querySelector('.score-input').value = tData.scoreInput || ""; row.querySelector('.end-boss-r').value = tData.ebR || ""; row.querySelector('.end-boss-idx').value = tData.ebIdx || ""; row.querySelector('.end-boss-hp').value = tData.ebHp || "";
+                ss[0].innerHTML = `<option value="${tData.c1}">${tData.c1}</option>`; 
+                ss[1].innerHTML = `<option value="${tData.c2}">${tData.c2}</option>`; 
+                ss[2].innerHTML = `<option value="${tData.c3}">${tData.c3}</option>`;
+                ss[0].value = tData.c1; 
+                ss[1].value = tData.c2; 
+                ss[2].value = tData.c3;
             }
         });
         
-        let successMsg = fillFromDB ? t("✅ 實戰反推完成，並已自動填補剩餘空位！") : t("✅ 實戰反推完成，僅重排現有隊伍！");
+        let successMsg = fillFromDB ? t("✅ 實戰反推與穿插最佳化完成，並已自動填補空位！") : t("✅ 實戰反推完成，已為您計算出能避開抗性與轉場浪費的最佳順序！");
         alert(successMsg);
     }
     updateTracker();
