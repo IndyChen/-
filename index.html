@@ -190,7 +190,7 @@
         <button class="btn-top" onclick="openDataManager()" style="color:var(--neon-green); border-color:var(--border-glass);">⚙️ 數據總管與備份</button>
     </div>
     
-    <h2>鳴潮矩陣編隊工具 <span style="font-size: 0.5em; color: var(--neon-purple); vertical-align: middle;">v4.7.5</span></h2>
+    <h2>鳴潮矩陣編隊工具 <span style="font-size: 0.5em; color: var(--neon-purple); vertical-align: middle;">v4.7.6</span></h2>
     
     <div class="data-source">
         <span>📊 數據庫設計與邏輯：AI架構 / 數據提供：QuichilOvO、南邊 / 整理：Kolton</span>
@@ -263,7 +263,7 @@
             </div>
 
             <details open style="flex: 1; min-width: 300px; background: rgba(30, 30, 36, 0.7); padding: 15px; border-radius: 12px; border: 1px solid var(--border-glass); cursor: pointer;">
-                <summary style="color: var(--gold); font-weight: bold; outline: none; font-size: 1.1em;">📜 點此查看版本更新說明 (當前: v4.7.5 正式版)</summary>
+                <summary style="color: var(--gold); font-weight: bold; outline: none; font-size: 1.1em;">📜 點此查看版本更新說明 (當前: v4.7.6 正式版)</summary>
                 <div style="margin-top: 15px; font-size: 0.95em; color: #ccc; line-height: 1.6; border-top: 1px dashed var(--border-glass); padding-top: 15px; cursor: default;" onclick="event.stopPropagation();">
                     
                     <strong style="color: var(--neon-purple); font-size: 1.05em;">✨ 【新增功能】</strong>
@@ -500,6 +500,15 @@
                             <div><label style="font-size:0.8em; color:#aaa;">抗性減傷(%):</label><input type="number" id="env-res" class="env-input" value="40" step="5" style="color:#ffaa00;" oninput="updateTracker()"></div>
                             <div><label style="font-size:0.8em; color:#aaa;">轉場耗時(秒):</label><input type="number" id="env-trans" class="env-input" value="1.5" step="0.1" oninput="updateTracker()"></div>
                             <div><label style="font-size:0.8em; color:#aaa;">單隊時限(秒):</label><input type="number" id="env-time" class="env-input" style="color:var(--neon-purple);" value="120" step="10" oninput="updateTracker()"></div>
+                            <div style="grid-column: 1 / -1; margin-top: 5px; padding-top: 12px; border-top: 1px dashed var(--border-glass); display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                            <label style="font-size:0.85em; color:var(--gold); font-weight:bold;">🛡️ 各序列 Boss 抗性標籤:</label>
+                            <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                                <div style="display:flex; align-items:center; gap:2px;"><span style="color:#aaa; font-size:0.8em;">[1]</span><select id="env-res-1" onchange="updateTracker()" style="background:rgba(0,0,0,0.5); color:#fff; border:1px solid var(--border-glass); padding:4px; border-radius:4px; outline:none; font-size:0.85em;"><option value="">--無--</option><option value="冷凝">❄️冷凝</option><option value="熱熔">🔥熱熔</option><option value="導電">⚡導電</option><option value="氣動">🌪️氣動</option><option value="衍射">✨衍射</option><option value="湮滅">🌑湮滅</option></select></div>
+                                <div style="display:flex; align-items:center; gap:2px;"><span style="color:#aaa; font-size:0.8em;">[2]</span><select id="env-res-2" onchange="updateTracker()" style="background:rgba(0,0,0,0.5); color:#fff; border:1px solid var(--border-glass); padding:4px; border-radius:4px; outline:none; font-size:0.85em;"><option value="">--無--</option><option value="冷凝">❄️冷凝</option><option value="熱熔">🔥熱熔</option><option value="導電">⚡導電</option><option value="氣動">🌪️氣動</option><option value="衍射">✨衍射</option><option value="湮滅">🌑湮滅</option></select></div>
+                                <div style="display:flex; align-items:center; gap:2px;"><span style="color:#aaa; font-size:0.8em;">[3]</span><select id="env-res-3" onchange="updateTracker()" style="background:rgba(0,0,0,0.5); color:#fff; border:1px solid var(--border-glass); padding:4px; border-radius:4px; outline:none; font-size:0.85em;"><option value="">--無--</option><option value="冷凝">❄️冷凝</option><option value="熱熔">🔥熱熔</option><option value="導電">⚡導電</option><option value="氣動">🌪️氣動</option><option value="衍射">✨衍射</option><option value="湮滅">🌑湮滅</option></select></div>
+                                <div style="display:flex; align-items:center; gap:2px;"><span style="color:#aaa; font-size:0.8em;">[4]</span><select id="env-res-4" onchange="updateTracker()" style="background:rgba(0,0,0,0.5); color:#fff; border:1px solid var(--border-glass); padding:4px; border-radius:4px; outline:none; font-size:0.85em;"><option value="">--無--</option><option value="冷凝">❄️冷凝</option><option value="熱熔">🔥熱熔</option><option value="導電">⚡導電</option><option value="氣動">🌪️氣動</option><option value="衍射">✨衍射</option><option value="湮滅">🌑湮滅</option></select></div>
+                            </div>
+                        </div>
                         </div>
                         <details style="margin-top: 15px; border-top: 1px dashed #555; padding-top: 10px;">
                             <summary style="color:#aaa; font-size:0.9em; cursor:pointer; outline:none;">🧮 進階：個別 BOSS 血量覆寫與代數反解校正面板 (點擊展開)</summary>
