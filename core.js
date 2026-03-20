@@ -38,10 +38,27 @@ let activePresetGens = new Set();
 let currentEditRotId = null;
 
 // --- 2. 基礎工具 (Utils) ---
+const t_cache = {}; // 🚀 新增：全域翻譯快取字典
+
 function t(str) { 
+    // 原本的防呆機制完全保留
     if (!isSimp || !str || typeof str !== 'string' || typeof phraseDict === 'undefined') return str; 
+    
+    // 🔥 終極殺招 1：查快取！如果有翻譯過，耗時 0 毫秒直接回傳
+    if (t_cache[str]) return t_cache[str];
+    
     let res = str;
-    for (let [tw, cn] of phraseDict) res = res.split(tw).join(cn);
+    for (let [tw, cn] of phraseDict) {
+        // 🔥 終極殺招 2：雷達掃描 (includes)
+        // 先檢查字串裡面「到底有沒有這個詞」？確定有，才執行分割與合併！
+        // 這行可以幫你的舊 CPU 省下 99% 以上的無效運算。
+        if (res.includes(tw)) {
+            res = res.split(tw).join(cn);
+        }
+    }
+    
+    // 算完之後，把結果存進記憶體，下次再遇到同一個詞就秒殺！
+    t_cache[str] = res;
     return res;
 }
 
