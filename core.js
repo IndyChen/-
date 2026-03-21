@@ -332,6 +332,26 @@ function getRotDpsRange(d) {
     return { min: Math.max(0, max * (stab / 100)), max: max, isCustom: false };
 }
 
+function getUsedCharacters() {
+    let used = {}; 
+    for(let n in charData) used[n] = 0;
+    document.querySelectorAll('.char-select').forEach(s => { 
+        if(s.value && s.closest('tr') && !s.closest('tr').classList.contains('hidden-row')) used[getBase(s.value)]++; 
+    });
+    return used;
+}
+
+function getMaxTeams(usedObj) {
+    let baseRemains = {};
+    for(let name of ownedCharacters) { 
+        let b = getBase(name); 
+        if(charData[b]) { let r = charData[b].max - (usedObj[b]||0); if(r>0) baseRemains[b] = r; } 
+    }
+    let counts = Object.values(baseRemains), teams = 0;
+    while(counts.length >= 3) { counts.sort((a,b)=>b-a); counts[0]--; counts[1]--; counts[2]--; teams++; counts = counts.filter(c=>c>0); }
+    return Math.min(16, teams);
+}
+
 function runMonteCarlo(expectedDps, rotId) {
     let stats = customStatsMap[rotId];
     if (!stats || stats.nukeCR === undefined || stats.nukeLoss === undefined) return null;
