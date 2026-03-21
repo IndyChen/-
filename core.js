@@ -868,10 +868,22 @@ async function reverseInferAndOptimize() {
             let projectedScore = Math.floor(bestSimDmg * env.scoreRatio);
             
             let successMsg = fillFromDB ? t("✅ 實戰反推與穿插最佳化完成，並已自動填補空位！") : t("✅ 實戰反推完成，已為您計算出能避開抗性與轉場浪費的最佳順序！");
+            
+            // 🌟 修復 1：把算出來的最高總分加進彈窗裡告訴玩家
+            successMsg += t("\n🏆 最佳化後預估總分：") + projectedScore.toLocaleString() + t(" 分");
+            
             alert(successMsg);
+            
+            // 🌟 修復 2：關鍵防呆！強制將模式切換為「自動推演」
+            // 否則舊的手動得分被清空後，儀表板會卡在手動模式並顯示 0 分
+            let simModeEl = document.getElementById('sim-mode');
+            if (simModeEl && simModeEl.value !== 'auto') {
+                simModeEl.value = 'auto';
+            }
+
         }
         updateTracker();
-        // 🚀 新增這行：強制刷新左側排軸清單，讓綠色的自訂 DPS 與穩定度即時顯示！
+        // 🚀 強制刷新左側排軸清單，讓綠色的自訂 DPS 與穩定度即時顯示！
         if (typeof renderRotations === 'function') renderRotations();
 
     } catch (err) {
