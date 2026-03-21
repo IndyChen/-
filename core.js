@@ -1,5 +1,5 @@
 // ==========================================
-// 鳴潮矩陣編隊工具 v4.8.0 [核心運算模組]
+// 鳴潮矩陣編隊工具 v4.8 [核心運算模組]
 // 檔案：core.js
 // 職責：資料存取、數學推演、動態時間判定、雙引擎洗牌(DP+Beam)、專屬增傷
 // ==========================================
@@ -31,7 +31,6 @@ let bossHPHistory = {};
 let customRotations = [];
 let savedLineups = [];
 
-// 篩選器狀態
 let show5Star = true, show4Star = true, showG1 = true, showG2 = true, showG3 = true;
 let activePresetAttrs = new Set(); 
 let activePresetGens = new Set();
@@ -78,7 +77,6 @@ function clampHpPct(el) {
 function getBase(n) { return ['光主', '暗主', '風主'].includes(n) ? '漂泊者' : n; }
 function isOwned(n) { return ['光主', '暗主', '風主'].includes(n) ? ownedCharacters.has('漂泊者') : ownedCharacters.has(n); }
 
-// ⚡ 動態設備算力測速器 (測試 50ms)
 function getDeviceBenchmark() {
     let testStart = performance.now();
     let testOps = 0;
@@ -90,12 +88,9 @@ function getDeviceBenchmark() {
         }
     }
     let rawOpsPerSec = testOps * (1000 / 50);
-    // 乘以 0.5 係數以高估運算時間，並設定 50 萬次為防呆底線
     return Math.max(500000, rawOpsPerSec * 0.5); 
 }
-// ==========================================
-// 🛡️ 核心特權過濾器 (真正公平的策略引擎版)
-// ==========================================
+
 function getBestPossibleRots(c1, c2, c3, strategy = 'min') {
     let possibleRots = dpsData.filter(d => d.c1 === c1 && d.c2 === c2 && d.c3 === c3 && checkedRotations.has(d.id));
     possibleRots.sort((a, b) => {
@@ -135,9 +130,6 @@ function getUniqueValidTeams(strategy = 'min') {
     return Array.from(map.values());
 }
 
-// ==========================================
-// --- 1.5 v4.8 核心：異步總機與冪函數擬合引擎 ---
-// ==========================================
 function yieldToMain() { return new Promise(resolve => setTimeout(resolve, 0)); }
 
 function updateProgress(pct, text) {
@@ -154,14 +146,26 @@ const DEFAULT_CURVE_K = {
     "忌炎": 1.00, "暗主": 0.80, "安可": 0.80
 };
 
-// 📈 支援跨輪次精準殘血收尾 (v4.8 動態時間與首輪特化)
+// 🚀 v4.8.1 修復：動態計算真實總傷，防禦資料庫寫死數據
+function getEffectiveTotalDmg(d, rotId, isFirstRotation, currentDps, rotTime) {
+    let dbTotalDmg = (isFirstRotation && d && d.firstTotalDmg) ? d.firstTotalDmg : ((d && d.totalDmg) ? d.totalDmg : null);
+    let hasCustomDps = customStatsMap[rotId] && customStatsMap[rotId].dps !== undefined;
+
+    if (hasCustomDps && d && d.dps > 0) {
+        let dpsRatio = currentDps / d.dps;
+        return dbTotalDmg ? (dbTotalDmg * dpsRatio) : (currentDps * rotTime);
+    }
+    return dbTotalDmg ? dbTotalDmg : (currentDps * rotTime);
+}
+
 function getTtkFromMathCurve(hpToKill, baseDps, r_factor, lvlPenalty, mainC, rotId, timeSpentOnField = 0) {
     let d = dpsData.find(x => x.id === rotId);
     let isFirstRotation = (timeSpentOnField === 0);
     
     let rotTime = (isFirstRotation && d && d.firstDuration) ? d.firstDuration : ((d && d.duration) ? d.duration : 25);
-    let baseTotalDmg = (isFirstRotation && d && d.firstTotalDmg) ? d.firstTotalDmg : ((d && d.totalDmg) ? d.totalDmg : (baseDps * rotTime));
     
+    // 🌟 修復 1：套用動態總傷引擎
+    let baseTotalDmg = getEffectiveTotalDmg(d, rotId, isFirstRotation, baseDps, rotTime);
     let totalDmgPerRot = baseTotalDmg * r_factor * lvlPenalty;
     
     if (isNaN(totalDmgPerRot) || totalDmgPerRot <= 0 || isNaN(hpToKill) || hpToKill <= 0) return 9999;
@@ -188,11 +192,9 @@ function getTtkFromMathCurve(hpToKill, baseDps, r_factor, lvlPenalty, mainC, rot
     }
 }
 
-// ⚔️ 統一的抗性與角色增傷計算器 (v4.8 專屬增傷標籤)
 function getCombatMultiplier(env, teamAttr, mainC, bossIdx) {
     let isResisted = teamAttr && teamAttr === env.resTags[bossIdx - 1];
     let currentWeak = env.weakTags[bossIdx - 1] || "";
-    // 支援輸入多個條件如 "熱熔,今汐"
     let isBuffed = currentWeak && (currentWeak.includes(teamAttr) || currentWeak.includes(mainC));
     
     let r_factor = isResisted ? (1 - env.resPenalty / 100) : 1;
@@ -206,7 +208,6 @@ function initCoreData() {
     let savedLang = localStorage.getItem('ww_lang');
     isSimp = (savedLang === 'zh-CN' || savedLang === '"zh-CN"');
 
-    // 📥 讀取內建排軸庫
     if (typeof teamDB !== 'undefined' && typeof charData !== 'undefined') {
         for (let c1 in teamDB) {
             teamDB[c1].forEach(tData => {
@@ -222,7 +223,6 @@ function initCoreData() {
         }
     }
     
-    // 📥 讀取玩家自訂排軸
     customRotations = safeStorageGet('ww_custom_rotations_v2', []);
     customRotations.forEach(cr => {
         if(typeof charData !== 'undefined') {
@@ -297,7 +297,6 @@ function getEnvSettings() {
     }; 
 }
 
-// --- 4. 數學公式與王血量推演 (Math & Boss HP) ---
 function initBossHPMap() {
     let env = getEnvSettings();
     bossHPMap = safeStorageGet('ww_boss_hp', {});
@@ -311,14 +310,6 @@ function initBossHPMap() {
             } 
         } 
     }
-}
-
-function getBaseEnvHP(r, index) { 
-    let env = getEnvSettings(); 
-    if (r === 1) return env.r1_hp; 
-    if (r === 2) return index === 1 ? 546.67 : env.r2_hp; 
-    if (r === 3) return env.r3_hp; 
-    return env.r3_hp * (1 + env.growth * ((r - 4) * 4 + index)); 
 }
 
 function getBossMaxHP(r, index) { 
@@ -340,28 +331,6 @@ function getRotDpsRange(d) {
     let stab = diffStability[diffKey] !== undefined ? diffStability[diffKey] : 100;
     return { min: Math.max(0, max * (stab / 100)), max: max, isCustom: false };
 }
-
-function getUsedCharacters() {
-    let used = {}; 
-    for(let n in charData) used[n] = 0;
-    document.querySelectorAll('.char-select').forEach(s => { 
-        if(s.value && s.closest('tr') && !s.closest('tr').classList.contains('hidden-row')) used[getBase(s.value)]++; 
-    });
-    return used;
-}
-
-function getMaxTeams(usedObj) {
-    let baseRemains = {};
-    for(let name of ownedCharacters) { 
-        let b = getBase(name); 
-        if(charData[b]) { let r = charData[b].max - (usedObj[b]||0); if(r>0) baseRemains[b] = r; } 
-    }
-    let counts = Object.values(baseRemains), teams = 0;
-    while(counts.length >= 3) { counts.sort((a,b)=>b-a); counts[0]--; counts[1]--; counts[2]--; teams++; counts = counts.filter(c=>c>0); }
-    return Math.min(16, teams);
-}
-
-// --- 5. 核心推演引擎 (The Simulation Engine) ---
 
 function runMonteCarlo(expectedDps, rotId) {
     let stats = customStatsMap[rotId];
@@ -445,8 +414,6 @@ function runSimulations(env) {
                             while (t_left > 0 && loopGuard < 50) {
                                 loopGuard++;
                                 let lvlPenalty = (r === 1) ? 1.0 : (r === 2 ? (env.pen110 || 1.0) : (env.pen120 || 1.0));
-                                
-                                // 🚀 統一增傷計算器
                                 let r_factor = getCombatMultiplier(env, teamAttr, mainC, idx);
                                 
                                 let timeOnField = env.battleTime - t_left; 
@@ -460,7 +427,10 @@ function runSimulations(env) {
                                     let d = dpsData.find(x => x.id === rotId);
                                     let isFirst = (timeOnField === 0);
                                     let rotTime = (isFirst && d && d.firstDuration) ? d.firstDuration : ((d && d.duration) ? d.duration : 25);
-                                    let baseTotalDmg = (isFirst && d && d.firstTotalDmg) ? d.firstTotalDmg : ((d && d.totalDmg) ? d.totalDmg : (baseDps * rotTime));
+                                    
+                                    // 🌟 修復 2：套用動態總傷引擎
+                                    let baseTotalDmg = getEffectiveTotalDmg(d, rotId, isFirst, baseDps, rotTime);
+                                    
                                     let true_eff_dps = Math.max(0.0001, (baseTotalDmg / rotTime) * r_factor * lvlPenalty);
 
                                     dmg += true_eff_dps * t_left; hp -= true_eff_dps * t_left; t_left = 0; 
@@ -515,9 +485,6 @@ function runSimulations(env) {
     return results;
 }
 
-// ==========================================
-// 💎 DP 引擎核心數學邏輯 (狀態壓縮動態規劃)
-// ==========================================
 function runBitmaskDP(teams, env) {
     let n = teams.length;
     let numStates = 1 << n; 
@@ -539,8 +506,6 @@ function runBitmaskDP(teams, env) {
                 while (t_left > 0 && loopGuard < 50) {
                     loopGuard++;
                     let lvlPenalty = (tmp_r === 1) ? 1.0 : (tmp_r === 2 ? (env.pen110 || 1.0) : (env.pen120 || 1.0));
-                    
-                    // 🚀 統一增傷計算器
                     let r_factor = getCombatMultiplier(env, team.teamAttr, team.c1, tmp_idx);
                     
                     let timeOnField = env.battleTime - t_left; 
@@ -554,7 +519,10 @@ function runBitmaskDP(teams, env) {
                         let d = dpsData.find(x => x.id === team.rotId);
                         let isFirst = (timeOnField === 0);
                         let rotTime = (isFirst && d && d.firstDuration) ? d.firstDuration : ((d && d.duration) ? d.duration : 25);
-                        let baseTotalDmg = (isFirst && d && d.firstTotalDmg) ? d.firstTotalDmg : ((d && d.totalDmg) ? d.totalDmg : (team.calculatedMinDps * rotTime));
+                        
+                        // 🌟 修復 3：套用動態總傷引擎
+                        let baseTotalDmg = getEffectiveTotalDmg(d, team.rotId, isFirst, team.calculatedMinDps, rotTime);
+                        
                         let true_eff_dps = Math.max(0.0001, (baseTotalDmg / rotTime) * r_factor * lvlPenalty);
 
                         dmgDone += true_eff_dps * t_left; tmp_hp -= true_eff_dps * t_left; t_left = 0;
@@ -568,11 +536,9 @@ function runBitmaskDP(teams, env) {
             }
         }
     }
-    // 🚀 原本只有回傳陣列，現在連同最高分數一起回傳
     return { seq: dp[numStates - 1].seq, score: dp[numStates - 1].score };
 }
 
-// --- 8. 進階推演與編隊功能 (雙引擎調度器) ---
 async function reverseInferAndOptimize() {
     if (typeof isEngineRunning !== 'undefined' && isEngineRunning) return alert(t("⚠️ 引擎正在高載運算中，請稍候..."));
     if (typeof isEngineRunning === 'undefined') window.isEngineRunning = false;
@@ -611,8 +577,6 @@ async function reverseInferAndOptimize() {
                     while (dmg_left > 0 && loopGuard < 50) {
                         loopGuard++;
                         let lvlPenalty = (tmp_r === 1) ? 1.0 : (tmp_r === 2 ? (env.pen110 || 1.0) : (env.pen120 || 1.0));
-                        
-                        // 🚀 統一增傷計算器
                         let r_factor = getCombatMultiplier(env, teamAttr, c1, tmp_idx);
                         if (r_factor <= 0) r_factor = 0.1;
                         let totalPenalty = r_factor * lvlPenalty;
@@ -661,7 +625,6 @@ async function reverseInferAndOptimize() {
                             newDps = originalBaseDps; newStab = (restoredBaseDps / originalBaseDps) * 100; 
                         }
                         
-                        // 🚀 核心修復：強制收束浮點數
                         newDps = parseFloat(newDps.toFixed(3));
                         newStab = parseFloat(newStab.toFixed(1));
                         
@@ -692,8 +655,6 @@ async function reverseInferAndOptimize() {
                     while (t_left > 0 && simLoopGuard < 50) {
                         simLoopGuard++;
                         let lvlPenalty = (start_r === 1) ? 1.0 : (start_r === 2 ? (env.pen110 || 1.0) : (env.pen120 || 1.0));
-                        
-                        // 🚀 統一增傷計算器
                         let r_factor = getCombatMultiplier(env, teamAttr, c1, start_idx);
                         
                         let timeOnField = env.battleTime - t_left;
@@ -707,7 +668,10 @@ async function reverseInferAndOptimize() {
                             let d = dpsData.find(x => x.id === rotId);
                             let isFirst = (timeOnField === 0);
                             let rotTime = (isFirst && d && d.firstDuration) ? d.firstDuration : ((d && d.duration) ? d.duration : 25);
-                            let baseTotalDmg = (isFirst && d && d.firstTotalDmg) ? d.firstTotalDmg : ((d && d.totalDmg) ? d.totalDmg : (calculatedMinDps * rotTime));
+                            
+                            // 🌟 修復 4：套用動態總傷引擎
+                            let baseTotalDmg = getEffectiveTotalDmg(d, rotId, isFirst, calculatedMinDps, rotTime);
+
                             let true_eff_dps = Math.max(0.0001, (baseTotalDmg / rotTime) * r_factor * lvlPenalty);
 
                             start_hp -= true_eff_dps * t_left; t_left = 0; 
@@ -723,7 +687,7 @@ async function reverseInferAndOptimize() {
 
         if (currentTeams.length > 0) {
             let maxAllowed = parseInt(document.getElementById('team-count-select').value) || 16;
-            let fillFromDB = confirm(t("是否要從資料庫自動填補剩下的空位？"));
+            let fillFromDB = confirm(t("是否要從資料庫自動填補剩下的空位？\n\n[確定]：保留現有隊伍，並自動用最高分隊伍填滿剩下的空位。\n[取消]：僅針對當前已有隊伍進行重新排序。"));
             let poolToPermute = [...currentTeams];
 
             if (fillFromDB) {
@@ -761,14 +725,12 @@ async function reverseInferAndOptimize() {
             let opsPerSec = getDeviceBenchmark(); 
             let dpTransitions = n * Math.pow(2, Math.max(0, n - 1)); 
             let estDpTimeSec = (dpTransitions / opsPerSec).toFixed(1);
-            // 🚀 修復：補上警告字眼的翻譯綁定
             let dpWarning = (dpTransitions > 1000000) ? t(" (⚠️ 極高風險，可能卡死瀏覽器)") : "";
 
             let defaultBeamWidth = 500;
             let beamTransitions = n * n * defaultBeamWidth; 
             let estBeamTimeSec = (beamTransitions / opsPerSec).toFixed(1);
 
-            // 🚀 修復：將變數抽離 t() 函數，確保精準匹配字典
             let msg = t("漂泊者，洗牌引擎準備就緒！目前候選隊伍數：") + `${n} ` + t("隊\n\n");
             msg += t("請選擇排軸演算法：\n");
             msg += `[1] 🤖 ` + t("智慧分流 (推薦)：N≤14用DP，N>14用束式\n");
@@ -785,14 +747,14 @@ async function reverseInferAndOptimize() {
             else useDP = (n <= 14); 
 
             let bestSequence = [];
-            let bestSimDmg = 0; // 🚀 新增：用來記錄底層引擎算出的最高總傷害
+            let bestSimDmg = 0;
 
             if (useDP) {
                 updateProgress(50, t(`啟動狀態壓縮 DP 引擎 (預估 `) + `${estDpTimeSec}` + t(` 秒)...`));
                 await yieldToMain();
                 let dpRes = runBitmaskDP(poolToPermute, env); 
                 bestSequence = dpRes.seq;
-                bestSimDmg = dpRes.score; // 🚀 攔截 DP 引擎的最高分
+                bestSimDmg = dpRes.score;
             } else {
                 let beamWidth = defaultBeamWidth;
                 let widthChoice = prompt(t(`啟動束式搜索。\n請輸入搜尋深度 (Beam Width)。\n建議值：500。`), "500");
@@ -816,7 +778,6 @@ async function reverseInferAndOptimize() {
                             while (t_left > 0 && loopGuard < 50) {
                                 loopGuard++;
                                 let lvlPenalty = (tmp_r === 1) ? 1.0 : (tmp_r === 2 ? (env.pen110 || 1.0) : (env.pen120 || 1.0));
-                                
                                 let r_factor = getCombatMultiplier(env, team.teamAttr, team.c1, tmp_idx);
                                 
                                 let timeOnField = env.battleTime - t_left;
@@ -830,7 +791,10 @@ async function reverseInferAndOptimize() {
                                     let d = dpsData.find(x => x.id === team.rotId);
                                     let isFirst = (timeOnField === 0);
                                     let rotTime = (isFirst && d && d.firstDuration) ? d.firstDuration : ((d && d.duration) ? d.duration : 25);
-                                    let baseTotalDmg = (isFirst && d && d.firstTotalDmg) ? d.firstTotalDmg : ((d && d.totalDmg) ? d.totalDmg : (team.calculatedMinDps * rotTime));
+                                    
+                                    // 🌟 修復 5：套用動態總傷引擎
+                                    let baseTotalDmg = getEffectiveTotalDmg(d, team.rotId, isFirst, team.calculatedMinDps, rotTime);
+
                                     let true_eff_dps = Math.max(0.0001, (baseTotalDmg / rotTime) * r_factor * lvlPenalty);
 
                                     dmgDone += true_eff_dps * t_left; tmp_hp -= true_eff_dps * t_left; t_left = 0; 
@@ -845,7 +809,7 @@ async function reverseInferAndOptimize() {
                     states = nextStates.slice(0, beamWidth);
                 }
                 bestSequence = states[0].sequence;
-                bestSimDmg = states[0].score; // 🚀 攔截 Beam 引擎的最高分
+                bestSimDmg = states[0].score;
             }
 
             updateProgress(100, t('穿插最佳化完成！'));
@@ -864,26 +828,18 @@ async function reverseInferAndOptimize() {
                 }
             });
             
-            // 🚀 將原始總傷害換算為《鳴潮》遊戲內得分，並顯示在彈窗中
             let projectedScore = Math.floor(bestSimDmg * env.scoreRatio);
-            
             let successMsg = fillFromDB ? t("✅ 實戰反推與穿插最佳化完成，並已自動填補空位！") : t("✅ 實戰反推完成，已為您計算出能避開抗性與轉場浪費的最佳順序！");
-            
-            // 🌟 修復 1：把算出來的最高總分加進彈窗裡告訴玩家
             successMsg += t("\n🏆 最佳化後預估總分：") + projectedScore.toLocaleString() + t(" 分");
-            
             alert(successMsg);
             
-            // 🌟 修復 2：關鍵防呆！強制將模式切換為「自動推演」
-            // 否則舊的手動得分被清空後，儀表板會卡在手動模式並顯示 0 分
+            // 🌟 關鍵修復：強制將模式切換回自動推演，讓儀表板能正確讀取剛剛反推的新火力
             let simModeEl = document.getElementById('sim-mode');
             if (simModeEl && simModeEl.value !== 'auto') {
                 simModeEl.value = 'auto';
             }
-
         }
         updateTracker();
-        // 🚀 強制刷新左側排軸清單，讓綠色的自訂 DPS 與穩定度即時顯示！
         if (typeof renderRotations === 'function') renderRotations();
 
     } catch (err) {
@@ -903,7 +859,6 @@ async function autoBuildMaxDpsTeams() {
 
     try {
         let maxAllowed = parseInt(document.getElementById('team-count-select').value) || 16;
-        // 匹配字典字串
         let modeChoice = prompt(t("請選擇編制策略：\n輸入 1 ➔ 追求【下限穩定度最高】\n輸入 2 ➔ 追求【上限理論值最高】"), "1");
         if (modeChoice !== "1" && modeChoice !== "2") return;
         let strategy = modeChoice === "1" ? 'min' : 'max';
@@ -924,9 +879,7 @@ async function autoBuildMaxDpsTeams() {
         }
         teamsWithScore.sort((a, b) => b.score - a.score);
         
-        // 🚀 新增：動態計算候選數量與預估耗時
         let totalCandidates = teamsWithScore.length;
-        // 🚀 喚醒測速：一鍵編制因物件操作較多，將測速結果乘以 0.4 作為保守估計
         let opsPerSec = getDeviceBenchmark() * 0.4;
         let defaultBeamWidth = 500;
         let estTimeSec = ((totalCandidates * defaultBeamWidth) / opsPerSec).toFixed(1);
@@ -987,6 +940,11 @@ async function autoBuildMaxDpsTeams() {
             } 
         });
         
+        let simModeEl = document.getElementById('sim-mode');
+        if (simModeEl && simModeEl.value !== 'auto') {
+            simModeEl.value = 'auto';
+        }
+
         updateTracker(); 
         let strategyName = strategy === 'min' ? t('下限穩定度') : t('上限理論值');
         alert(t(`配置完成！目標：[`) + strategyName + t(`最高]。共組建 `) + finalOptimizedTeams.length + t(` 隊。`));
