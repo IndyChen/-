@@ -868,10 +868,11 @@ async function reverseInferAndOptimize() {
             let projectedScore = Math.floor(bestSimDmg * env.scoreRatio);
             
             let successMsg = fillFromDB ? t("✅ 實戰反推與穿插最佳化完成，並已自動填補空位！") : t("✅ 實戰反推完成，已為您計算出能避開抗性與轉場浪費的最佳順序！");
-            successMsg += t("\n🏆 最佳化後預估總分：") + projectedScore.toLocaleString() + t(" 分");
             alert(successMsg);
         }
         updateTracker();
+        // 🚀 新增這行：強制刷新左側排軸清單，讓綠色的自訂 DPS 與穩定度即時顯示！
+        if (typeof renderRotations === 'function') renderRotations();
 
     } catch (err) {
         console.error("引擎運算發生錯誤:", err);
