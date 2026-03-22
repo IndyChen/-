@@ -1,5 +1,5 @@
 // ==========================================
-// 鳴潮矩陣編隊工具 v4.8.0版 [畫面渲染與互動模組]
+// 鳴潮矩陣編隊工具 v4.8.1版 [畫面渲染與互動模組]
 // 檔案：ui.js
 // 職責：DOM 操作、事件監聽、畫面更新、圖表與彈窗
 // ==========================================
@@ -182,7 +182,7 @@ function buildOptionsHTML(slotType, v1, v2, v3, curRaw, used, teamBases) {
     let recs = new Map(), hasContext = (slotType === 1 && (v2 || v3)) || (slotType === 2 && (v1 || v3)) || (slotType === 3 && (v1 || v2));
     
     let availableDisplayChars = [];
-    let availableSet = new Set(); // 🚀 光速查找
+    let availableSet = new Set(); 
 
     for (let name of ownedCharacters) { 
         if (name === '漂泊者') { 
@@ -227,7 +227,6 @@ function buildOptionsHTML(slotType, v1, v2, v3, curRaw, used, teamBases) {
     html += `<optgroup label="🔸 ${t('其他角色')}">`;
     let validOthers = availableDisplayChars.filter(name => !recs.has(name) && !(used[getBase(name)] >= (charData[getBase(name)]?.max || 1) && getBase(curRaw) !== getBase(name)));
     
-    // 🚀 效能優化：拆解過長的三元運算子
     validOthers.sort((a, b) => {
         let typeA = charData[getBase(a)]?.type || "";
         let typeB = charData[getBase(b)]?.type || "";
@@ -251,9 +250,7 @@ function renderIndividualHPPanel() {
         for (let i = 1; i <= 4; i++) {
             let key = `R${r}-${i}`, data = bossHPMap[key], btnHtml = '', estHtml = '';
             if (bossHPHistory[key] && bossHPHistory[key].length >= 1) {
-                // 🚀 核心修復：過濾掉歷史快取中壞掉的 NaN 數據，防止污染平均值
                 let validHistory = bossHPHistory[key].filter(h => !isNaN(h.dmg) && h.dmg > 0);
-                
                 if (validHistory.length >= 1) {
                     let avg = validHistory.reduce((sum, h) => sum + h.dmg, 0) / validHistory.length; 
                     estHtml = `<div style="color: #00ffaa; font-size: 0.75em; margin-top: 2px;">📊 ${t('預估')}: ${avg.toFixed(2)} ${t('萬')}</div>`;
@@ -622,15 +619,12 @@ function openStatsModal(e, rotId) {
     
     let stats = customStatsMap[rotId];
     if (stats) { 
-        // 🚀 核心修復：讀取顯示時加上 toFixed 防禦，強制收束到小數點後 2 位與 1 位
         document.getElementById('stats-dps').value = parseFloat(stats.dps).toFixed(2); 
         document.getElementById('stats-stab').value = parseFloat(stats.stability).toFixed(1); 
-        
         document.getElementById('stats-nuke-cr').value = stats.nukeCR || '';
         document.getElementById('stats-nuke-loss').value = stats.nukeLoss || '';
-        document.getElementById('stats-curve-k').value = stats.curveK || ''; 
+        document.getElementById('stats-curve-k').value = stats.curvePoints ? JSON.stringify(stats.curvePoints) : (stats.curveK || ''); 
     } else { 
-        // 若為預設值，也加上防禦處理
         document.getElementById('stats-dps').value = d.dps > 0 ? parseFloat(d.dps).toFixed(2) : ''; 
         document.getElementById('stats-stab').value = 100; 
         document.getElementById('stats-nuke-cr').value = '';
@@ -640,7 +634,6 @@ function openStatsModal(e, rotId) {
         document.getElementById('stats-burst-d').value = '';
     }
     
-    // 自動讀取庫中的「循環秒數」與「總傷害」至魔法解析器
     document.getElementById('magic-total-time').value = d.duration || 25;
     document.getElementById('magic-total-dmg').value = d.totalDmg || (d.dps && d.duration ? (d.dps * d.duration).toFixed(2) : '');
 
@@ -659,6 +652,7 @@ function openCustomTeamModal() {
         });
     }
 
+    // 🚀 Flexbox 完美平均分割版 UI
     m.innerHTML = `
         <div style="background:var(--bg-panel); backdrop-filter:blur(20px); padding:25px; border-radius:16px; border:1px solid var(--gold); width:450px; max-width:90%; max-height:85vh; overflow-y:auto; box-shadow: 0 10px 40px rgba(0,0,0,0.8);">
             <h3 style="margin-top:0; color:var(--gold); text-align:center;">➕ ${t('新增自訂編隊')}</h3>
@@ -679,44 +673,47 @@ function openCustomTeamModal() {
             </div>
 
             <details style="margin-bottom: 10px; border-top: 1px dashed #ffaa00; padding-top: 10px;">
-                <summary style="color:#ffaa00; font-size:0.9em; cursor:pointer; outline:none;">🎲 蒙地卡羅大頭判定 (選填)</summary>
+                <summary style="color:#ffaa00; font-size:0.9em; cursor:pointer; outline:none;">🎲 蒙地卡羅期望運算設定</summary>
                 <div style="display:flex; gap:10px; margin-top:8px;">
                     <label style="flex:1; color:#fff; font-size:0.8em;">🎯 核心暴率(%): <input type="number" id="ct-nuke-cr" class="score-input" placeholder="例: 75" style="margin-top:4px; border-color:#ffaa00; color:#ffaa00;"></label>
-                    <label style="flex:1; color:#fff; font-size:0.8em;">📉 沒暴損失(萬): <input type="number" id="ct-nuke-loss" class="score-input" placeholder="例: 15" style="margin-top:4px; border-color:#ffaa00; color:#ffaa00;"></label>
+                    <label style="flex:1; color:#fff; font-size:0.8em;">📉 未暴損失(萬): <input type="number" id="ct-nuke-loss" class="score-input" placeholder="例: 15" style="margin-top:4px; border-color:#ffaa00; color:#ffaa00;"></label>
                 </div>
             </details>
 
             <details style="margin-bottom: 15px; border-top: 1px dashed var(--gold); padding-top: 10px;">
-                <summary style="color:var(--gold); font-size:0.9em; cursor:pointer; outline:none;">✨ 貼上動作排軸，讓系統施展魔法 (點擊展開)</summary>
+                <summary style="color:var(--gold); font-size:0.9em; cursor:pointer; outline:none;">📊 貼上動作排軸解析傷害曲線 (點擊展開)</summary>
                 <div style="margin-top: 8px; background: rgba(0,0,0,0.3); padding: 10px; border-radius: 8px; border: 1px solid #555;">
                     
-                    <div style="display:flex; gap:8px; margin-bottom:8px; align-items:center; flex-wrap: wrap;">
-                        <label style="color:#aaa; font-size:0.75em;">解析模式:</label>
-                        <select id="ct-magic-parse-mode" class="score-input" style="width: auto; height: 24px; padding: 0 4px; margin-bottom: 0; font-size: 0.75em;">
-                            <option value="auto">🤖 智慧偵測 (2~3欄)</option>
-                            <option value="2col">⚖️ 強制雙欄 (動作, 傷害)</option>
-                            <option value="3col-dur">⏱️ 強制三欄 (動作, 耗時, 傷害)</option>
-                            <option value="3col-time">⏳ 強制三欄 (動作, 出傷秒, 傷害)</option>
-                        </select>
-                        
-                        <label style="color:#aaa; font-size:0.75em; margin-left:auto;">總傷害(萬):</label>
-                        <input type="number" id="ct-magic-total-dmg" class="score-input" placeholder="選填" step="1" style="width: 60px; height: 24px; padding: 2px 4px; margin-bottom: 0;">
+                    <div style="display:flex; gap:10px; margin-bottom:10px;">
+                        <label style="flex:2; color:#aaa; font-size:0.75em; margin-bottom:0;">
+                            解析模式:
+                            <select id="ct-magic-parse-mode" class="score-input" style="width:100%; height:28px; padding:0 4px; margin-top:4px; margin-bottom:0; font-size:1em;">
+                                <option value="auto">🤖 自動偵測 (2~3欄)</option>
+                                <option value="2col">⚖️ 雙欄 (動作, 傷害)</option>
+                                <option value="3col-dur">⏱️ 三欄 (動作, 耗時, 傷害)</option>
+                                <option value="3col-time">⏳ 三欄 (動作, 出傷時間, 傷害)</option>
+                            </select>
+                        </label>
+                        <label style="flex:1; color:#aaa; font-size:0.75em; margin-bottom:0;">
+                            總傷害(萬):
+                            <input type="number" id="ct-magic-total-dmg" class="score-input" placeholder="選填" step="1" style="width:100%; height:28px; padding:2px 4px; margin-top:4px; margin-bottom:0; font-size:1em;">
+                        </label>
                     </div>
 
                     <div style="display:flex; gap:8px; margin-bottom: 8px;">
                         <label style="flex:1; color:#fff; font-size:0.75em;">
-                            🕒 檢核時間(%): <input type="number" id="ct-burst-t" class="score-input" style="margin-top:4px;" oninput="autoCalcK_CT()">
+                            🕒 參考時間(%): <input type="number" id="ct-burst-t" class="score-input" style="margin-top:4px;" oninput="autoCalcK_CT()">
                         </label>
                         <label style="flex:1; color:#fff; font-size:0.75em;">
                             💥 累積總傷(%): <input type="number" id="ct-burst-d" class="score-input" style="margin-top:4px;" oninput="autoCalcK_CT()">
                         </label>
                         <label style="flex:1; color:#fff; font-size:0.75em;">
-                            🧮 曲線指數(k): <input type="number" id="ct-curve-k" class="score-input" style="margin-top:4px; border-color:var(--neon-green); color:var(--neon-green);">
+                            🧮 曲線參數: <input type="text" id="ct-curve-k" class="score-input" style="margin-top:4px; border-color:var(--neon-green); color:var(--neon-green);">
                         </label>
                     </div>
-                    <textarea id="ct-magic-paste" placeholder="在此貼上排軸數據..." style="width:100%; height:80px; background:rgba(0,0,0,0.5); color:#fff; border:1px solid var(--border-glass); padding:8px; border-radius:6px; outline:none; font-family:monospace; resize:vertical; font-size:0.8em; box-sizing:border-box;"></textarea>
+                    <textarea id="ct-magic-paste" placeholder="請依上方模式貼上排軸數值資料..." style="width:100%; height:80px; background:rgba(0,0,0,0.5); color:#fff; border:1px solid var(--border-glass); padding:8px; border-radius:6px; outline:none; font-family:monospace; resize:vertical; font-size:0.8em; box-sizing:border-box;"></textarea>
                     <button type="button" onclick="runMagicParser_CT()" style="width:100%; margin-top:8px; background:var(--gold); color:#000; font-weight:bold; border:none; padding:6px; border-radius:6px; cursor:pointer; box-shadow: 0 0 10px rgba(212, 175, 55, 0.4);">
-                        🪄 匯入解析並自動填入 K 值與 DPS
+                        📊 匯入解析並填入曲線參數與 DPS
                     </button>
                 </div>
             </details>
@@ -731,10 +728,78 @@ function openCustomTeamModal() {
             </div>
         </div>`;
         
-    // 🚀 加上這行：對動態生成的面板施放翻譯
     if (typeof translateDOM === 'function') translateDOM(m);
-    
     m.style.display = 'flex';
+}
+
+function extractKeyframes(parsedPoints, d_total, t_total, mode) {
+    let cumulativeDmg = 0;
+    let cumulativeTime = 0;
+    let normalizedPath = [{ t: 0, d: 0 }];
+    
+    for (let i = 0; i < parsedPoints.length; i++) {
+        let currentT;
+        if (parsedPoints[i].time !== null && parsedPoints[i].time !== undefined) {
+            if (mode === '3col-dur') {
+                cumulativeTime += parsedPoints[i].time;
+                currentT = cumulativeTime / t_total;
+            } else if (mode === '3col-time') {
+                currentT = parsedPoints[i].time / t_total;
+            } else {
+                currentT = (i + 1) / parsedPoints.length;
+            }
+        } else {
+            currentT = (i + 1) / parsedPoints.length;
+        }
+        
+        currentT = Math.min(1.0, Math.max(0, currentT));
+        
+        cumulativeDmg += parsedPoints[i].dmg;
+        let currentD = cumulativeDmg / d_total;
+        normalizedPath.push({ t: currentT, d: currentD });
+    }
+
+    let keyframes = [{ t: 0, d: 0 }];
+    let avgSlope = 1.0; 
+    
+    for (let i = 1; i < normalizedPath.length; i++) {
+        let prev = normalizedPath[i - 1];
+        let curr = normalizedPath[i];
+        
+        let t_diff = curr.t - prev.t;
+        if (t_diff <= 0) t_diff = 0.0001;
+        
+        let slope = (curr.d - prev.d) / t_diff;
+        
+        if (slope > avgSlope * 2.5 || (curr.d - prev.d) > 0.08) {
+            if (keyframes.length === 0 || Math.abs(keyframes[keyframes.length - 1].t - prev.t) > 0.02) {
+                keyframes.push({ t: parseFloat(prev.t.toFixed(3)), d: parseFloat(prev.d.toFixed(3)) });
+            }
+            keyframes.push({ t: parseFloat(curr.t.toFixed(3)), d: parseFloat(curr.d.toFixed(3)) });
+        }
+    }
+    
+    if (Math.abs(keyframes[keyframes.length - 1].t - 1) > 0.01) {
+        keyframes.push({ t: 1, d: 1 });
+    }
+    return keyframes;
+}
+
+function autoCalcK() {
+    let tPct = parseFloat(document.getElementById('stats-burst-t').value);
+    let dPct = parseFloat(document.getElementById('stats-burst-d').value);
+    if (!isNaN(tPct) && !isNaN(dPct) && tPct > 0 && tPct < 100 && dPct > 0 && dPct < 100) {
+        let calcK = Math.log(dPct / 100) / Math.log(tPct / 100);
+        document.getElementById('stats-curve-k').value = Math.max(0.01, calcK).toFixed(3);
+    }
+}
+function autoCalcK_CT() {
+    let tPct = parseFloat(document.getElementById('ct-burst-t').value);
+    let dPct = parseFloat(document.getElementById('ct-burst-d').value);
+    if (!isNaN(tPct) && !isNaN(dPct) && tPct > 0 && tPct < 100 && dPct > 0 && dPct < 100) {
+        let calcK = Math.log(dPct / 100) / Math.log(tPct / 100);
+        document.getElementById('ct-curve-k').value = Math.max(0.01, calcK).toFixed(3);
+    }
 }
 
 function runMagicParser_CT() {
@@ -753,41 +818,91 @@ function runMagicParser_CT() {
     lines.forEach(line => {
         let parts = line.replace(/[\s\t]+/g, '\t').split('\t'); 
         if (parts.length >= 2) {
-            let dmgStr = parts[parts.length - 1].replace(/,/g, '');
-            let dmgMatch = dmgStr.match(/[\d.]+/);
+            let dmgMatch = parts[parts.length - 1].replace(/,/g, '').match(/[\d.]+/);
+            let timeVal = null;
             
             if (mode === '3col-time' || mode === '3col-dur') {
                 dmgMatch = parts.length >= 3 ? parts[2].replace(/,/g, '').match(/[\d.]+/) : dmgMatch;
+                let timeMatch = parts.length >= 3 ? parts[1].replace(/,/g, '').match(/[\d.]+/) : null;
+                if (timeMatch) timeVal = parseFloat(timeMatch[0]);
             }
             
             if (dmgMatch) {
                 let dmgVal = parseFloat(dmgMatch[0]);
-                parsedPoints.push({ raw: line, dmg: dmgVal });
+                parsedPoints.push({ raw: line, dmg: dmgVal, time: timeVal });
                 d_total += dmgVal;
             }
         }
     });
 
     if (parsedPoints.length < 2) return alert(t("無法從貼上的文字中辨識出有效的數值格式！"));
-    
-    if (totalDmgStr && !isNaN(parseFloat(totalDmgStr))) {
-        d_total = parseFloat(totalDmgStr);
-    }
+    if (totalDmgStr && !isNaN(parseFloat(totalDmgStr))) d_total = parseFloat(totalDmgStr);
 
-    let maxPoint = parsedPoints.reduce((max, p) => p.dmg > max.dmg ? p : max, parsedPoints[0]);
-    let burstDmgPct = (maxPoint.dmg / d_total) * 100;
-    let burstTimePct = 60; 
-
-    document.getElementById('ct-burst-t').value = burstTimePct;
-    document.getElementById('ct-burst-d').value = burstDmgPct.toFixed(1);
-    autoCalcK_CT();
-    
     let t_total = parseFloat(document.getElementById('ct-duration').value) || 25;
     let inferredDps = d_total / t_total;
     document.getElementById('ct-dps').value = inferredDps.toFixed(2);
+
+    let maxPoint = parsedPoints.reduce((max, p) => p.dmg > max.dmg ? p : max, parsedPoints[0]);
+    let burstDmgPct = (maxPoint.dmg / d_total) * 100;
+    document.getElementById('ct-burst-t').value = 60;
+    document.getElementById('ct-burst-d').value = burstDmgPct.toFixed(1);
+
+    let keyframes = extractKeyframes(parsedPoints, d_total, t_total, mode);
+    document.getElementById('ct-curve-k').value = JSON.stringify(keyframes);
+
+    let pointCount = keyframes.length;
+    alert(t("解析完成。\n共擷取 ") + pointCount + t(" 個特徵轉折點，\n已套用多點線性插值矩陣。"));
+}
+
+function runMagicParser() {
+    let mode = document.getElementById('magic-parse-mode').value;
+    let totalTimeStr = document.getElementById('magic-total-time').value;
+    let totalDmgStr = document.getElementById('magic-total-dmg').value;
+    let rawData = document.getElementById('magic-paste-area').value;
     
-    // 🚀 修復結尾 alert 的翻譯包裹
-    alert(t("🪄 魔法解析完成！\n已偵測到最大單次爆發：") + maxPoint.dmg + t("\n系統已為您自動填入 K 值與 DPS。"));
+    if (!rawData.trim()) return alert(t("請先在文字框貼上排軸資料！"));
+    
+    let lines = rawData.split('\n').map(l => l.trim()).filter(l => l);
+    if (lines.length < 2) return alert(t("資料過少，無法解析！"));
+
+    let t_total = parseFloat(totalTimeStr) || 25; 
+    let d_total = 0;
+    let parsedPoints = [];
+
+    lines.forEach(line => {
+        let parts = line.replace(/[\s\t]+/g, '\t').split('\t'); 
+        if (parts.length >= 2) {
+            let dmgMatch = parts[parts.length - 1].replace(/,/g, '').match(/[\d.]+/);
+            let timeVal = null;
+            
+            if (mode === '3col-time' || mode === '3col-dur') {
+                dmgMatch = parts.length >= 3 ? parts[2].replace(/,/g, '').match(/[\d.]+/) : dmgMatch;
+                let timeMatch = parts.length >= 3 ? parts[1].replace(/,/g, '').match(/[\d.]+/) : null;
+                if (timeMatch) timeVal = parseFloat(timeMatch[0]);
+            }
+            
+            if (dmgMatch) {
+                let dmgVal = parseFloat(dmgMatch[0]);
+                parsedPoints.push({ raw: line, dmg: dmgVal, time: timeVal });
+                d_total += dmgVal;
+            }
+        }
+    });
+
+    if (parsedPoints.length < 2) return alert(t("無法從貼上的文字中辨識出有效的數值格式！"));
+    if (totalDmgStr && !isNaN(parseFloat(totalDmgStr))) d_total = parseFloat(totalDmgStr);
+
+    let maxPoint = parsedPoints.reduce((max, p) => p.dmg > max.dmg ? p : max, parsedPoints[0]);
+    let burstDmgPct = (maxPoint.dmg / d_total) * 100;
+    
+    document.getElementById('stats-burst-t').value = 60;
+    document.getElementById('stats-burst-d').value = burstDmgPct.toFixed(1);
+    
+    let keyframes = extractKeyframes(parsedPoints, d_total, t_total, mode);
+    document.getElementById('stats-curve-k').value = JSON.stringify(keyframes);
+
+    let pointCount = keyframes.length;
+    alert(t("解析完成。\n共擷取 ") + pointCount + t(" 個特徵轉折點，\n已套用多點線性插值矩陣。"));
 }
 
 function saveCustomTeam() {
@@ -795,7 +910,6 @@ function saveCustomTeam() {
     let dps = parseFloat(document.getElementById('ct-dps').value) || 0, diff = document.getElementById('ct-diff').value;
     let duration = parseFloat(document.getElementById('ct-duration').value) || 25; 
     
-    // 獲取進階設定
     let curveKVal = document.getElementById('ct-curve-k') ? document.getElementById('ct-curve-k').value : "";
     let nukeCrVal = document.getElementById('ct-nuke-cr') ? parseFloat(document.getElementById('ct-nuke-cr').value) || 0 : 0;
     let nukeLossVal = document.getElementById('ct-nuke-loss') ? parseFloat(document.getElementById('ct-nuke-loss').value) || 0 : 0;
@@ -813,16 +927,27 @@ function saveCustomTeam() {
     let genVal = charData[getBase(c1)] ? charData[getBase(c1)].gen : 1;
     dpsData.push({ id: internalId, c1: c1, c2: c2, c3: c3, dps: dps, rot: "自訂", diff: diff, gen: genVal, isUserCustom: true, duration: duration, totalDmg: totalDmg });
     
-    // 🚀 寫入進階面板資料庫 (包含 K 值與蒙地卡羅)
     if (curveKVal || nukeCrVal > 0) {
         let diffKey = diff.includes('⚠️') ? '⚠️' : diff.includes('⭐') ? '⭐' : diff.includes('🔵') ? '🔵' : diff.includes('🟩') ? '🟩' : '🧩';
+        let isArray = curveKVal.trim().startsWith('[');
+        let parsedPointsArray = null;
+        
+        if (isArray) {
+            try { 
+                parsedPointsArray = JSON.parse(curveKVal); 
+            } catch (e) { 
+                return alert(t("⚠️ 特徵陣列格式錯誤，請確認 JSON 格式！(或清空以使用預設值)")); 
+            }
+        }
+        
         customStatsMap[internalId] = {
             dps: dps,
             stability: diffStability[diffKey] || 100,
             buff: 0,
             nukeCR: nukeCrVal,
             nukeLoss: nukeLossVal,
-            curveK: curveKVal
+            curveK: isArray ? null : curveKVal,
+            curvePoints: parsedPointsArray
         };
         safeStorageSet('ww_custom_stats', customStatsMap);
     }
@@ -830,7 +955,6 @@ function saveCustomTeam() {
     checkedRotations.add(internalId);
     safeStorageSet('ww_rotations', [...checkedRotations]);
 
-    // 防止幽靈數據，強制勾選角色
     ownedCharacters.add(getBase(c1)); ownedCharacters.add(getBase(c2)); ownedCharacters.add(getBase(c3));
     safeStorageSet('ww_roster', [...ownedCharacters]);
     document.querySelectorAll('#roster-setup input[type="checkbox"]').forEach(chk => {
@@ -840,30 +964,6 @@ function saveCustomTeam() {
     document.getElementById('custom-team-modal').style.display = 'none'; 
     debouncedRenderAndTrack(); 
     alert(t('自訂編隊已成功加入！'));
-}
-
-function openStatsModal(e, rotId) {
-    e.preventDefault(); e.stopPropagation(); currentEditRotId = rotId;
-    let d = dpsData.find(x => x.id === rotId); 
-    document.getElementById('stats-modal-rot').innerText = `${t(d.c1)} + ${t(d.c2)} + ${t(d.c3)}`;
-    
-    let stats = customStatsMap[rotId];
-    if (stats) { 
-        document.getElementById('stats-dps').value = stats.dps; 
-        document.getElementById('stats-stab').value = stats.stability; 
-        document.getElementById('stats-nuke-cr').value = stats.nukeCR || '';
-        document.getElementById('stats-nuke-loss').value = stats.nukeLoss || '';
-        document.getElementById('stats-curve-k').value = stats.curveK || ''; 
-    } else { 
-        document.getElementById('stats-dps').value = d.dps > 0 ? d.dps : ''; 
-        document.getElementById('stats-stab').value = 100; 
-        document.getElementById('stats-nuke-cr').value = '';
-        document.getElementById('stats-nuke-loss').value = '';
-        document.getElementById('stats-curve-k').value = ''; 
-        document.getElementById('stats-burst-t').value = '';
-        document.getElementById('stats-burst-d').value = '';
-    }
-    document.getElementById('stats-modal').style.display = 'flex';
 }
 
 function closeStatsModal() { document.getElementById('stats-modal').style.display = 'none'; currentEditRotId = null; }
@@ -879,13 +979,25 @@ function saveStatsModal() {
     if (isNaN(dpsVal) || isNaN(stabVal)) return alert(t("請輸入有效的數字！"));
     
     if (currentEditRotId) { 
+        let isArray = curveKVal.trim().startsWith('[');
+        let parsedPointsArray = null;
+        
+        if (isArray) {
+            try { 
+                parsedPointsArray = JSON.parse(curveKVal); 
+            } catch (e) { 
+                return alert(t("⚠️ 特徵陣列格式錯誤，請確認 JSON 格式！(或清空以使用預設值)")); 
+            }
+        }
+        
         customStatsMap[currentEditRotId] = { 
             dps: dpsVal, 
             stability: Math.min(100, Math.max(0, stabVal)), 
             buff: 0,
             nukeCR: nukeCrVal,
             nukeLoss: nukeLossVal,
-            curveK: curveKVal 
+            curveK: isArray ? null : curveKVal,
+            curvePoints: parsedPointsArray
         }; 
         safeStorageSet('ww_custom_stats', customStatsMap); 
         debouncedRenderAndTrack(); 
@@ -960,63 +1072,6 @@ function importFromCode() {
 
 function deleteCustomTeam(index) {
     if(!confirm(t('確定刪除？'))) return; let cr = customRotations.splice(index, 1)[0]; safeStorageSet('ww_custom_rotations_v2', customRotations); dpsData = dpsData.filter(d => d.id !== 'custom_rot_' + cr.id); debouncedRenderAndTrack(); openDataManager(); 
-}
-
-// ==========================================
-// --- 8. 魔法解析器 (Magic Parser) ---
-// ==========================================
-function autoCalcK() {
-    let tPct = parseFloat(document.getElementById('stats-burst-t').value);
-    let dPct = parseFloat(document.getElementById('stats-burst-d').value);
-    if (!isNaN(tPct) && !isNaN(dPct) && tPct > 0 && tPct < 100 && dPct > 0 && dPct < 100) {
-        let calcK = Math.log(dPct / 100) / Math.log(tPct / 100);
-        document.getElementById('stats-curve-k').value = Math.max(0.01, calcK).toFixed(3);
-    }
-}
-
-function runMagicParser() {
-    let mode = document.getElementById('magic-parse-mode').value;
-    let totalTimeStr = document.getElementById('magic-total-time').value;
-    let totalDmgStr = document.getElementById('magic-total-dmg').value;
-    let rawData = document.getElementById('magic-paste-area').value;
-    
-    if (!rawData.trim()) return alert(t("請先在文字框貼上排軸資料！"));
-    
-    let lines = rawData.split('\n').map(l => l.trim()).filter(l => l);
-    if (lines.length < 2) return alert(t("資料過少，無法解析！"));
-
-    let t_total = parseFloat(totalTimeStr) || 25; 
-    let d_total = 0;
-    let parsedPoints = [];
-
-    lines.forEach(line => {
-        let parts = line.replace(/[\s\t]+/g, '\t').split('\t'); 
-        if (parts.length >= 2) {
-            let dmgMatch = parts[parts.length - 1].replace(/,/g, '').match(/[\d.]+/);
-            if (dmgMatch) {
-                parsedPoints.push({ raw: line, dmg: parseFloat(dmgMatch[0]) });
-                d_total += parseFloat(dmgMatch[0]);
-            }
-        }
-    });
-
-    if (parsedPoints.length < 2) return alert(t("無法從貼上的文字中辨識出有效的數值格式！"));
-    
-    if (!totalDmgStr) {
-        document.getElementById('magic-total-dmg').value = Math.round(d_total);
-    } else {
-        d_total = parseFloat(totalDmgStr);
-    }
-
-    let maxPoint = parsedPoints.reduce((max, p) => p.dmg > max.dmg ? p : max, parsedPoints[0]);
-    let burstDmgPct = (maxPoint.dmg / d_total) * 100;
-    let burstTimePct = 60; 
-
-    document.getElementById('stats-burst-t').value = burstTimePct;
-    document.getElementById('stats-burst-d').value = burstDmgPct.toFixed(1);
-    
-    autoCalcK();
-    alert(t("🪄 魔法解析完成！\n已偵測到最大單次爆發：") + maxPoint.dmg + "\n" + t("請檢查並微調上方綠色的時間/傷害佔比。"));
 }
 
 // ==========================================
@@ -1259,7 +1314,11 @@ function initializeApp() {
         document.getElementById('team-count-select').value = savedCount;
     }
 
-    document.getElementById('skill-slider').value = 100; 
+    let savedSkill = safeStorageGet('ww_skill_slider', 100);
+    let skillSlider = document.getElementById('skill-slider');
+    if (skillSlider) {
+        skillSlider.value = savedSkill;
+    }
     updateMasterSkill();
     renderCheckboxes(); 
     renderRotations();
