@@ -849,10 +849,14 @@ async function reverseInferAndOptimize() {
                     let state = nextStates[i];
                     let lastTeamId = state.sequence.length > 0 ? state.sequence[state.sequence.length-1].rotId : 'none';
                     teamUsageCount[lastTeamId] = (teamUsageCount[lastTeamId] || 0) + 1;
-                    // 動態調整：深度大於 10000 時，放寬多樣性限制，允許單一隊伍佔據更多分支
-                    let maxRatio = finalBeamWidth > 10000 ? 0.8 : 0.2; 
-                    if (teamUsageCount[lastTeamId] < finalBeamWidth * maxRatio || diverseStates.length < finalBeamWidth * 0.1) {
+                    
+                    // 動態關閉多樣性限制：深度超過 10萬 時，純粹取高分，硬吃滿分支
+                    if (finalBeamWidth > 100000) {
                         diverseStates.push(state); added.add(state);
+                    } else {
+                        if (teamUsageCount[lastTeamId] < finalBeamWidth * 0.2 || diverseStates.length < finalBeamWidth * 0.1) {
+                            diverseStates.push(state); added.add(state);
+                        }
                     }
                     if (diverseStates.length >= finalBeamWidth) break;
                 }
@@ -1004,14 +1008,19 @@ async function autoBuildMaxDpsTeams() {
 
             if (nextStates.length > maxStatesReached) maxStatesReached = nextStates.length;
             
-            // 🚀 O(N) 雜湊集合多樣性篩選
             let diverseStates = []; let teamUsageCount = {}; let added = new Set();
             for (let i = 0; i < nextStates.length; i++) {
                 let state = nextStates[i];
                 let lastTeamId = state.teams.length > 0 ? state.teams[state.teams.length-1].rotId : 'none';
                 teamUsageCount[lastTeamId] = (teamUsageCount[lastTeamId] || 0) + 1;
-                if (teamUsageCount[lastTeamId] < beamWidth * 0.2 || diverseStates.length < beamWidth * 0.1) {
+                
+                // 動態關閉多樣性限制：深度超過 10萬 時，純粹取高分，硬吃滿分支
+                if (beamWidth > 100000) {
                     diverseStates.push(state); added.add(state);
+                } else {
+                    if (teamUsageCount[lastTeamId] < beamWidth * 0.2 || diverseStates.length < beamWidth * 0.1) {
+                        diverseStates.push(state); added.add(state);
+                    }
                 }
                 if (diverseStates.length >= beamWidth) break;
             }
