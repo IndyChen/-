@@ -1,7 +1,7 @@
 // ==========================================
-// 鳴潮矩陣編隊工具 v4.8.1 [核心運算模組 - 單核極速 + 查表插值特化版]
+// 鳴潮矩陣編隊工具 v4.8.1 [核心運算模組 - 智慧剪枝特化版]
 // 檔案：core.js
-// 職責：資料存取、數學推演、動態時間判定、雙引擎洗牌(DP+Beam)、專屬增傷
+// 職責：資料存取、數學推演、動態時間判定、雙引擎洗牌(DP+Beam)、專屬增傷、A*潛力估價
 // ==========================================
 
 // --- 0. 全域崩潰攔截系統 ---
@@ -710,7 +710,6 @@ async function reverseInferAndOptimize() {
             }
         });
 
-        // 🚀 沙盤空置防呆機制
         if (currentTeams.length === 0) {
             alert(t("⚠️ 沙盤中目前沒有隊伍！請先在上方編排至少一組隊伍，再執行實戰洗牌反推。"));
             isEngineRunning = false;
@@ -799,7 +798,7 @@ async function reverseInferAndOptimize() {
                 finalBeamWidth = parseInt(widthChoice);
             }
 
-            let states = [{ score: 0, sequence: [], remaining: poolToPermute, r: 1, idx: 1, hp: getBossMaxHP(1, 1) }];
+            let states = [{ score: 0, evalScore: 0, sequence: [], remaining: poolToPermute, r: 1, idx: 1, hp: getBossMaxHP(1, 1) }];
 
             for (let step = 0; step < n; step++) {
                 updateProgress(Math.floor((step / n) * 100), t(`推演中 (`) + `${step+1}/${n})...`);
@@ -837,20 +836,38 @@ async function reverseInferAndOptimize() {
                         }
 
                         let newRemaining = state.remaining.filter((_, idx) => idx !== i);
-                        nextStates.push({ score: state.score + dmgDone, sequence: [...state.sequence, team], remaining: newRemaining, r: tmp_r, idx: tmp_idx, hp: tmp_hp });
+                        
+                        // 🚀 A* 潛力估價 (Heuristic)：預估手上剩餘隊伍打出的理論分
+                        let heuristic = newRemaining.reduce((sum, t) => sum + (t.calculatedMinDps * 25 * (env.scoreRatio || 10)), 0);
+                        
+                        nextStates.push({ 
+                            score: state.score + dmgDone, 
+                            evalScore: state.score + dmgDone + heuristic, // 🚀 混合得分 = 當前得分 + 潛力估算
+                            sequence: [...state.sequence, team], 
+                            remaining: newRemaining, 
+                            r: tmp_r, idx: tmp_idx, hp: tmp_hp 
+                        });
                     }
                 }
                 
-                nextStates.sort((a, b) => b.score - a.score);
+                // 依照混合得分降冪排序
+                nextStates.sort((a, b) => b.evalScore - a.evalScore);
                 if (nextStates.length > maxStatesReached) maxStatesReached = nextStates.length;
                 
+                // 🚀 動態容差剪枝 (Dynamic Threshold Pruning)
+                let bestEval = nextStates.length > 0 ? nextStates[0].evalScore : 0;
+                let threshold = bestEval * 0.85; // 容差值設為 85%，低於此潛力的戰術才會被捨棄
+
                 let diverseStates = []; let teamUsageCount = {}; let added = new Set();
                 for (let i = 0; i < nextStates.length; i++) {
                     let state = nextStates[i];
+                    
+                    // 若低於閥值且保留的組合數已達最低要求 (20%)，則大膽剪枝
+                    if (state.evalScore < threshold && diverseStates.length >= finalBeamWidth * 0.2) break;
+
                     let lastTeamId = state.sequence.length > 0 ? state.sequence[state.sequence.length-1].rotId : 'none';
                     teamUsageCount[lastTeamId] = (teamUsageCount[lastTeamId] || 0) + 1;
                     
-                    // 動態關閉多樣性限制：深度超過 10萬 時，純粹取高分，硬吃滿分支
                     if (finalBeamWidth > 100000) {
                         diverseStates.push(state); added.add(state);
                     } else {
@@ -860,6 +877,8 @@ async function reverseInferAndOptimize() {
                     }
                     if (diverseStates.length >= finalBeamWidth) break;
                 }
+                
+                // 若寬容過濾後數量不足，才從備用池補齊
                 if (diverseStates.length < finalBeamWidth) {
                     for (let i = 0; i < nextStates.length && diverseStates.length < finalBeamWidth; i++) {
                         if (!added.has(nextStates[i])) diverseStates.push(nextStates[i]);
@@ -903,10 +922,10 @@ async function reverseInferAndOptimize() {
         successMsg += `- 實際運算耗時：${calcTimeSec} 秒\n`;
         
         if (!useDP) {
-            successMsg += `- 運算模式：單一執行緒\n`;
-            successMsg += `- 設定搜尋深度：${finalBeamWidth}\n`;
+            successMsg += `- 運算模式：智慧容差剪枝 (動態閾值)\n`;
+            successMsg += `- 設定最大深度：${finalBeamWidth}\n`;
             successMsg += `- 實際最大分支：${maxStatesReached.toLocaleString()}\n`;
-            if (maxStatesReached <= finalBeamWidth) successMsg += `✨ 狀態：運算資源充足，本次推演已涵蓋設定深度內的所有組合。`;
+            if (maxStatesReached <= finalBeamWidth) successMsg += `✨ 狀態：運算資源充足，已涵蓋有效潛力範圍內的所有組合。`;
             else successMsg += `⚠️ 狀態：已觸發截斷機制。此為設定深度下之最佳近似解。`;
         } else {
             successMsg += `✨ 狀態：狀態壓縮 DP 執行完畢，已涵蓋全域最佳解。`;
@@ -939,7 +958,8 @@ async function autoBuildMaxDpsTeams() {
         let validTeams = getUniqueValidTeams(strategy); 
         if (validTeams.length === 0) return alert(t("沒有可用的排軸！請確認已勾選角色與排軸。"));
 
-        let states = [{ minScore: 0, maxScore: 0, teams: [], usage: {} }];
+        // 初始化狀態增加 evalScore 以利 A* 排序
+        let states = [{ minScore: 0, maxScore: 0, score: 0, evalScore: 0, teams: [], usage: {} }];
         let maxStatesReached = 0; 
         let teamsWithScore = [];
         
@@ -949,8 +969,20 @@ async function autoBuildMaxDpsTeams() {
         }
         teamsWithScore.sort((a, b) => strategy === 'max' ? b.maxScore - a.maxScore : b.minScore - a.minScore);
         
+        // 🚀 建立快速查詢陣列，用於計算 A* 潛力估價
+        let scoresArr = teamsWithScore.map(t => strategy === 'max' ? t.maxScore : t.minScore);
+        let getHeuristic = (idx, count) => { 
+            let sum = 0; 
+            for(let c = 0; c < count && (idx + c) < scoresArr.length; c++) sum += scoresArr[idx + c]; 
+            return sum; 
+        };
+
         let totalCandidates = teamsWithScore.length;
+        let opsPerSec = getDeviceBenchmark() * 0.4;
         let defaultBeamWidth = 1000;
+
+        let estTimeSec = ((totalCandidates * defaultBeamWidth) / opsPerSec).toFixed(1);
+        if (parseFloat(estTimeSec) < 0.1) estTimeSec = "0.1";
 
         let widthMsg = t(`系統共篩選出 `) + totalCandidates + t(` 組有效候選編隊。\n\n請輸入搜尋深度 (Beam Width)。\n建議值：1000 (數值越大越精準，耗時將線性增加)：`);
         let widthChoice = prompt(widthMsg, defaultBeamWidth.toString());
@@ -977,6 +1009,7 @@ async function autoBuildMaxDpsTeams() {
         let stepCount = 0; let totalSteps = teamsWithScore.length; let startTime = Date.now(); 
 
         for (let {team, minScore, maxScore} of teamsWithScore) {
+            let currentScoreAdd = strategy === 'max' ? maxScore : minScore;
             stepCount++;
             if (stepCount % 2 === 0 || stepCount === 1) {
                 updateProgress(Math.floor((stepCount / totalSteps) * 100), t(`建構中 (`) + `${stepCount}/${totalSteps})...`);
@@ -989,32 +1022,60 @@ async function autoBuildMaxDpsTeams() {
 
             for (let i = 0; i < states.length; i++) {
                 let state = states[i];
+                
+                // 分支 1：將此隊伍納入編制
                 if (state.teams.length < maxAllowed) {
                     let u1 = state.usage[b1] || 0, u2 = state.usage[b2] || 0, u3 = state.usage[b3] || 0;
                     if (u1 < limit1 && u2 < limit2 && u3 < limit3 && b1 !== b2 && b1 !== b3 && b2 !== b3) {
                         let newUsage = Object.assign({}, state.usage);
                         newUsage[b1] = u1 + 1; newUsage[b2] = u2 + 1; newUsage[b3] = u3 + 1;
                         let newTeams = state.teams.slice(); newTeams.push(team);
-                        nextStates.push({ maxScore: state.maxScore + maxScore, minScore: state.minScore + minScore, teams: newTeams, usage: newUsage });
+                        
+                        // 🚀 A* 潛力估價 (取得最理想的後續隊伍火力總和)
+                        let heuristic = getHeuristic(stepCount, maxAllowed - newTeams.length);
+                        let evalScore = state.score + currentScoreAdd + heuristic;
+
+                        nextStates.push({ 
+                            maxScore: state.maxScore + (strategy==='max'?maxScore:0), 
+                            minScore: state.minScore + (strategy==='min'?minScore:0), 
+                            score: state.score + currentScoreAdd, 
+                            evalScore: evalScore, 
+                            teams: newTeams, 
+                            usage: newUsage 
+                        });
                     }
                 }
-                nextStates.push(state);
+                
+                // 分支 2：不納入此隊伍 (繼續尋找其他可能)
+                let skipHeuristic = getHeuristic(stepCount, maxAllowed - state.teams.length);
+                nextStates.push({
+                    maxScore: state.maxScore,
+                    minScore: state.minScore,
+                    score: state.score,
+                    evalScore: state.score + skipHeuristic,
+                    teams: state.teams,
+                    usage: state.usage
+                });
             }
 
-            nextStates.sort((a, b) => {
-                if (strategy === 'max') { let diff = b.maxScore - a.maxScore; return Math.abs(diff) > 0.01 ? diff : b.minScore - a.minScore; } 
-                else { let diff = b.minScore - a.minScore; return Math.abs(diff) > 0.01 ? diff : b.maxScore - a.maxScore; }
-            });
+            // 依照混合得分 (evalScore) 降冪排序，若相同則比較真實得分 (score)
+            nextStates.sort((a, b) => Math.abs(b.evalScore - a.evalScore) > 0.01 ? b.evalScore - a.evalScore : b.score - a.score);
 
             if (nextStates.length > maxStatesReached) maxStatesReached = nextStates.length;
+            
+            // 🚀 動態容差剪枝 (Dynamic Threshold Pruning)
+            let bestEval = nextStates.length > 0 ? nextStates[0].evalScore : 0;
+            let threshold = bestEval * 0.90; // 容差值設為 90%
             
             let diverseStates = []; let teamUsageCount = {}; let added = new Set();
             for (let i = 0; i < nextStates.length; i++) {
                 let state = nextStates[i];
+                
+                if (state.evalScore < threshold && diverseStates.length >= beamWidth * 0.2) break;
+
                 let lastTeamId = state.teams.length > 0 ? state.teams[state.teams.length-1].rotId : 'none';
                 teamUsageCount[lastTeamId] = (teamUsageCount[lastTeamId] || 0) + 1;
                 
-                // 動態關閉多樣性限制：深度超過 10萬 時，純粹取高分，硬吃滿分支
                 if (beamWidth > 100000) {
                     diverseStates.push(state); added.add(state);
                 } else {
@@ -1061,14 +1122,15 @@ async function autoBuildMaxDpsTeams() {
         let calcTimeSec = ((Date.now() - startTime) / 1000).toFixed(2);
         successMsg += `\n📊 運算觀測報告：\n`;
         successMsg += `- 實際運算耗時：${calcTimeSec} 秒\n`;
-        successMsg += `- 運算模式：單一執行緒\n`;
-        successMsg += `- 設定搜尋深度：${beamWidth}\n`;
+        successMsg += `- 運算模式：智慧容差剪枝 (動態閾值)\n`;
+        successMsg += `- 設定最大深度：${beamWidth}\n`;
         successMsg += `- 實際最大分支：${maxStatesReached.toLocaleString()}\n`;
         
-        if (maxStatesReached <= beamWidth) successMsg += `✨ 狀態：運算資源充足，本次推演已涵蓋設定深度內的所有組合。`;
+        if (maxStatesReached <= beamWidth) successMsg += `✨ 狀態：運算資源充足，已涵蓋有效潛力範圍內的所有組合。`;
         else successMsg += `⚠️ 狀態：已觸發截斷機制。此為設定深度下之最佳近似解。`;
 
         alert(successMsg);
+        if (typeof renderRotations === 'function') renderRotations();
         
     } catch (err) {
         console.error("一鍵編隊發生錯誤:", err);
