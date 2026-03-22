@@ -1,5 +1,5 @@
 // ==========================================
-// 鳴潮矩陣編隊工具 v4.8 [核心運算模組]
+// 鳴潮矩陣編隊工具 v4.8.1 [核心運算模組 - 單核極速 + 查表插值特化版]
 // 檔案：core.js
 // 職責：資料存取、數學推演、動態時間判定、雙引擎洗牌(DP+Beam)、專屬增傷
 // ==========================================
@@ -146,7 +146,7 @@ const DEFAULT_CURVE_K = {
     "忌炎": 1.00, "暗主": 0.80, "安可": 0.80
 };
 
-// 🚀 v4.8.1 修復：動態計算真實總傷，防禦資料庫寫死數據
+// 🚀 動態計算真實總傷引擎
 function getEffectiveTotalDmg(d, rotId, isFirstRotation, currentDps, rotTime) {
     let dbTotalDmg = (isFirstRotation && d && d.firstTotalDmg) ? d.firstTotalDmg : ((d && d.totalDmg) ? d.totalDmg : null);
     let hasCustomDps = customStatsMap[rotId] && customStatsMap[rotId].dps !== undefined;
@@ -158,38 +158,49 @@ function getEffectiveTotalDmg(d, rotId, isFirstRotation, currentDps, rotTime) {
     return dbTotalDmg ? dbTotalDmg : (currentDps * rotTime);
 }
 
+// 🚀 支援多點線性插值 (LUT) 的殘血推演演算法
 function getTtkFromMathCurve(hpToKill, baseDps, r_factor, lvlPenalty, mainC, rotId, timeSpentOnField = 0) {
     let d = dpsData.find(x => x.id === rotId);
     let isFirstRotation = (timeSpentOnField === 0);
     
     let rotTime = (isFirstRotation && d && d.firstDuration) ? d.firstDuration : ((d && d.duration) ? d.duration : 25);
-    
-    // 🌟 修復 1：套用動態總傷引擎
     let baseTotalDmg = getEffectiveTotalDmg(d, rotId, isFirstRotation, baseDps, rotTime);
     let totalDmgPerRot = baseTotalDmg * r_factor * lvlPenalty;
     
     if (isNaN(totalDmgPerRot) || totalDmgPerRot <= 0 || isNaN(hpToKill) || hpToKill <= 0) return 9999;
 
-    let k = 1.0;
-    if (customStatsMap[rotId] && customStatsMap[rotId].curveK !== undefined && customStatsMap[rotId].curveK !== null) {
-        let parsedK = parseFloat(customStatsMap[rotId].curveK);
-        if (!isNaN(parsedK)) k = (parsedK > 0) ? parsedK : 1.0; 
-    } else if (DEFAULT_CURVE_K[mainC]) {
-        k = DEFAULT_CURVE_K[mainC];
+    let fullRots = Math.floor(hpToKill / totalDmgPerRot);
+    let remainderHp = hpToKill % totalDmgPerRot;
+    if (remainderHp === 0) return fullRots * rotTime;
+
+    let targetDmgPct = remainderHp / totalDmgPerRot;
+    if (targetDmgPct < 0.001) return targetDmgPct * rotTime; 
+
+    let remainderTimePct = 0;
+
+    if (customStatsMap && customStatsMap[rotId] && customStatsMap[rotId].curvePoints && customStatsMap[rotId].curvePoints.length >= 2) {
+        let pts = customStatsMap[rotId].curvePoints;
+        for (let i = 0; i < pts.length - 1; i++) {
+            if (targetDmgPct >= pts[i].d && targetDmgPct <= pts[i+1].d) {
+                let d_range = pts[i+1].d - pts[i].d;
+                if (d_range <= 0) { remainderTimePct = pts[i].t; break; }
+                let progress = (targetDmgPct - pts[i].d) / d_range;
+                remainderTimePct = pts[i].t + progress * (pts[i+1].t - pts[i].t);
+                break;
+            }
+        }
+    } else {
+        let k = 1.0;
+        if (customStatsMap && customStatsMap[rotId] && customStatsMap[rotId].curveK !== undefined && customStatsMap[rotId].curveK !== null) {
+            let parsedK = parseFloat(customStatsMap[rotId].curveK);
+            if (!isNaN(parsedK)) k = (parsedK > 0) ? parsedK : 1.0; 
+        } else if (DEFAULT_CURVE_K[mainC]) {
+            k = DEFAULT_CURVE_K[mainC];
+        }
+        remainderTimePct = Math.pow(targetDmgPct, 1 / k);
     }
 
-    if (hpToKill >= totalDmgPerRot) {
-        let fullRots = Math.floor(hpToKill / totalDmgPerRot);
-        let remainderHp = hpToKill % totalDmgPerRot;
-        if (remainderHp === 0) return fullRots * rotTime;
-        let remainderTime = Math.pow(remainderHp / totalDmgPerRot, 1 / k) * rotTime;
-        return (fullRots * rotTime) + remainderTime;
-    } else {
-        let targetDmgPct = hpToKill / totalDmgPerRot;
-        if (targetDmgPct < 0.01) return targetDmgPct * rotTime; 
-        let timePct = Math.pow(targetDmgPct, 1 / k); 
-        return timePct * rotTime;
-    }
+    return (fullRots * rotTime) + (remainderTimePct * rotTime);
 }
 
 function getCombatMultiplier(env, teamAttr, mainC, bossIdx) {
@@ -448,7 +459,6 @@ function runSimulations(env) {
                                     let isFirst = (timeOnField === 0);
                                     let rotTime = (isFirst && d && d.firstDuration) ? d.firstDuration : ((d && d.duration) ? d.duration : 25);
                                     
-                                    // 🌟 修復 2：套用動態總傷引擎
                                     let baseTotalDmg = getEffectiveTotalDmg(d, rotId, isFirst, baseDps, rotTime);
                                     
                                     let true_eff_dps = Math.max(0.0001, (baseTotalDmg / rotTime) * r_factor * lvlPenalty);
@@ -540,7 +550,6 @@ function runBitmaskDP(teams, env) {
                         let isFirst = (timeOnField === 0);
                         let rotTime = (isFirst && d && d.firstDuration) ? d.firstDuration : ((d && d.duration) ? d.duration : 25);
                         
-                        // 🌟 修復 3：套用動態總傷引擎
                         let baseTotalDmg = getEffectiveTotalDmg(d, team.rotId, isFirst, team.calculatedMinDps, rotTime);
                         
                         let true_eff_dps = Math.max(0.0001, (baseTotalDmg / rotTime) * r_factor * lvlPenalty);
@@ -688,8 +697,6 @@ async function reverseInferAndOptimize() {
                             let d = dpsData.find(x => x.id === rotId);
                             let isFirst = (timeOnField === 0);
                             let rotTime = (isFirst && d && d.firstDuration) ? d.firstDuration : ((d && d.duration) ? d.duration : 25);
-                            
-                            // 🌟 修復 4：套用動態總傷引擎
                             let baseTotalDmg = getEffectiveTotalDmg(d, rotId, isFirst, calculatedMinDps, rotTime);
 
                             let true_eff_dps = Math.max(0.0001, (baseTotalDmg / rotTime) * r_factor * lvlPenalty);
@@ -703,163 +710,203 @@ async function reverseInferAndOptimize() {
             }
         });
 
+        // 🚀 沙盤空置防呆機制
+        if (currentTeams.length === 0) {
+            alert(t("⚠️ 沙盤中目前沒有隊伍！請先在上方編排至少一組隊伍，再執行實戰洗牌反推。"));
+            isEngineRunning = false;
+            let progressContainer = document.getElementById('sim-progress-container');
+            if (progressContainer) progressContainer.style.display = 'none';
+            return;
+        }
+
         safeStorageSet('ww_custom_stats', customStatsMap);
 
-        if (currentTeams.length > 0) {
-            let maxAllowed = parseInt(document.getElementById('team-count-select').value) || 16;
-            let fillFromDB = confirm(t("是否要從資料庫自動填補剩下的空位？\n\n[確定]：保留現有隊伍，並自動用最高分隊伍填滿剩下的空位。\n[取消]：僅針對當前已有隊伍進行重新排序。"));
-            let poolToPermute = [...currentTeams];
+        let maxAllowed = parseInt(document.getElementById('team-count-select').value) || 16;
+        let fillFromDB = confirm(t("是否要從資料庫自動填補剩下的空位？\n\n[確定]：保留現有隊伍，並自動用最高分隊伍填滿剩下的空位。\n[取消]：僅針對當前已有隊伍進行重新排序。"));
+        let poolToPermute = [...currentTeams];
 
-            if (fillFromDB) {
-                let tempUsage = {};
-                currentTeams.forEach(tData => {
-                    let b1 = getBase(tData.c1), b2 = getBase(tData.c2), b3 = getBase(tData.c3);
-                    tempUsage[b1] = (tempUsage[b1] || 0) + 1; tempUsage[b2] = (tempUsage[b2] || 0) + 1; tempUsage[b3] = (tempUsage[b3] || 0) + 1;
-                });
-                
-                let validDBTeams = getUniqueValidTeams(); 
-                validDBTeams.sort((a,b) => getRotDpsRange(b).min - getRotDpsRange(a).min); 
-                
-                for (let dbTeam of validDBTeams) {
-                    if (poolToPermute.length >= maxAllowed) break;
-                    let b1 = getBase(dbTeam.c1), b2 = getBase(dbTeam.c2), b3 = getBase(dbTeam.c3);
-                    let limit1 = charData[b1]?.max || 1, limit2 = charData[b2]?.max || 1, limit3 = charData[b3]?.max || 1;
-                    let u1 = tempUsage[b1] || 0, u2 = tempUsage[b2] || 0, u3 = tempUsage[b3] || 0;
-                    
-                    if (u1 < limit1 && u2 < limit2 && u3 < limit3 && b1 !== b2 && b1 !== b3 && b2 !== b3) {
-                        let isDuplicate = poolToPermute.some(ct => ct.c1 === dbTeam.c1 && ct.c2 === dbTeam.c2 && ct.c3 === dbTeam.c3);
-                        if (!isDuplicate) {
-                            tempUsage[b1] = u1 + 1; tempUsage[b2] = u2 + 1; tempUsage[b3] = u3 + 1;
-                            poolToPermute.push({
-                                c1: dbTeam.c1, c2: dbTeam.c2, c3: dbTeam.c3, scoreInput: "", ebR: "", ebIdx: "", ebHp: "", 
-                                calculatedMinDps: getRotDpsRange(dbTeam).min,
-                                teamAttr: typeof charAttrMap !== 'undefined' ? charAttrMap[dbTeam.c1] : null,
-                                rotId: dbTeam.id 
-                            });
-                        }
-                    }
-                }
-            }
-
-            let n = poolToPermute.length;
-            let opsPerSec = getDeviceBenchmark(); 
-            let dpTransitions = n * Math.pow(2, Math.max(0, n - 1)); 
-            let estDpTimeSec = (dpTransitions / opsPerSec).toFixed(1);
-            let dpWarning = (dpTransitions > 1000000) ? t(" (⚠️ 極高風險，可能卡死瀏覽器)") : "";
-
-            let defaultBeamWidth = 500;
-            let beamTransitions = n * n * defaultBeamWidth; 
-            let estBeamTimeSec = (beamTransitions / opsPerSec).toFixed(1);
-
-            let msg = t("漂泊者，洗牌引擎準備就緒！目前候選隊伍數：") + `${n} ` + t("隊\n\n");
-            msg += t("請選擇排軸演算法：\n");
-            msg += `[1] 🤖 ` + t("智慧分流 (推薦)：N≤14用DP，N>14用束式\n");
-            msg += `[2] 💎 ` + t("狀態壓縮 DP (保證絕對最佳解)：預估耗時 ") + `${estDpTimeSec} ` + t("秒") + `${dpWarning}\n`;
-            msg += `[3] 🚀 ` + t("束式搜索 (極速逼近局部最佳解)：預估耗時 ") + `${estBeamTimeSec} ` + t("秒\n\n");
-            msg += t("請輸入 1, 2 或 3：");
-
-            let algoChoice = prompt(msg, "1");
-            if (algoChoice === null) return; 
-
-            let useDP = false;
-            if (algoChoice === "2") useDP = true;
-            else if (algoChoice === "3") useDP = false;
-            else useDP = (n <= 14); 
-
-            let bestSequence = [];
-            let bestSimDmg = 0;
-
-            if (useDP) {
-                updateProgress(50, t(`啟動狀態壓縮 DP 引擎 (預估 `) + `${estDpTimeSec}` + t(` 秒)...`));
-                await yieldToMain();
-                let dpRes = runBitmaskDP(poolToPermute, env); 
-                bestSequence = dpRes.seq;
-                bestSimDmg = dpRes.score;
-            } else {
-                let beamWidth = defaultBeamWidth;
-                let widthChoice = prompt(t(`啟動束式搜索。\n請輸入搜尋深度 (Beam Width)。\n建議值：500。`), "500");
-                if (widthChoice !== null && !isNaN(parseInt(widthChoice)) && parseInt(widthChoice) > 0) {
-                    beamWidth = parseInt(widthChoice);
-                }
-
-                let states = [{ score: 0, sequence: [], remaining: poolToPermute, r: 1, idx: 1, hp: getBossMaxHP(1, 1) }];
-
-                for (let step = 0; step < n; step++) {
-                    updateProgress(Math.floor((step / n) * 100), t(`束式推演中 (`) + `${step+1}/${n}) - ` + t(`深度: `) + `${beamWidth}`);
-                    await yieldToMain(); 
-
-                    let nextStates = [];
-                    for (let state of states) {
-                        for (let i = 0; i < state.remaining.length; i++) {
-                            let team = state.remaining[i];
-                            let t_left = env.battleTime, dmgDone = 0, tmp_r = state.r, tmp_idx = state.idx, tmp_hp = state.hp;
-                            let loopGuard = 0;
-
-                            while (t_left > 0 && loopGuard < 50) {
-                                loopGuard++;
-                                let lvlPenalty = (tmp_r === 1) ? 1.0 : (tmp_r === 2 ? (env.pen110 || 1.0) : (env.pen120 || 1.0));
-                                let r_factor = getCombatMultiplier(env, team.teamAttr, team.c1, tmp_idx);
-                                
-                                let timeOnField = env.battleTime - t_left;
-                                let ttk = getTtkFromMathCurve(tmp_hp, team.calculatedMinDps, r_factor, lvlPenalty, team.c1, team.rotId, timeOnField);
-
-                                if (ttk <= t_left) { 
-                                    dmgDone += tmp_hp; t_left -= (ttk + env.transTime); tmp_idx++; 
-                                    if (tmp_idx > 4) { tmp_r++; tmp_idx = 1; } 
-                                    tmp_hp = getBossMaxHP(tmp_r, tmp_idx); 
-                                } else { 
-                                    let d = dpsData.find(x => x.id === team.rotId);
-                                    let isFirst = (timeOnField === 0);
-                                    let rotTime = (isFirst && d && d.firstDuration) ? d.firstDuration : ((d && d.duration) ? d.duration : 25);
-                                    
-                                    // 🌟 修復 5：套用動態總傷引擎
-                                    let baseTotalDmg = getEffectiveTotalDmg(d, team.rotId, isFirst, team.calculatedMinDps, rotTime);
-
-                                    let true_eff_dps = Math.max(0.0001, (baseTotalDmg / rotTime) * r_factor * lvlPenalty);
-
-                                    dmgDone += true_eff_dps * t_left; tmp_hp -= true_eff_dps * t_left; t_left = 0; 
-                                }
-                            }
-
-                            let newRemaining = state.remaining.filter((_, idx) => idx !== i);
-                            nextStates.push({ score: state.score + dmgDone, sequence: [...state.sequence, team], remaining: newRemaining, r: tmp_r, idx: tmp_idx, hp: tmp_hp });
-                        }
-                    }
-                    nextStates.sort((a, b) => b.score - a.score);
-                    states = nextStates.slice(0, beamWidth);
-                }
-                bestSequence = states[0].sequence;
-                bestSimDmg = states[0].score;
-            }
-
-            updateProgress(100, t('穿插最佳化完成！'));
-            setTimeout(() => document.getElementById('sim-progress-container').style.display='none', 800);
-
-            document.querySelectorAll('.char-select, .score-input, .end-boss-r, .end-boss-idx, .end-boss-hp').forEach(el => el.value = ""); 
-            
-            bestSequence.forEach((tData, index) => {
-                if (index < maxAllowed && rows[index]) {
-                    let row = rows[index];
-                    let ss = row.querySelectorAll('select.char-select');
-                    ss[0].innerHTML = `<option value="${tData.c1}">${tData.c1}</option>`; 
-                    ss[1].innerHTML = `<option value="${tData.c2}">${tData.c2}</option>`; 
-                    ss[2].innerHTML = `<option value="${tData.c3}">${tData.c3}</option>`;
-                    ss[0].value = tData.c1; ss[1].value = tData.c2; ss[2].value = tData.c3;
-                }
+        if (fillFromDB) {
+            let tempUsage = {};
+            currentTeams.forEach(tData => {
+                let b1 = getBase(tData.c1), b2 = getBase(tData.c2), b3 = getBase(tData.c3);
+                tempUsage[b1] = (tempUsage[b1] || 0) + 1; tempUsage[b2] = (tempUsage[b2] || 0) + 1; tempUsage[b3] = (tempUsage[b3] || 0) + 1;
             });
             
-            let projectedScore = Math.floor(bestSimDmg * env.scoreRatio);
-            let successMsg = fillFromDB ? t("✅ 實戰反推與穿插最佳化完成，並已自動填補空位！") : t("✅ 實戰反推完成，已為您計算出能避開抗性與轉場浪費的最佳順序！");
-            successMsg += t("\n🏆 最佳化後預估總分：") + projectedScore.toLocaleString() + t(" 分");
-            alert(successMsg);
+            let validDBTeams = getUniqueValidTeams(); 
+            validDBTeams.sort((a,b) => getRotDpsRange(b).min - getRotDpsRange(a).min); 
             
-            // 🌟 關鍵修復：強制將模式切換回自動推演，讓儀表板能正確讀取剛剛反推的新火力
-            let simModeEl = document.getElementById('sim-mode');
-            if (simModeEl && simModeEl.value !== 'auto') {
-                simModeEl.value = 'auto';
+            for (let dbTeam of validDBTeams) {
+                if (poolToPermute.length >= maxAllowed) break;
+                let b1 = getBase(dbTeam.c1), b2 = getBase(dbTeam.c2), b3 = getBase(dbTeam.c3);
+                let limit1 = charData[b1]?.max || 1, limit2 = charData[b2]?.max || 1, limit3 = charData[b3]?.max || 1;
+                let u1 = tempUsage[b1] || 0, u2 = tempUsage[b2] || 0, u3 = tempUsage[b3] || 0;
+                
+                if (u1 < limit1 && u2 < limit2 && u3 < limit3 && b1 !== b2 && b1 !== b3 && b2 !== b3) {
+                    let isDuplicate = poolToPermute.some(ct => ct.c1 === dbTeam.c1 && ct.c2 === dbTeam.c2 && ct.c3 === dbTeam.c3);
+                    if (!isDuplicate) {
+                        tempUsage[b1] = u1 + 1; tempUsage[b2] = u2 + 1; tempUsage[b3] = u3 + 1;
+                        poolToPermute.push({
+                            c1: dbTeam.c1, c2: dbTeam.c2, c3: dbTeam.c3, scoreInput: "", ebR: "", ebIdx: "", ebHp: "", 
+                            calculatedMinDps: getRotDpsRange(dbTeam).min,
+                            teamAttr: typeof charAttrMap !== 'undefined' ? charAttrMap[dbTeam.c1] : null,
+                            rotId: dbTeam.id 
+                        });
+                    }
+                }
             }
         }
-        updateTracker();
+
+        let n = poolToPermute.length;
+        let opsPerSec = getDeviceBenchmark(); 
+        let dpTransitions = n * Math.pow(2, Math.max(0, n - 1)); 
+        let estDpTimeSec = (dpTransitions / opsPerSec).toFixed(1);
+        let dpWarning = (dpTransitions > 1000000) ? t(" (⚠️ 運算時間可能過長)") : "";
+
+        let defaultBeamWidth = 500;
+        let beamTransitions = n * n * defaultBeamWidth; 
+        let estBeamTimeSec = (beamTransitions / opsPerSec).toFixed(1);
+
+        let msg = t("目前候選隊伍數：") + `${n} ` + t("隊\n\n");
+        msg += t("請選擇推演演算法：\n");
+        msg += `[1] 🤖 ` + t("智慧分流 (推薦：自動評估最佳演算法)\n");
+        msg += `[2] 💎 ` + t("狀態壓縮 DP (全域搜尋)：預估耗時 ") + `${estDpTimeSec} ` + t("秒") + `${dpWarning}\n`;
+        msg += `[3] 🚀 ` + t("束式搜索 (局部最佳化)：預估耗時 ") + `${estBeamTimeSec} ` + t("秒\n\n");
+        msg += t("請輸入 1, 2 或 3：");
+
+        let algoChoice = prompt(msg, "1");
+        if (algoChoice === null) return; 
+
+        let useDP = false;
+        if (algoChoice === "2") useDP = true;
+        else if (algoChoice === "3") useDP = false;
+        else useDP = (n <= 14); 
+
+        let bestSequence = [];
+        let bestSimDmg = 0;
+        let engineStartTime = Date.now();
+        let maxStatesReached = 0;
+        let finalBeamWidth = defaultBeamWidth;
+
+        if (useDP) {
+            updateProgress(50, t(`啟動狀態壓縮 DP 引擎 (預估 `) + `${estDpTimeSec}` + t(` 秒)...`));
+            await yieldToMain();
+            let dpRes = runBitmaskDP(poolToPermute, env); 
+            bestSequence = dpRes.seq;
+            bestSimDmg = dpRes.score;
+        } else {
+            let widthChoice = prompt(t(`啟動束式搜索。\n請輸入搜尋深度 (Beam Width)。\n建議值：500。`), "500");
+            if (widthChoice !== null && !isNaN(parseInt(widthChoice)) && parseInt(widthChoice) > 0) {
+                finalBeamWidth = parseInt(widthChoice);
+            }
+
+            let states = [{ score: 0, sequence: [], remaining: poolToPermute, r: 1, idx: 1, hp: getBossMaxHP(1, 1) }];
+
+            for (let step = 0; step < n; step++) {
+                updateProgress(Math.floor((step / n) * 100), t(`推演中 (`) + `${step+1}/${n})...`);
+                await yieldToMain(); 
+
+                let nextStates = [];
+                for (let state of states) {
+                    for (let i = 0; i < state.remaining.length; i++) {
+                        let team = state.remaining[i];
+                        let t_left = env.battleTime, dmgDone = 0, tmp_r = state.r, tmp_idx = state.idx, tmp_hp = state.hp;
+                        let loopGuard = 0;
+
+                        while (t_left > 0 && loopGuard < 50) {
+                            loopGuard++;
+                            let lvlPenalty = (tmp_r === 1) ? 1.0 : (tmp_r === 2 ? (env.pen110 || 1.0) : (env.pen120 || 1.0));
+                            let r_factor = getCombatMultiplier(env, team.teamAttr, team.c1, tmp_idx);
+                            
+                            let timeOnField = env.battleTime - t_left;
+                            let ttk = getTtkFromMathCurve(tmp_hp, team.calculatedMinDps, r_factor, lvlPenalty, team.c1, team.rotId, timeOnField);
+
+                            if (ttk <= t_left) { 
+                                dmgDone += tmp_hp; t_left -= (ttk + env.transTime); tmp_idx++; 
+                                if (tmp_idx > 4) { tmp_r++; tmp_idx = 1; } 
+                                tmp_hp = getBossMaxHP(tmp_r, tmp_idx); 
+                            } else { 
+                                let d = dpsData.find(x => x.id === team.rotId);
+                                let isFirst = (timeOnField === 0);
+                                let rotTime = (isFirst && d && d.firstDuration) ? d.firstDuration : ((d && d.duration) ? d.duration : 25);
+                                let baseTotalDmg = getEffectiveTotalDmg(d, team.rotId, isFirst, team.calculatedMinDps, rotTime);
+
+                                let true_eff_dps = Math.max(0.0001, (baseTotalDmg / rotTime) * r_factor * lvlPenalty);
+
+                                dmgDone += true_eff_dps * t_left; tmp_hp -= true_eff_dps * t_left; t_left = 0; 
+                            }
+                        }
+
+                        let newRemaining = state.remaining.filter((_, idx) => idx !== i);
+                        nextStates.push({ score: state.score + dmgDone, sequence: [...state.sequence, team], remaining: newRemaining, r: tmp_r, idx: tmp_idx, hp: tmp_hp });
+                    }
+                }
+                
+                nextStates.sort((a, b) => b.score - a.score);
+                if (nextStates.length > maxStatesReached) maxStatesReached = nextStates.length;
+                
+                let diverseStates = []; let teamUsageCount = {}; let added = new Set();
+                for (let i = 0; i < nextStates.length; i++) {
+                    let state = nextStates[i];
+                    let lastTeamId = state.sequence.length > 0 ? state.sequence[state.sequence.length-1].rotId : 'none';
+                    teamUsageCount[lastTeamId] = (teamUsageCount[lastTeamId] || 0) + 1;
+                    if (teamUsageCount[lastTeamId] < finalBeamWidth * 0.2 || diverseStates.length < finalBeamWidth * 0.1) {
+                        diverseStates.push(state); added.add(state);
+                    }
+                    if (diverseStates.length >= finalBeamWidth) break;
+                }
+                if (diverseStates.length < finalBeamWidth) {
+                    for (let i = 0; i < nextStates.length && diverseStates.length < finalBeamWidth; i++) {
+                        if (!added.has(nextStates[i])) diverseStates.push(nextStates[i]);
+                    }
+                }
+                states = diverseStates; 
+            }
+            bestSequence = states[0].sequence;
+            bestSimDmg = states[0].score;
+        }
+
+        updateProgress(100, t('最佳化排序完成！'));
+        setTimeout(() => document.getElementById('sim-progress-container').style.display='none', 800);
+
+        document.querySelectorAll('.char-select, .score-input, .end-boss-r, .end-boss-idx, .end-boss-hp').forEach(el => el.value = ""); 
+        
+        bestSequence.forEach((tData, index) => {
+            if (index < maxAllowed && rows[index]) {
+                let row = rows[index];
+                let ss = row.querySelectorAll('select.char-select');
+                ss[0].innerHTML = `<option value="${tData.c1}">${tData.c1}</option>`; 
+                ss[1].innerHTML = `<option value="${tData.c2}">${tData.c2}</option>`; 
+                ss[2].innerHTML = `<option value="${tData.c3}">${tData.c3}</option>`;
+                ss[0].value = tData.c1; ss[1].value = tData.c2; ss[2].value = tData.c3;
+            }
+        });
+        
+        let simModeEl = document.getElementById('sim-mode'); if (simModeEl && simModeEl.value !== 'auto') simModeEl.value = 'auto';
+        updateTracker(); 
+
+        let finalSimRes = runSimulations(env); 
+        let estMinScore = Math.floor(finalSimRes.totalMatrixScoreMin);
+        let estMaxScore = Math.floor(finalSimRes.totalMatrixScoreMax);
+
+        let successMsg = fillFromDB ? t("解析完成。已將現有隊伍重新排序並填補剩餘空位。") : t("解析完成。已計算出能避開抗性與轉場的最佳出戰順序。");
+        successMsg += `\n\n🎯 預估矩陣總分 (上限)：${estMaxScore.toLocaleString()} 分`;
+        successMsg += `\n🛡️ 預估最差保底 (下限)：${estMinScore.toLocaleString()} 分\n`;
+
+        let calcTimeSec = ((Date.now() - engineStartTime) / 1000).toFixed(2);
+        successMsg += `\n📊 運算觀測報告：\n`;
+        successMsg += `- 實際運算耗時：${calcTimeSec} 秒\n`;
+        
+        if (!useDP) {
+            successMsg += `- 運算模式：單一執行緒\n`;
+            successMsg += `- 設定搜尋深度：${finalBeamWidth}\n`;
+            successMsg += `- 實際最大分支：${maxStatesReached.toLocaleString()}\n`;
+            if (maxStatesReached <= finalBeamWidth) successMsg += `✨ 狀態：運算資源充足，本次推演已涵蓋設定深度內的所有組合。`;
+            else successMsg += `⚠️ 狀態：已觸發截斷機制。此為設定深度下之最佳近似解。`;
+        } else {
+            successMsg += `✨ 狀態：狀態壓縮 DP 執行完畢，已涵蓋全域最佳解。`;
+        }
+        alert(successMsg);
+        
         if (typeof renderRotations === 'function') renderRotations();
 
     } catch (err) {
@@ -886,91 +933,134 @@ async function autoBuildMaxDpsTeams() {
         let validTeams = getUniqueValidTeams(strategy); 
         if (validTeams.length === 0) return alert(t("沒有可用的排軸！請確認已勾選角色與排軸。"));
 
-        let n = validTeams.length;
-        let states = [{ score: 0, teams: [], usage: {} }];
-        
+        let states = [{ minScore: 0, maxScore: 0, teams: [], usage: {} }];
+        let maxStatesReached = 0; 
         let teamsWithScore = [];
+        
         for (let tData of validTeams) {
             let range = getRotDpsRange(tData);
-            let score = strategy === 'min' ? range.min : range.max;
-            if (score > 0) {
-                teamsWithScore.push({ team: tData, score: score });
-            }
+            if (range.max > 0) teamsWithScore.push({ team: tData, minScore: range.min, maxScore: range.max });
         }
-        teamsWithScore.sort((a, b) => b.score - a.score);
+        teamsWithScore.sort((a, b) => strategy === 'max' ? b.maxScore - a.maxScore : b.minScore - a.minScore);
         
         let totalCandidates = teamsWithScore.length;
-        let opsPerSec = getDeviceBenchmark() * 0.4;
-        let defaultBeamWidth = 500;
-        let estTimeSec = ((totalCandidates * defaultBeamWidth) / opsPerSec).toFixed(1);
-        if (parseFloat(estTimeSec) < 0.1) estTimeSec = "0.1";
+        let defaultBeamWidth = 1000;
 
-        let widthMsg = t(`系統共篩選出 `) + totalCandidates + t(` 組有效候選隊伍。\n\n`) +
-                       t(`請輸入搜尋深度 (Beam Width)。\n建議值：500 (預估耗時 `) + estTimeSec + t(` 秒)。\n(數值越大越精準，但耗時將線性增加)：`);
-        
-        let widthChoice = prompt(widthMsg, "500");
+        let widthMsg = t(`系統共篩選出 `) + totalCandidates + t(` 組有效候選編隊。\n\n請輸入搜尋深度 (Beam Width)。\n建議值：1000 (數值越大越精準，耗時將線性增加)：`);
+        let widthChoice = prompt(widthMsg, defaultBeamWidth.toString());
         let beamWidth = parseInt(widthChoice);
-        if (isNaN(beamWidth) || beamWidth <= 0) beamWidth = 500;
-        
-        let stepCount = 0;
-        let totalSteps = teamsWithScore.length;
+        if (isNaN(beamWidth) || beamWidth <= 0) beamWidth = defaultBeamWidth;
 
-        for (let {team, score} of teamsWithScore) {
+        let estMemoryMB = (beamWidth * maxAllowed * 400) / (1024 * 1024);
+        let safeMemoryLimitMB = 1500; 
+        if (performance && performance.memory) {
+            safeMemoryLimitMB = Math.floor((performance.memory.jsHeapSizeLimit * 0.8) / (1024 * 1024));
+            estMemoryMB += (performance.memory.usedJSHeapSize / (1024 * 1024)); 
+        }
+        if (estMemoryMB > safeMemoryLimitMB) {
+            let proceed = confirm(t(`⚠️ 記憶體資源警告 ⚠️\n\n系統預估本次推演將消耗約 `) + estMemoryMB.toFixed(0) + t(` MB。\n可能導致瀏覽器卡頓或崩潰。\n\n確定繼續執行嗎？`));
+            if (!proceed) {
+                isEngineRunning = false;
+                let progressContainer = document.getElementById('sim-progress-container');
+                if (progressContainer) progressContainer.style.display = 'none';
+                return; 
+            }
+        }
+
+        let limitMap = {}; for (let key in charData) limitMap[key] = charData[key].max;
+        let stepCount = 0; let totalSteps = teamsWithScore.length; let startTime = Date.now(); 
+
+        for (let {team, minScore, maxScore} of teamsWithScore) {
             stepCount++;
-            if (stepCount % 2 === 0) {
-                updateProgress(Math.floor((stepCount / totalSteps) * 100), t(`從庫中篩選建構隊伍 (`) + `${stepCount}/${totalSteps})...`);
+            if (stepCount % 2 === 0 || stepCount === 1) {
+                updateProgress(Math.floor((stepCount / totalSteps) * 100), t(`建構中 (`) + `${stepCount}/${totalSteps})...`);
                 await yieldToMain(); 
             }
 
             let nextStates = [];
             let b1 = getBase(team.c1), b2 = getBase(team.c2), b3 = getBase(team.c3);
-            let limit1 = charData[b1]?.max || 1, limit2 = charData[b2]?.max || 1, limit3 = charData[b3]?.max || 1;
-            
-            for (let state of states) {
+            let limit1 = limitMap[b1] || 1, limit2 = limitMap[b2] || 1, limit3 = limitMap[b3] || 1;
+
+            for (let i = 0; i < states.length; i++) {
+                let state = states[i];
                 if (state.teams.length < maxAllowed) {
                     let u1 = state.usage[b1] || 0, u2 = state.usage[b2] || 0, u3 = state.usage[b3] || 0;
                     if (u1 < limit1 && u2 < limit2 && u3 < limit3 && b1 !== b2 && b1 !== b3 && b2 !== b3) {
-                        let newUsage = { ...state.usage };
+                        let newUsage = Object.assign({}, state.usage);
                         newUsage[b1] = u1 + 1; newUsage[b2] = u2 + 1; newUsage[b3] = u3 + 1;
-                        nextStates.push({ score: state.score + score, teams: [...state.teams, team], usage: newUsage });
+                        let newTeams = state.teams.slice(); newTeams.push(team);
+                        nextStates.push({ maxScore: state.maxScore + maxScore, minScore: state.minScore + minScore, teams: newTeams, usage: newUsage });
                     }
                 }
                 nextStates.push(state);
             }
-            nextStates.sort((a, b) => b.score - a.score);
-            states = nextStates.slice(0, beamWidth);
+
+            nextStates.sort((a, b) => {
+                if (strategy === 'max') { let diff = b.maxScore - a.maxScore; return Math.abs(diff) > 0.01 ? diff : b.minScore - a.minScore; } 
+                else { let diff = b.minScore - a.minScore; return Math.abs(diff) > 0.01 ? diff : b.maxScore - a.maxScore; }
+            });
+
+            if (nextStates.length > maxStatesReached) maxStatesReached = nextStates.length;
+            
+            // 🚀 O(N) 雜湊集合多樣性篩選
+            let diverseStates = []; let teamUsageCount = {}; let added = new Set();
+            for (let i = 0; i < nextStates.length; i++) {
+                let state = nextStates[i];
+                let lastTeamId = state.teams.length > 0 ? state.teams[state.teams.length-1].rotId : 'none';
+                teamUsageCount[lastTeamId] = (teamUsageCount[lastTeamId] || 0) + 1;
+                if (teamUsageCount[lastTeamId] < beamWidth * 0.2 || diverseStates.length < beamWidth * 0.1) {
+                    diverseStates.push(state); added.add(state);
+                }
+                if (diverseStates.length >= beamWidth) break;
+            }
+            if (diverseStates.length < beamWidth) {
+                for (let i = 0; i < nextStates.length && diverseStates.length < beamWidth; i++) {
+                    if (!added.has(nextStates[i])) diverseStates.push(nextStates[i]);
+                }
+            }
+            states = diverseStates; 
         }
         
-        updateProgress(100, t('自動編排完成！'));
+        updateProgress(100, t('自動編隊完成！'));
         setTimeout(() => document.getElementById('sim-progress-container').style.display='none', 800);
 
-        let finalOptimizedTeams = states[0].teams; 
-        finalOptimizedTeams.reverse(); 
-
+        let finalOptimizedTeams = states[0].teams; finalOptimizedTeams.reverse(); 
         document.querySelectorAll('.char-select, .score-input, .end-boss-hp, .end-boss-r, .end-boss-idx').forEach(el => el.value=""); 
-        let rows = document.querySelectorAll('#team-board tr');
         
+        let rows = document.querySelectorAll('#team-board tr');
         finalOptimizedTeams.forEach((tData, index) => { 
             if(rows[index] && index < maxAllowed) { 
                 let ss = rows[index].querySelectorAll('select.char-select'); 
-                ss[0].innerHTML = `<option value="${tData.c1}">${tData.c1}</option>`; 
-                ss[1].innerHTML = `<option value="${tData.c2}">${tData.c2}</option>`; 
-                ss[2].innerHTML = `<option value="${tData.c3}">${tData.c3}</option>`; 
+                ss[0].innerHTML = `<option value="${tData.c1}">${tData.c1}</option>`; ss[1].innerHTML = `<option value="${tData.c2}">${tData.c2}</option>`; ss[2].innerHTML = `<option value="${tData.c3}">${tData.c3}</option>`; 
                 ss[0].value = tData.c1; ss[1].value = tData.c2; ss[2].value = tData.c3; 
             } 
         });
         
-        let simModeEl = document.getElementById('sim-mode');
-        if (simModeEl && simModeEl.value !== 'auto') {
-            simModeEl.value = 'auto';
-        }
-
+        let simModeEl = document.getElementById('sim-mode'); if (simModeEl && simModeEl.value !== 'auto') simModeEl.value = 'auto';
         updateTracker(); 
+
+        let finalSimRes = runSimulations(getEnvSettings()); 
+        let estMinScore = Math.floor(finalSimRes.totalMatrixScoreMin), estMaxScore = Math.floor(finalSimRes.totalMatrixScoreMax);
         let strategyName = strategy === 'min' ? t('下限穩定度') : t('上限理論值');
-        alert(t(`配置完成！目標：[`) + strategyName + t(`最高]。共組建 `) + finalOptimizedTeams.length + t(` 隊。`));
+        let successMsg = t(`配置完成！目標：[`) + strategyName + t(`最高]。共組建 `) + finalOptimizedTeams.length + t(` 隊。\n`);
+
+        successMsg += `\n🎯 預估矩陣總分 (上限)：${estMaxScore.toLocaleString()} 分`;
+        successMsg += `\n🛡️ 預估最差保底 (下限)：${estMinScore.toLocaleString()} 分\n`;
+
+        let calcTimeSec = ((Date.now() - startTime) / 1000).toFixed(2);
+        successMsg += `\n📊 運算觀測報告：\n`;
+        successMsg += `- 實際運算耗時：${calcTimeSec} 秒\n`;
+        successMsg += `- 運算模式：單一執行緒\n`;
+        successMsg += `- 設定搜尋深度：${beamWidth}\n`;
+        successMsg += `- 實際最大分支：${maxStatesReached.toLocaleString()}\n`;
+        
+        if (maxStatesReached <= beamWidth) successMsg += `✨ 狀態：運算資源充足，本次推演已涵蓋設定深度內的所有組合。`;
+        else successMsg += `⚠️ 狀態：已觸發截斷機制。此為設定深度下之最佳近似解。`;
+
+        alert(successMsg);
         
     } catch (err) {
-        console.error("一鍵編制發生錯誤:", err);
+        console.error("一鍵編隊發生錯誤:", err);
         alert(t("⚠️ 引擎發生未預期錯誤，請重新整理後再試。"));
     } finally {
         isEngineRunning = false;
