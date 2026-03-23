@@ -1,7 +1,7 @@
 // ==========================================
 // 鳴潮矩陣編隊工具 v4.8.2 [核心運算模組 - 智慧剪枝特化版]
 // 檔案：core.js
-// 職責：資料存取、數學推演、動態時間判定、雙引擎洗牌(DP+Beam)、專屬增傷、A*潛力估價
+// 職責：資料存取、數學推演、動態時間判定、雙引擎洗牌(DP+Beam)、專屬增傷、A*潛力估價、防呆機制
 // ==========================================
 
 // --- 0. 全域崩潰攔截系統 ---
@@ -146,14 +146,11 @@ const DEFAULT_CURVE_K = {
     "忌炎": 1.00, "暗主": 0.80, "安可": 0.80
 };
 
-// 🚀 動態計算真實總傷引擎
 // 🚀 動態計算真實總傷引擎 (修復版：全局套用穩定度)
 function getEffectiveTotalDmg(d, rotId, isFirstRotation, currentDps, rotTime) {
     let dbTotalDmg = (isFirstRotation && d && d.firstTotalDmg) ? d.firstTotalDmg : ((d && d.totalDmg) ? d.totalDmg : null);
     
-    // 💡 移除 hasCustomDps 的限制！
-    // 只要原始資料庫有 dps，無論是否為自訂隊伍，都必須將目前的 currentDps (已包含穩定度折損) 
-    // 換算為比例 (dpsRatio)，用來完美縮放資料庫中的總傷 (dbTotalDmg)！
+    // 💡 無論是否為自訂隊伍，將目前的 currentDps 換算為比例 (dpsRatio)，完美縮放爆發總傷！
     if (d && d.dps > 0) {
         let dpsRatio = currentDps / d.dps;
         return dbTotalDmg ? (dbTotalDmg * dpsRatio) : (currentDps * rotTime);
@@ -333,19 +330,17 @@ function getBossMaxHP(r, index) {
     return Math.max(0.1, safeValue); 
 }
 
+// 🚀 數據主權劃分：嚴格區分實戰自訂與全局原生
 function getRotDpsRange(d) {
     let buffMult = customStatsMap[d.id] && customStatsMap[d.id].buff ? 1 + (customStatsMap[d.id].buff / 100) : 1;
 
-    // 🟢 情況一：這是「實戰反推」或「玩家自訂」的隊伍
     if (customStatsMap[d.id]) { 
         let s = customStatsMap[d.id]; 
         let max = s.dps * buffMult; 
-        // 加入防呆：確保自訂穩定度若為空值，預設給 100，不引發 NaN 錯誤
         let customStab = (s.stability !== undefined && s.stability !== null) ? s.stability : 100;
         return { min: Math.max(0, max * (customStab / 100)), max: max, isCustom: true }; 
     }
 
-    // 🔵 情況二：這是「資料庫原生」的隊伍
     let max = d.dps * buffMult; 
     if (max === 0) return { min: 0, max: 0, isCustom: false };
     
@@ -470,11 +465,9 @@ function runSimulations(env) {
                                     let d = dpsData.find(x => x.id === rotId);
                                     let isFirst = (timeOnField === 0);
                                     let rotTime = (isFirst && d && d.firstDuration) ? d.firstDuration : ((d && d.duration) ? d.duration : 25);
-                                    
                                     let baseTotalDmg = getEffectiveTotalDmg(d, rotId, isFirst, baseDps, rotTime);
                                     
                                     let true_eff_dps = Math.max(0.0001, (baseTotalDmg / rotTime) * r_factor * lvlPenalty);
-
                                     dmg += true_eff_dps * t_left; hp -= true_eff_dps * t_left; t_left = 0; 
                                 }
                             }
@@ -483,13 +476,18 @@ function runSimulations(env) {
                         
                         let resMin = simulate(auto_hp_min, auto_r_min, auto_idx_min, dpsRange.min, c1);
                         auto_hp_min = resMin.hp; auto_r_min = resMin.r; auto_idx_min = resMin.idx; 
-                        results.totalMatrixScoreMin += resMin.dmg * env.scoreRatio;
                         
                         let resMax = simulate(auto_hp_max, auto_r_max, auto_idx_max, dpsRange.max, c1);
                         auto_hp_max = resMax.hp; auto_r_max = resMax.r; auto_idx_max = resMax.idx; 
-                        results.totalMatrixScoreMax += resMax.dmg * env.scoreRatio;
 
-                        rowResult.html = `<span style="color:#aaa;">${t('下限')}: </span><span style="color:var(--gold);">${resMin.startStr} ➔ ${resMin.endStr}</span><br><span style="color:#aaa;">${t('上限')}: </span><span style="color:var(--neon-green);">${resMax.startStr} ➔ ${resMax.endStr}</span><br><span style="color:var(--neon-purple); font-weight:bold; font-size:1.1em;">${Math.floor(resMin.dmg * env.scoreRatio).toLocaleString()} ~ ${Math.floor(resMax.dmg * env.scoreRatio).toLocaleString()} ${t('分')}</span>`;
+                        // 🚀 強制校正「轉場懲罰」導致的上下限倒置異常
+                        let safeMinDmg = Math.min(resMin.dmg, resMax.dmg);
+                        let safeMaxDmg = Math.max(resMin.dmg, resMax.dmg);
+                        
+                        results.totalMatrixScoreMin += safeMinDmg * env.scoreRatio;
+                        results.totalMatrixScoreMax += safeMaxDmg * env.scoreRatio;
+
+                        rowResult.html = `<span style="color:#aaa;">${t('下限')}: </span><span style="color:var(--gold);">${resMin.startStr} ➔ ${resMin.endStr}</span><br><span style="color:#aaa;">${t('上限')}: </span><span style="color:var(--neon-green);">${resMax.startStr} ➔ ${resMax.endStr}</span><br><span style="color:var(--neon-purple); font-weight:bold; font-size:1.1em;">${Math.floor(safeMinDmg * env.scoreRatio).toLocaleString()} ~ ${Math.floor(safeMaxDmg * env.scoreRatio).toLocaleString()} ${t('分')}</span>`;
                     }
                 }
             } else if (simMode === 'manual') {
@@ -561,11 +559,9 @@ function runBitmaskDP(teams, env) {
                         let d = dpsData.find(x => x.id === team.rotId);
                         let isFirst = (timeOnField === 0);
                         let rotTime = (isFirst && d && d.firstDuration) ? d.firstDuration : ((d && d.duration) ? d.duration : 25);
-                        
                         let baseTotalDmg = getEffectiveTotalDmg(d, team.rotId, isFirst, team.calculatedMinDps, rotTime);
                         
                         let true_eff_dps = Math.max(0.0001, (baseTotalDmg / rotTime) * r_factor * lvlPenalty);
-
                         dmgDone += true_eff_dps * t_left; tmp_hp -= true_eff_dps * t_left; t_left = 0;
                     }
                 }
@@ -592,6 +588,8 @@ async function reverseInferAndOptimize() {
         let rows = document.querySelectorAll('#team-board tr');
         let start_r = 1, start_idx = 1, start_hp = getBossMaxHP(1, 1);
         
+        let hasIncompleteScore = false; // 🚀 防呆標記
+
         rows.forEach((row) => {
             if (row.classList.contains('hidden-row')) return;
             let ss = row.querySelectorAll('select.char-select');
@@ -603,6 +601,13 @@ async function reverseInferAndOptimize() {
 
             if (c1) { 
                 let actualScore = parseFloat(scoreInput);
+                
+                // 🚀 防呆攔截：若選了主C卻未填寫分數或分數異常
+                if (isNaN(actualScore) || actualScore <= 0) {
+                    hasIncompleteScore = true;
+                    return; 
+                }
+
                 let ebRInt = parseInt(ebR), ebIdxInt = parseInt(ebIdx), ebHpPct = parseFloat(ebHp);
                 let calculatedMinDps = 0, rotId = null;
                 let possibleRots = getBestPossibleRots(c1, c2, c3); 
@@ -610,7 +615,7 @@ async function reverseInferAndOptimize() {
                 if (possibleRots.length > 0) rotId = possibleRots[0].id;
                 let teamAttr = typeof charAttrMap !== 'undefined' ? charAttrMap[c1] : null;
 
-                if (!isNaN(actualScore) && actualScore > 0 && possibleRots.length > 0) {
+                if (actualScore > 0 && possibleRots.length > 0) {
                     let dmg_left = actualScore / Math.max(0.0001, env.scoreRatio);
                     let kills = 0, effective_dmg_sum = 0, tmp_r = start_r, tmp_idx = start_idx, tmp_hp = start_hp, dmgDealtToKilledBosses = 0;
                     let loopGuard = 0;
@@ -712,7 +717,6 @@ async function reverseInferAndOptimize() {
                             let baseTotalDmg = getEffectiveTotalDmg(d, rotId, isFirst, calculatedMinDps, rotTime);
 
                             let true_eff_dps = Math.max(0.0001, (baseTotalDmg / rotTime) * r_factor * lvlPenalty);
-
                             start_hp -= true_eff_dps * t_left; t_left = 0; 
                         }
                     }
@@ -722,8 +726,16 @@ async function reverseInferAndOptimize() {
             }
         });
 
+        // 🚀 防呆執行
+        if (hasIncompleteScore) {
+            isEngineRunning = false;
+            let progressContainer = document.getElementById('sim-progress-container');
+            if (progressContainer) progressContainer.style.display = 'none';
+            return alert(t("⚠️ 發現已選擇角色但未填寫【實戰得分】的隊伍！\n\n實戰洗牌反推需要精確的分數。如果您希望系統自動填補該空位，請將該列的主C選單改回 (空白)。"));
+        }
+
         if (currentTeams.length === 0) {
-            alert(t("⚠️ 沙盤中目前沒有隊伍！請先在上方編排至少一組隊伍，再執行實戰洗牌反推。"));
+            alert(t("⚠️ 沙盤中目前沒有隊伍！請先在上方編排至少一組隊伍並填寫實戰得分，再執行實戰洗牌反推。"));
             isEngineRunning = false;
             let progressContainer = document.getElementById('sim-progress-container');
             if (progressContainer) progressContainer.style.display = 'none';
@@ -733,7 +745,10 @@ async function reverseInferAndOptimize() {
         safeStorageSet('ww_custom_stats', customStatsMap);
 
         let maxAllowed = parseInt(document.getElementById('team-count-select').value) || 16;
-        let fillFromDB = confirm(t("是否要從資料庫自動填補剩下的空位？\n\n[確定]：保留現有隊伍，並自動用最高分隊伍填滿剩下的空位。\n[取消]：僅針對當前已有隊伍進行重新排序。"));
+        
+        // 🚀 讀心式暗示判定填補空位
+        let fillFromDB = (currentTeams.length < maxAllowed);
+        
         let poolToPermute = [...currentTeams];
 
         if (fillFromDB) {
@@ -758,7 +773,7 @@ async function reverseInferAndOptimize() {
                         tempUsage[b1] = u1 + 1; tempUsage[b2] = u2 + 1; tempUsage[b3] = u3 + 1;
                         poolToPermute.push({
                             c1: dbTeam.c1, c2: dbTeam.c2, c3: dbTeam.c3, scoreInput: "", ebR: "", ebIdx: "", ebHp: "", 
-                            calculatedMinDps: getRotDpsRange(dbTeam).min,
+                            calculatedMinDps: getRotDpsRange(dbTeam).min, // 🚀 統一排隊基準戰力
                             teamAttr: typeof charAttrMap !== 'undefined' ? charAttrMap[dbTeam.c1] : null,
                             rotId: dbTeam.id 
                         });
@@ -773,19 +788,25 @@ async function reverseInferAndOptimize() {
         let estDpTimeSec = (dpTransitions / opsPerSec).toFixed(1);
         let dpWarning = (dpTransitions > 1000000) ? t(" (⚠️ 運算時間可能過長)") : "";
 
-        let defaultBeamWidth = 500;
+        // 🚀 動態二次方深度估算
+        let defaultBeamWidth = Math.min(8000, Math.max(1000, Math.floor(500 + 0.5 * Math.pow(n, 2))));
         let beamTransitions = n * n * defaultBeamWidth; 
         let estBeamTimeSec = (beamTransitions / opsPerSec).toFixed(1);
 
-        let msg = t("目前候選隊伍數：") + `${n} ` + t("隊\n\n");
+        let msg = t("目前排兵候選隊伍數：") + `${n} ` + t("隊\n\n");
         msg += t("請選擇推演演算法：\n");
-        msg += `[1] 🤖 ` + t("智慧分流 (推薦：自動評估最佳演算法)\n");
+        msg += `[1] 🤖 ` + t("智慧分流 (推薦：N≤14用DP，N>14用束式)\n");
         msg += `[2] 💎 ` + t("狀態壓縮 DP (全域搜尋)：預估耗時 ") + `${estDpTimeSec} ` + t("秒") + `${dpWarning}\n`;
         msg += `[3] 🚀 ` + t("束式搜索 (局部最佳化)：預估耗時 ") + `${estBeamTimeSec} ` + t("秒\n\n");
         msg += t("請輸入 1, 2 或 3：");
 
         let algoChoice = prompt(msg, "1");
-        if (algoChoice === null) return; 
+        if (algoChoice === null) {
+            isEngineRunning = false;
+            let progressContainer = document.getElementById('sim-progress-container');
+            if (progressContainer) progressContainer.style.display = 'none';
+            return; 
+        }
 
         let useDP = false;
         if (algoChoice === "2") useDP = true;
@@ -805,7 +826,7 @@ async function reverseInferAndOptimize() {
             bestSequence = dpRes.seq;
             bestSimDmg = dpRes.score;
         } else {
-            let widthChoice = prompt(t(`啟動束式搜索。\n請輸入搜尋深度 (Beam Width)。\n建議值：500。`), "500");
+            let widthChoice = prompt(t(`啟動束式搜索。\n請輸入搜尋深度 (Beam Width)。\n建議值：`) + defaultBeamWidth + t(` (已自動推估)。`), defaultBeamWidth.toString());
             if (widthChoice !== null && !isNaN(parseInt(widthChoice)) && parseInt(widthChoice) > 0) {
                 finalBeamWidth = parseInt(widthChoice);
             }
@@ -842,19 +863,18 @@ async function reverseInferAndOptimize() {
                                 let baseTotalDmg = getEffectiveTotalDmg(d, team.rotId, isFirst, team.calculatedMinDps, rotTime);
 
                                 let true_eff_dps = Math.max(0.0001, (baseTotalDmg / rotTime) * r_factor * lvlPenalty);
-
                                 dmgDone += true_eff_dps * t_left; tmp_hp -= true_eff_dps * t_left; t_left = 0; 
                             }
                         }
 
                         let newRemaining = state.remaining.filter((_, idx) => idx !== i);
                         
-                        // 🚀 A* 潛力估價 (Heuristic)：預估手上剩餘隊伍打出的理論分
+                        // 🚀 A* 潛力估價
                         let heuristic = newRemaining.reduce((sum, t) => sum + (t.calculatedMinDps * 25 * (env.scoreRatio || 10)), 0);
                         
                         nextStates.push({ 
                             score: state.score + dmgDone, 
-                            evalScore: state.score + dmgDone + heuristic, // 🚀 混合得分 = 當前得分 + 潛力估算
+                            evalScore: state.score + dmgDone + heuristic,
                             sequence: [...state.sequence, team], 
                             remaining: newRemaining, 
                             r: tmp_r, idx: tmp_idx, hp: tmp_hp 
@@ -862,19 +882,16 @@ async function reverseInferAndOptimize() {
                     }
                 }
                 
-                // 依照混合得分降冪排序
                 nextStates.sort((a, b) => b.evalScore - a.evalScore);
                 if (nextStates.length > maxStatesReached) maxStatesReached = nextStates.length;
                 
-                // 🚀 動態容差剪枝 (Dynamic Threshold Pruning)
                 let bestEval = nextStates.length > 0 ? nextStates[0].evalScore : 0;
-                let threshold = bestEval * 0.85; // 容差值設為 85%，低於此潛力的戰術才會被捨棄
+                let threshold = bestEval * 0.85; 
 
                 let diverseStates = []; let teamUsageCount = {}; let added = new Set();
                 for (let i = 0; i < nextStates.length; i++) {
                     let state = nextStates[i];
                     
-                    // 若低於閥值且保留的組合數已達最低要求 (20%)，則大膽剪枝
                     if (state.evalScore < threshold && diverseStates.length >= finalBeamWidth * 0.2) break;
 
                     let lastTeamId = state.sequence.length > 0 ? state.sequence[state.sequence.length-1].rotId : 'none';
@@ -890,7 +907,6 @@ async function reverseInferAndOptimize() {
                     if (diverseStates.length >= finalBeamWidth) break;
                 }
                 
-                // 若寬容過濾後數量不足，才從備用池補齊
                 if (diverseStates.length < finalBeamWidth) {
                     for (let i = 0; i < nextStates.length && diverseStates.length < finalBeamWidth; i++) {
                         if (!added.has(nextStates[i])) diverseStates.push(nextStates[i]);
@@ -922,8 +938,12 @@ async function reverseInferAndOptimize() {
         updateTracker(); 
 
         let finalSimRes = runSimulations(env); 
-        let estMinScore = Math.floor(finalSimRes.totalMatrixScoreMin);
-        let estMaxScore = Math.floor(finalSimRes.totalMatrixScoreMax);
+        
+        // 🚀 終極防護：確保最終輸出的總分不出現倒置
+        let rawMin = Math.floor(finalSimRes.totalMatrixScoreMin);
+        let rawMax = Math.floor(finalSimRes.totalMatrixScoreMax);
+        let estMinScore = Math.min(rawMin, rawMax);
+        let estMaxScore = Math.max(rawMin, rawMax);
 
         let successMsg = fillFromDB ? t("解析完成。已將現有隊伍重新排序並填補剩餘空位。") : t("解析完成。已計算出能避開抗性與轉場的最佳出戰順序。");
         successMsg += `\n\n🎯 預估矩陣總分 (上限)：${estMaxScore.toLocaleString()} 分`;
@@ -964,13 +984,16 @@ async function autoBuildMaxDpsTeams() {
     try {
         let maxAllowed = parseInt(document.getElementById('team-count-select').value) || 16;
         let modeChoice = prompt(t("請選擇編制策略：\n輸入 1 ➔ 追求【下限穩定度最高】\n輸入 2 ➔ 追求【上限理論值最高】"), "1");
-        if (modeChoice !== "1" && modeChoice !== "2") return;
+        if (modeChoice !== "1" && modeChoice !== "2") {
+            isEngineRunning = false; return;
+        }
         let strategy = modeChoice === "1" ? 'min' : 'max';
 
         let validTeams = getUniqueValidTeams(strategy); 
-        if (validTeams.length === 0) return alert(t("沒有可用的排軸！請確認已勾選角色與排軸。"));
+        if (validTeams.length === 0) {
+            isEngineRunning = false; return alert(t("沒有可用的排軸！請確認已勾選角色與排軸。"));
+        }
 
-        // 初始化狀態增加 evalScore 以利 A* 排序
         let states = [{ minScore: 0, maxScore: 0, score: 0, evalScore: 0, teams: [], usage: {} }];
         let maxStatesReached = 0; 
         let teamsWithScore = [];
@@ -981,7 +1004,6 @@ async function autoBuildMaxDpsTeams() {
         }
         teamsWithScore.sort((a, b) => strategy === 'max' ? b.maxScore - a.maxScore : b.minScore - a.minScore);
         
-        // 🚀 建立快速查詢陣列，用於計算 A* 潛力估價
         let scoresArr = teamsWithScore.map(t => strategy === 'max' ? t.maxScore : t.minScore);
         let getHeuristic = (idx, count) => { 
             let sum = 0; 
@@ -991,12 +1013,14 @@ async function autoBuildMaxDpsTeams() {
 
         let totalCandidates = teamsWithScore.length;
         let opsPerSec = getDeviceBenchmark() * 0.4;
-        let defaultBeamWidth = 1000;
+        
+        // 🚀 動態二次方深度估算
+        let defaultBeamWidth = Math.min(8000, Math.max(1000, Math.floor(500 + 0.5 * Math.pow(totalCandidates, 2))));
 
         let estTimeSec = ((totalCandidates * defaultBeamWidth) / opsPerSec).toFixed(1);
         if (parseFloat(estTimeSec) < 0.1) estTimeSec = "0.1";
 
-        let widthMsg = t(`系統共篩選出 `) + totalCandidates + t(` 組有效候選編隊。\n\n請輸入搜尋深度 (Beam Width)。\n建議值：1000 (數值越大越精準，耗時將線性增加)：`);
+        let widthMsg = t(`系統共篩選出 `) + totalCandidates + t(` 組有效候選編隊。\n\n請輸入搜尋深度 (Beam Width)。\n建議值：`) + defaultBeamWidth + t(` (系統已依您的排軸量自動推估的最佳值)：`);
         let widthChoice = prompt(widthMsg, defaultBeamWidth.toString());
         let beamWidth = parseInt(widthChoice);
         if (isNaN(beamWidth) || beamWidth <= 0) beamWidth = defaultBeamWidth;
@@ -1035,7 +1059,6 @@ async function autoBuildMaxDpsTeams() {
             for (let i = 0; i < states.length; i++) {
                 let state = states[i];
                 
-                // 分支 1：將此隊伍納入編制
                 if (state.teams.length < maxAllowed) {
                     let u1 = state.usage[b1] || 0, u2 = state.usage[b2] || 0, u3 = state.usage[b3] || 0;
                     if (u1 < limit1 && u2 < limit2 && u3 < limit3 && b1 !== b2 && b1 !== b3 && b2 !== b3) {
@@ -1043,7 +1066,6 @@ async function autoBuildMaxDpsTeams() {
                         newUsage[b1] = u1 + 1; newUsage[b2] = u2 + 1; newUsage[b3] = u3 + 1;
                         let newTeams = state.teams.slice(); newTeams.push(team);
                         
-                        // 🚀 A* 潛力估價 (取得最理想的後續隊伍火力總和)
                         let heuristic = getHeuristic(stepCount, maxAllowed - newTeams.length);
                         let evalScore = state.score + currentScoreAdd + heuristic;
 
@@ -1058,7 +1080,6 @@ async function autoBuildMaxDpsTeams() {
                     }
                 }
                 
-                // 分支 2：不納入此隊伍 (繼續尋找其他可能)
                 let skipHeuristic = getHeuristic(stepCount, maxAllowed - state.teams.length);
                 nextStates.push({
                     maxScore: state.maxScore,
@@ -1070,14 +1091,12 @@ async function autoBuildMaxDpsTeams() {
                 });
             }
 
-            // 依照混合得分 (evalScore) 降冪排序，若相同則比較真實得分 (score)
             nextStates.sort((a, b) => Math.abs(b.evalScore - a.evalScore) > 0.01 ? b.evalScore - a.evalScore : b.score - a.score);
 
             if (nextStates.length > maxStatesReached) maxStatesReached = nextStates.length;
             
-            // 🚀 動態容差剪枝 (Dynamic Threshold Pruning)
             let bestEval = nextStates.length > 0 ? nextStates[0].evalScore : 0;
-            let threshold = bestEval * 0.90; // 容差值設為 90%
+            let threshold = bestEval * 0.90; 
             
             let diverseStates = []; let teamUsageCount = {}; let added = new Set();
             for (let i = 0; i < nextStates.length; i++) {
@@ -1124,7 +1143,13 @@ async function autoBuildMaxDpsTeams() {
         updateTracker(); 
 
         let finalSimRes = runSimulations(getEnvSettings()); 
-        let estMinScore = Math.floor(finalSimRes.totalMatrixScoreMin), estMaxScore = Math.floor(finalSimRes.totalMatrixScoreMax);
+        
+        // 🚀 終極防護：確保最終輸出的總分不出現倒置
+        let rawMin = Math.floor(finalSimRes.totalMatrixScoreMin);
+        let rawMax = Math.floor(finalSimRes.totalMatrixScoreMax);
+        let estMinScore = Math.min(rawMin, rawMax);
+        let estMaxScore = Math.max(rawMin, rawMax);
+
         let strategyName = strategy === 'min' ? t('下限穩定度') : t('上限理論值');
         let successMsg = t(`配置完成！目標：[`) + strategyName + t(`最高]。共組建 `) + finalOptimizedTeams.length + t(` 隊。\n`);
 
