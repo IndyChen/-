@@ -490,9 +490,12 @@ function resetIndividualHP() { bossHPMap = {}; bossHPHistory = {}; try { localSt
 
 function updateMasterSkill() {
     let val = parseInt(document.getElementById('skill-slider').value); 
+    // 將玩家拉動的數值即時存入 localStorage
+    safeStorageSet('ww_skill_slider', val);
+    
     document.getElementById('skill-display').innerText = val + '%';
     
-    diffStability['⚠️'] = Math.max(0, 100 - (100 - val) * 1.8); 
+    diffStability['⚠️'] = Math.max(0, 100 - (100 - val) * 1.8);
     diffStability['⭐'] = Math.max(0, 100 - (100 - val) * 1.4);
     diffStability['🔵'] = Math.max(0, 100 - (100 - val) * 1.1); 
     diffStability['🟩'] = Math.max(0, 100 - (100 - val) * 0.8); 
@@ -1314,13 +1317,16 @@ function initializeApp() {
         document.getElementById('team-count-select').value = savedCount;
     }
 
+    // 🚀 確保正確讀取拉桿記憶，並賦值給拉桿 UI
     let savedSkill = safeStorageGet('ww_skill_slider', 100);
     let skillSlider = document.getElementById('skill-slider');
     if (skillSlider) {
         skillSlider.value = savedSkill;
     }
+    // 執行這行會把剛剛設定好的 slider value 讀出來並套用到所有公式
     updateMasterSkill();
-    renderCheckboxes(); 
+    
+    renderCheckboxes();
     renderRotations();
     
     const savedTeams = safeStorageGet('ww_teams', null);
