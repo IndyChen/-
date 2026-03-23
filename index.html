@@ -325,37 +325,39 @@
             </div>
 
             <details style="flex: 1; min-width: 300px; background: rgba(30, 30, 36, 0.7); padding: 15px; border-radius: 12px; border: 1px solid var(--border-glass); cursor: pointer;">
-                <summary style="color: var(--gold); font-weight: bold; outline: none; font-size: 1.1em;">📜 點此查看版本更新說明 (當前: v4.8.1)</summary>
-                <div style="margin-top: 15px; font-size: 0.95em; color: #ccc; line-height: 1.6; border-top: 1px dashed var(--border-glass); padding-top: 15px; cursor: default;" onclick="event.stopPropagation();">
-                    
-                    <strong style="color: #00ffaa; font-size: 1.05em;">✨ v4.8.1 【運算引擎與數據解析升級】</strong>
-                    <ul style="margin: 5px 0 15px 20px; padding: 0; color: #ccc;">
-                        <li>🚀 運算效能最佳化：將底層陣列過濾機制從 O(N × M) 的線性比對，升級為基於雜湊集合 (Set) 的 O(N) 演算法，顯著降低高深度分支推演時的運算耗時。</li>
-                        <li>📈 多點動態斜率偵測：解析器現可自動偵測實戰數據的斜率轉折點，產生多點線性插值矩陣 (LUT) 替換單一 K 值，提升殘血推演精準度。</li>
-                        <li>⚙️ 演算法調度優化：移除固定式引擎選單，改為執行推演前動態彈窗評估算力，並提供最適合的演算法選項。</li>
-                        <li>🛡️ 格式防呆機制：增加自訂加權面板中特徵陣列的 JSON 輸入格式檢查，避免系統解析異常。</li>
-                    </ul>
-
-                    <strong style="color: var(--neon-purple); font-size: 1.05em;">✨ v4.8.0 【核心演算法與功能更新】</strong>
-                    <ul style="margin: 5px 0 15px 20px; padding: 0; color: #ccc;">
-                        <li>⏳ <strong>動態軸長與首輪特化：</strong>支援讀取排軸真實循環秒數與首輪暖機特化時間，自訂編隊開放設定專屬軸長。</li>
-                        <li>🎲 <strong>蒙地卡羅運算：</strong>新增亂數抽樣功能，計算單發高傷技能未暴擊的期望值。</li>
-                        <li>🧠 <strong>雙引擎動態調度：</strong>實裝「狀態壓縮 DP」演算法，並依隊伍數量自動在 DP 與 Beam Search 間切換，平衡計算資源。</li>
-                        <li>⚙️ <strong>等級減傷校正：</strong>環境設定新增實測傷害輸入，可自動計算 110 級與 120 級的真實減傷係數。</li>
-                    </ul>
-
-                    <strong style="color: #888; font-size: 1em;">【v4.7.0 ~ 4.7.6 近期版本回顧】</strong>
-                    <div style="margin: 5px 0 0 10px; color: #888; line-height: 1.6; font-size: 0.95em;">
-                        - (4.7.6) Beam Search 升級、全局環境抗性、自動填補空位、精確數據剝離、自訂編隊優先、動態算力偵測。<br>
-                        - (4.7.5) 指南擴充、穩定度計算器、編隊拖曳互動、記憶擴充(10套)、系統報錯功能。<br>
-                        - (4.7.4) 實戰洗牌反推、一鍵重設預設 DPS、雙檔分離 UI。<br>
-                        - (4.7.3) 序列王血量代數反解引擎、大數據貢獻問卷。<br>
-                        - (4.7.2) 實裝「動態壓軸」編制邏輯。<br>
-                        - (4.7.1) 新增「內建軸穩定性計算器」。<br>
-                        - (4.7.0) 實裝「手法折損全局與微調拉桿」。
-                    </div>
+            <summary style="color: var(--gold); font-weight: bold; outline: none; font-size: 1.1em;">📜 點此查看版本更新說明 (當前: v4.8.2)</summary>
+            <div style="margin-top: 15px; font-size: 0.95em; color: #ccc; line-height: 1.6; border-top: 1px dashed var(--border-glass); padding-top: 15px; cursor: default;" onclick="event.stopPropagation();">
+                
+                <strong style="color: #00ffaa; font-size: 1.05em;">✨ v4.8.2 【核心引擎與機制升級】</strong>
+                <ul style="margin: 5px 0 15px 20px; padding: 0; color: #ccc;">
+                    <li>🧠 <strong>引入潛力估價與 90% 容差：</strong>解決 4.8.1 版因多樣性篩選造成的過度剪枝問題，確保具備未來潛力的隊伍組合能完整參與後續推演。</li>
+                    <li>🚀 <strong>推薦深度動態最佳化：</strong>不再僅以設備算力為基準，改依可用排軸數量自動推估所需深度。全排軸狀態下 5,000 深度即等同數十萬深度精度，誤差小於 3%。</li>
+                    <li>🛡️ <strong>防呆與讀心填補機制：</strong>限制實戰反推必須完整填入現有全隊分數，否則將攔截運算；並修復反推完成後，未能自動填滿顯示隊伍空位的問題。</li>
+                    <li>⚙️ <strong>修復全局穩定度異常：</strong>修正穩定度（操作達成率）數值無法跨網頁記憶的問題，並確保其能正確參與原生隊伍的預估下限計算。</li>
+                    <li>📊 <strong>修復預估分數倒置現象：</strong>修正因擊殺轉場時間懲罰，導致部分情況下「預估上限分數」反而低於「預估下限分數」的邏輯與顯示異常。</li>
+                </ul>
+        
+                <strong style="color: var(--neon-purple); font-size: 1.05em;">✨ v4.8.1 【運算引擎與數據解析升級】</strong>
+                <ul style="margin: 5px 0 15px 20px; padding: 0; color: #ccc;">
+                    <li>🚀 運算效能最佳化：將底層陣列過濾機制從 O(N × M) 的線性比對，升級為基於雜湊集合 (Set) 的 O(N) 演算法，顯著降低高深度分支推演時的運算耗時。</li>
+                    <li>📈 多點動態斜率偵測：解析器現可自動偵測實戰數據的斜率轉折點，產生多點線性插值矩陣 (LUT) 替換單一 K 值，提升殘血推演精準度。</li>
+                    <li>⚙️ 演算法調度優化：移除固定式引擎選單，改為執行推演前動態彈窗評估算力，並提供最適合的演算法選項。</li>
+                    <li>🛡️ 格式防呆機制：增加自訂加權面板中特徵陣列的 JSON 輸入格式檢查，避免系統解析異常。</li>
+                </ul>
+        
+                <strong style="color: #888; font-size: 1em;">【v4.7.0 ~ 4.8.0 近期版本回顧】</strong>
+                <div style="margin: 5px 0 0 10px; color: #888; line-height: 1.6; font-size: 0.95em;">
+                    - (4.8.0) 動態軸長與首輪特化、蒙地卡羅期望值運算、雙引擎動態調度、真實減傷校正。<br>
+                    - (4.7.6) Beam Search 升級、全局環境抗性、自動填補空位、精確數據剝離。<br>
+                    - (4.7.5) 指南擴充、穩定度計算器、編隊拖曳互動、記憶擴充(10套)。<br>
+                    - (4.7.4) 實戰洗牌反推、一鍵重設預設 DPS、雙檔分離 UI。<br>
+                    - (4.7.3) 序列王血量代數反解引擎、大數據貢獻問卷。<br>
+                    - (4.7.2) 實裝「動態壓軸」編制邏輯。<br>
+                    - (4.7.1) 新增「內建軸穩定性計算器」。<br>
+                    - (4.7.0) 實裝「手法折損全局與微調拉桿」。
                 </div>
-            </details>
+            </div>
+        </details>
         </div>
 
         <div class="panel">
