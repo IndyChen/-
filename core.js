@@ -147,14 +147,18 @@ const DEFAULT_CURVE_K = {
 };
 
 // 🚀 動態計算真實總傷引擎
+// 🚀 動態計算真實總傷引擎 (修復版：全局套用穩定度)
 function getEffectiveTotalDmg(d, rotId, isFirstRotation, currentDps, rotTime) {
     let dbTotalDmg = (isFirstRotation && d && d.firstTotalDmg) ? d.firstTotalDmg : ((d && d.totalDmg) ? d.totalDmg : null);
-    let hasCustomDps = customStatsMap[rotId] && customStatsMap[rotId].dps !== undefined;
-
-    if (hasCustomDps && d && d.dps > 0) {
+    
+    // 💡 移除 hasCustomDps 的限制！
+    // 只要原始資料庫有 dps，無論是否為自訂隊伍，都必須將目前的 currentDps (已包含穩定度折損) 
+    // 換算為比例 (dpsRatio)，用來完美縮放資料庫中的總傷 (dbTotalDmg)！
+    if (d && d.dps > 0) {
         let dpsRatio = currentDps / d.dps;
         return dbTotalDmg ? (dbTotalDmg * dpsRatio) : (currentDps * rotTime);
     }
+    
     return dbTotalDmg ? dbTotalDmg : (currentDps * rotTime);
 }
 
