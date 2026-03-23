@@ -331,16 +331,24 @@ function getBossMaxHP(r, index) {
 
 function getRotDpsRange(d) {
     let buffMult = customStatsMap[d.id] && customStatsMap[d.id].buff ? 1 + (customStatsMap[d.id].buff / 100) : 1;
+
+    // 🟢 情況一：這是「實戰反推」或「玩家自訂」的隊伍
     if (customStatsMap[d.id]) { 
         let s = customStatsMap[d.id]; 
         let max = s.dps * buffMult; 
-        return { min: Math.max(0, max * (s.stability / 100)), max: max, isCustom: true }; 
+        // 加入防呆：確保自訂穩定度若為空值，預設給 100，不引發 NaN 錯誤
+        let customStab = (s.stability !== undefined && s.stability !== null) ? s.stability : 100;
+        return { min: Math.max(0, max * (customStab / 100)), max: max, isCustom: true }; 
     }
+
+    // 🔵 情況二：這是「資料庫原生」的隊伍
     let max = d.dps * buffMult; 
     if (max === 0) return { min: 0, max: 0, isCustom: false };
+    
     let diffKey = d.diff.includes('⚠️') ? '⚠️' : d.diff.includes('⭐') ? '⭐' : d.diff.includes('🔵') ? '🔵' : d.diff.includes('🟩') ? '🟩' : '🧩';
-    let stab = diffStability[diffKey] !== undefined ? diffStability[diffKey] : 100;
-    return { min: Math.max(0, max * (stab / 100)), max: max, isCustom: false };
+    let globalStab = diffStability[diffKey] !== undefined ? diffStability[diffKey] : 100;
+    
+    return { min: Math.max(0, max * (globalStab / 100)), max: max, isCustom: false };
 }
 
 function getUsedCharacters() {
