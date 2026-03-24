@@ -1,7 +1,7 @@
 // ==========================================
-// 鳴潮矩陣編隊工具 v4.8.2版 [畫面渲染與互動模組]
+// 鳴潮矩陣編隊工具 v4.8.3版 [畫面渲染與互動模組]
 // 檔案：ui.js
-// 職責：DOM 操作、事件監聽、畫面更新、圖表與彈窗
+// 職責：DOM 操作、畫布互動 Tooltip
 // ==========================================
 
 // ==========================================
@@ -101,10 +101,7 @@ function toggleDifficulty(diff) {
     let activeClass = `active-diff-${idx}`;
     let isActive = btn.classList.contains(activeClass);
     let newState = !isActive;
-    
-    if (newState) btn.classList.add(activeClass);
-    else btn.classList.remove(activeClass);
-    
+    if (newState) btn.classList.add(activeClass); else btn.classList.remove(activeClass);
     const b = Array.from(document.querySelectorAll('#rotation-setup input[type="checkbox"]')).filter(i => i.closest('div').style.display !== 'none' && i.closest('div').innerText.includes(diff)); 
     b.forEach(i => i.checked = newState); 
     updateRotationState(); 
@@ -115,41 +112,158 @@ function updateToggleButtons() {
     if (rBoxes.length > 0) {
         const rAnyChecked = rBoxes.some(i => i.checked);
         let rBtn = document.getElementById('roster-switch');
-        if(rBtn) {
-            rBtn.innerHTML = rAnyChecked ? "🗑️ " + t("清空角色勾選") : "☑️ " + t("全選可見角色");
-            rBtn.className = rAnyChecked ? "btn-action-clear ratio-71" : "btn-action-all ratio-71";
-        }
+        if(rBtn) { rBtn.innerHTML = rAnyChecked ? "🗑️ " + t("清空角色勾選") : "☑️ " + t("全選可見角色"); rBtn.className = rAnyChecked ? "btn-action-clear ratio-71" : "btn-action-all ratio-71"; }
     }
-
     const rotBoxes = Array.from(document.querySelectorAll('#rotation-setup input[type="checkbox"]')).filter(i => i.closest('div').style.display !== 'none');
     if (rotBoxes.length > 0) {
         const rotAnyChecked = rotBoxes.some(i => i.checked);
         let rotBtn = document.getElementById('rot-all-btn');
-        if(rotBtn) {
-            rotBtn.innerHTML = rotAnyChecked ? "🗑️ " + t("清空可見排軸") : "☑️ " + t("全選可見排軸");
-            rotBtn.className = rotAnyChecked ? "btn-action-clear ratio-71" : "btn-action-all ratio-71";
+        if(rotBtn) { rotBtn.innerHTML = rotAnyChecked ? "🗑️ " + t("清空可見排軸") : "☑️ " + t("全選可見排軸"); rotBtn.className = rotAnyChecked ? "btn-action-clear ratio-71" : "btn-action-all ratio-71"; }
+    }
+}
+function copySampleCode() {
+    let inputEl = document.getElementById("sample-share-code");
+    let copyText = inputEl.value;
+    
+    // 視覺上讓輸入框內的文字被選取，給使用者回饋
+    inputEl.select();
+    inputEl.setSelectionRange(0, 99999); // 支援行動裝置
+
+    if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(copyText).then(() => {
+            alert(t ? t("✅ 範本分享碼已複製到剪貼簿！") : "✅ 範本分享碼已複製到剪貼簿！");
+        }).catch(err => {
+            console.error("Clipboard API 失敗，嘗試 Fallback", err);
+            fallbackCopySampleCode(copyText);
+        });
+    } else {
+        fallbackCopySampleCode(copyText);
+    }
+}
+
+function fallbackCopySampleCode(text) {
+    // 1. 強制清除頁面上所有不相干的文字選取
+    if (window.getSelection) {
+        window.getSelection().removeAllRanges();
+    }
+
+    // 2. 建立隱形的 textarea
+    let textArea = document.createElement("textarea");
+    textArea.value = text;
+    
+    // 確保它絕對不會影響畫面佈局，也不會觸發滾動
+    textArea.style.position = "fixed";
+    textArea.style.top = "-9999px"; 
+    textArea.style.left = "-9999px";
+    // 設為唯讀避免行動裝置彈出小鍵盤
+    textArea.setAttribute('readonly', '');
+    
+    document.body.appendChild(textArea);
+    
+    // 3. 聚焦並選取
+    textArea.focus();
+    textArea.select();
+    textArea.setSelectionRange(0, 99999); // 支援行動裝置
+
+    try {
+        let successful = document.execCommand('copy');
+        if(successful) {
+            alert(t ? t("✅ 範本分享碼已複製到剪貼簿！") : "✅ 範本分享碼已複製到剪貼簿！");
+        } else {
+            alert(t ? t("❌ 複製失敗，請手動全選複製。") : "❌ 複製失敗，請手動全選複製。");
         }
+    } catch (err) {
+        console.error('Fallback 複製發生異常', err);
+        alert(t ? t("❌ 瀏覽器不支援自動複製，請手動選取複製。") : "❌ 瀏覽器不支援自動複製，請手动選取複製。");
+    }
+    
+    // 4. 清理戰場
+    document.body.removeChild(textArea);
+    if (window.getSelection) {
+        window.getSelection().removeAllRanges();
     }
 }
 
 // ==========================================
-// --- 4. 選單與清單渲染 (UI Rendering) ---
+// --- 4. 選單與清單渲染 ---
 // ==========================================
 function renderCheckboxes() {
     if(typeof characterOrder === 'undefined' || typeof charData === 'undefined') return;
     const grid = document.getElementById('roster-setup');
     grid.innerHTML = '<div id="roster-grid"></div>';
     const container = document.getElementById('roster-grid');
+    
     characterOrder.forEach(name => {
         if(!charData[name]) return;
-        let label = document.createElement('label');
-        label.className = 'checkbox-item';
-        label.style.borderLeft = charData[name].rarity === 5 ? '4px solid var(--gold)' : '4px solid #9b59b6';
-        label.style.display = 'flex'; 
-        label.innerHTML = `<input type="checkbox" value="${name}" ${ownedCharacters.has(name)?'checked':''} onchange="updateOwnedCharacters()"> ${t(name)}`;
-        container.appendChild(label);
+        let isChecked = ownedCharacters.has(name);
+        let crVal = (globalCharStats[name] && globalCharStats[name].cr) ? globalCharStats[name].cr : "";
+
+        let div = document.createElement('div');
+        div.className = 'checkbox-item';
+        div.style.borderLeft = charData[name].rarity === 5 ? '4px solid var(--gold)' : '4px solid #9b59b6';
+        div.style.display = 'flex';
+        div.style.flexDirection = 'column';
+        div.style.alignItems = 'flex-start';
+        div.style.gap = '2px';
+        div.style.padding = '8px 12px';
+
+        // 🌟 數值徽章
+        let badgeHtml = crVal ? `<span style="font-size:0.75em; color:#1e1e24; background:var(--gold); padding:2px 5px; border-radius:4px; font-weight:bold; box-shadow:0 0 5px rgba(212,175,55,0.4);">${crVal}%</span>` : '';
+
+        // 上半部：勾選框 + 齒輪
+        let topRow = `
+            <div style="display:flex; align-items:center; width:100%; justify-content:space-between;">
+                <label style="cursor:pointer; display:flex; align-items:center; gap:8px;">
+                    <input type="checkbox" value="${name}" ${isChecked?'checked':''} onchange="updateOwnedCharacters()"> ${t(name)}
+                </label>
+                <div style="display:flex; align-items:center; gap:6px;">
+                    ${badgeHtml}
+                    <span onclick="toggleCrPanel(event, '${name}')" style="cursor:pointer; font-size:0.9em; opacity:0.4; transition:0.2s;" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0.4" title="設定面板參數">⚙️</span>
+                </div>
+            </div>`;
+
+        // 下半部：隱藏的輸入框
+        let btmRow = `
+            <div id="cr-input-${name}" style="display:none; align-items:center; gap:5px; font-size:0.8em; color:#ffaa00; width:100%; justify-content:space-between; border-top:1px dashed #444; padding-top:6px; margin-top:4px;">
+                <span title="請填入包含武器、聲骸、共鳴鏈的『面板暴擊率』。超過100%將以100%計算。">🎲 暴擊率%</span>
+                <input type="number" placeholder="未設" min="0" max="100" value="${crVal}" onchange="updateGlobalCharStat('${name}', 'cr', this.value)" style="width: 50px; padding: 2px 4px; background: rgba(0,0,0,0.6); color: #ffaa00; border: 1px solid #ffaa00; border-radius: 4px; text-align: center; outline: none; font-weight: bold;">
+            </div>`;
+
+        div.innerHTML = topRow + btmRow;
+        container.appendChild(div);
     });
     filterCharacters();
+}
+
+// 輔助函式 (處理展開與防呆 100% 存檔)
+function toggleCrPanel(e, name) {
+    if (e) { e.preventDefault(); e.stopPropagation(); }
+    let panel = document.getElementById(`cr-input-${name}`);
+    if (panel) panel.style.display = panel.style.display === 'none' ? 'flex' : 'none';
+}
+
+function updateGlobalCharStat(name, field, val) {
+    let num = parseFloat(val);
+    if (!globalCharStats[name]) globalCharStats[name] = {};
+    
+    if (isNaN(num)) {
+        delete globalCharStats[name][field]; 
+    } else {
+        if (field === 'cr') num = Math.min(100, Math.max(0, num)); // 🌟 100% 防呆校正
+        globalCharStats[name][field] = num;
+    }
+    
+    if(typeof safeStorageSet === 'function') safeStorageSet('ww_global_char_stats', globalCharStats);
+    renderCheckboxes(); 
+    debouncedRenderAndTrack(); 
+}
+
+function rosterCheckboxButton() {
+    const visibleBoxes = Array.from(document.querySelectorAll('#roster-setup .checkbox-item')).filter(l => l.style.display !== 'none').map(l => l.querySelector('input'));
+    if(!visibleBoxes.length) return;
+    const anyChecked = visibleBoxes.some(i => i.checked);
+    visibleBoxes.forEach(i => i.checked = !anyChecked); 
+    updateOwnedCharacters();
 }
 
 function renderRotations() {
@@ -180,35 +294,23 @@ function renderRotations() {
 function buildOptionsHTML(slotType, v1, v2, v3, curRaw, used, teamBases) {
     let html = `<option value="">-- ${slotType==1 ? t('主C') : slotType==2 ? t('副C') : t('生存')} --</option>`;
     let recs = new Map(), hasContext = (slotType === 1 && (v2 || v3)) || (slotType === 2 && (v1 || v3)) || (slotType === 3 && (v1 || v2));
-    
-    let availableDisplayChars = [];
-    let availableSet = new Set(); 
+    let availableDisplayChars = []; let availableSet = new Set(); 
 
     for (let name of ownedCharacters) { 
-        if (name === '漂泊者') { 
-            availableDisplayChars.push('光主', '暗主', '風主'); 
-            availableSet.add('光主').add('暗主').add('風主'); 
-        } else { 
-            availableDisplayChars.push(name); 
-            availableSet.add(name); 
-        } 
+        if (name === '漂泊者') { availableDisplayChars.push('光主', '暗主', '風主'); availableSet.add('光主').add('暗主').add('風主'); } 
+        else { availableDisplayChars.push(name); availableSet.add(name); } 
     }
 
     dpsData.forEach(d => {
         let match = hasContext ? ((slotType === 1 || !v1 || d.c1 === v1) && (slotType === 2 || !v2 || d.c2 === v2) && (slotType === 3 || !v3 || d.c3 === v3)) : checkedRotations.has(d.id);
         if(match) {
             let target = slotType==1 ? d.c1 : slotType==2 ? d.c2 : d.c3;
-            
             if(availableSet.has(target)) {
                 let c1Avail = (slotType === 1) || (d.c1 === v1 || (used[getBase(d.c1)]||0) < (charData[getBase(d.c1)]?.max||1));
                 let c2Avail = (slotType === 2) || (d.c2 === v2 || (used[getBase(d.c2)]||0) < (charData[getBase(d.c2)]?.max||1));
                 let c3Avail = (slotType === 3) || (d.c3 === v3 || (used[getBase(d.c3)]||0) < (charData[getBase(d.c3)]?.max||1));
                 if (!recs.has(target)) recs.set(target, { maxDPS: 0, buildable: false });
-                if (c1Avail && c2Avail && c3Avail) { 
-                    recs.get(target).buildable = true; 
-                    let r = getRotDpsRange(d); 
-                    if (r.min > recs.get(target).maxDPS) recs.get(target).maxDPS = r.min; 
-                }
+                if (c1Avail && c2Avail && c3Avail) { recs.get(target).buildable = true; let r = getRotDpsRange(d); if (r.min > recs.get(target).maxDPS) recs.get(target).maxDPS = r.min; }
             }
         }
     });
@@ -223,25 +325,15 @@ function buildOptionsHTML(slotType, v1, v2, v3, curRaw, used, teamBases) {
         });
         html += '</optgroup>';
     }
-    
     html += `<optgroup label="🔸 ${t('其他角色')}">`;
     let validOthers = availableDisplayChars.filter(name => !recs.has(name) && !(used[getBase(name)] >= (charData[getBase(name)]?.max || 1) && getBase(curRaw) !== getBase(name)));
-    
     validOthers.sort((a, b) => {
-        let typeA = charData[getBase(a)]?.type || "";
-        let typeB = charData[getBase(b)]?.type || "";
-        if (slotType === 3 && typeA !== typeB) {
-            return typeB.indexOf("生存") !== -1 ? 1 : -1;
-        }
+        let typeA = charData[getBase(a)]?.type || "", typeB = charData[getBase(b)]?.type || "";
+        if (slotType === 3 && typeA !== typeB) return typeB.indexOf("生存") !== -1 ? 1 : -1;
         return (typeof characterOrder !== 'undefined') ? characterOrder.indexOf(getBase(a)) - characterOrder.indexOf(getBase(b)) : 0;
     });
-
-    validOthers.forEach(name => { 
-        let inTeam = teamBases.has(getBase(name)) && getBase(curRaw)!==getBase(name); 
-        html += `<option value="${name}" ${inTeam?'disabled':''}>${t(name)}${inTeam?` 🛑[${t('在隊')}]`:''}</option>`; 
-    });
-    html += '</optgroup>'; 
-    return html;
+    validOthers.forEach(name => { let inTeam = teamBases.has(getBase(name)) && getBase(curRaw)!==getBase(name); html += `<option value="${name}" ${inTeam?'disabled':''}>${t(name)}${inTeam?` 🛑[${t('在隊')}]`:''}</option>`; });
+    html += '</optgroup>'; return html;
 }
 
 function renderIndividualHPPanel() {
@@ -254,10 +346,7 @@ function renderIndividualHPPanel() {
                 if (validHistory.length >= 1) {
                     let avg = validHistory.reduce((sum, h) => sum + h.dmg, 0) / validHistory.length; 
                     estHtml = `<div style="color: #00ffaa; font-size: 0.75em; margin-top: 2px;">📊 ${t('預估')}: ${avg.toFixed(2)} ${t('萬')}</div>`;
-                    
-                    if (validHistory.length >= 3 && Math.abs(avg - getBaseEnvHP(r, i)) / getBaseEnvHP(r, i) > 0.05 && data && data.isDefault) {
-                        btnHtml = `<button class="btn-calib" onclick="applyCalibratedHP('${key}', ${avg})">⚠️ ${t('套用校正')}</button>`;
-                    }
+                    if (validHistory.length >= 3 && Math.abs(avg - getBaseEnvHP(r, i)) / getBaseEnvHP(r, i) > 0.05 && data && data.isDefault) { btnHtml = `<button class="btn-calib" onclick="applyCalibratedHP('${key}', ${avg})">⚠️ ${t('套用校正')}</button>`; }
                 }
             }
             let safeValue = (data && data.value !== undefined) ? data.value : (typeof data === 'number' ? data : 400);
@@ -294,34 +383,19 @@ function initBoard() {
     
     let draggedRow = null;
     b.addEventListener('dragstart', e => { draggedRow = e.target.closest('tr'); if(draggedRow) draggedRow.classList.add('dragging'); });
-    b.addEventListener('dragover', e => {
-        e.preventDefault(); const targetRow = e.target.closest('tr');
-        if(targetRow && targetRow !== draggedRow && targetRow.classList.contains('draggable-row')) {
-            const bounding = targetRow.getBoundingClientRect();
-            if(e.clientY - (bounding.y + bounding.height/2) > 0) targetRow.after(draggedRow); else targetRow.before(draggedRow);
-            updateRowNumbers();
-        }
-    });
+    b.addEventListener('dragover', e => { e.preventDefault(); const targetRow = e.target.closest('tr'); if(targetRow && targetRow !== draggedRow && targetRow.classList.contains('draggable-row')) { const bounding = targetRow.getBoundingClientRect(); if(e.clientY - (bounding.y + bounding.height/2) > 0) targetRow.after(draggedRow); else targetRow.before(draggedRow); updateRowNumbers(); } });
     b.addEventListener('dragend', e => { if(draggedRow) draggedRow.classList.remove('dragging'); draggedRow = null; updateRowNumbers(); debouncedRenderAndTrack(); });
 }
 
-function updateRowNumbers() { 
-    document.querySelectorAll('#team-board tr').forEach((row, idx) => { 
-        const td = row.querySelector('td:first-child'); 
-        if(td) td.innerHTML = `${t("第")} ${idx + 1} ${t("隊")}`; 
-    }); 
-}
+function updateRowNumbers() { document.querySelectorAll('#team-board tr').forEach((row, idx) => { const td = row.querySelector('td:first-child'); if(td) td.innerHTML = `${t("第")} ${idx + 1} ${t("隊")}`; }); }
 
 // ==========================================
-// --- 5. Tracker 與儀表板更新 (Dashboard Updates) ---
+// --- 5. Tracker 與儀表板更新 ---
 // ==========================================
 function updateTracker() {
-    initBossHPMap();
-    renderIndividualHPPanel();
-    
-    let env = getEnvSettings();
-    let usedCharacters = getUsedCharacters();
-
+    initBossHPMap(); renderIndividualHPPanel();
+    if (typeof saveEnvDOMState === 'function') saveEnvDOMState();
+    let env = getEnvSettings(); let usedCharacters = getUsedCharacters();
     updateRosterAndSelects(usedCharacters);
     let simResults = runSimulations(env);
     
@@ -331,9 +405,7 @@ function updateTracker() {
             if(resTd) resTd.innerHTML = simResults.rowsData[index].html;
         }
     });
-
-    renderDashboard(simResults, env);
-    saveData();
+    renderDashboard(simResults, env); 
 }
 
 function updateRosterAndSelects(used) {
@@ -354,11 +426,7 @@ function updateRosterAndSelects(used) {
     if (tracker) {
         tracker.innerHTML = `<div style="background:rgba(0,0,0,0.4); padding:15px; border-radius:12px; margin-bottom:15px; text-align:center; border:1px solid var(--gold);">📊 ${t('理論最大')}：<span style="color:var(--neon-green); font-size:1.2em; font-weight:bold;">${getMaxTeams({})}</span> | ⏳ ${t('剩餘可排')}：<span style="color:var(--gold); font-size:1.2em; font-weight:bold;">${getMaxTeams(used)}</span></div>`;
         let groups = { "surv": [], "dps": [] };
-        ownedCharacters.forEach(name => { 
-            let base = getBase(name); 
-            if(charData[base]) { if(charData[base].type.includes("生存")) groups["surv"].push(name); else groups["dps"].push(name); }
-        });
-
+        ownedCharacters.forEach(name => { let base = getBase(name); if(charData[base]) { if(charData[base].type.includes("生存")) groups["surv"].push(name); else groups["dps"].push(name); } });
         ['surv', 'dps'].forEach(type => {
             if(groups[type].length > 0) {
                 tracker.innerHTML += `<div class="type-title">${t(type==='surv'?'生存位':'一般角色')}</div>`;
@@ -377,54 +445,22 @@ function updateRosterAndSelects(used) {
 function renderDashboard(res, env) {
     let dashboard = document.getElementById('dashboard-scores');
     if (!dashboard) return;
-
     if (res.simMode === 'auto') {
-        dashboard.innerHTML = `
-            <div>
-                <span style="color:var(--neon-green); font-weight:bold; font-size: 1.1em;">⚔️ ${t('自動推演區間 (依DPS)')}：</span><br>
-                <span style="color:var(--neon-purple); font-weight:900; font-size:1.4em; text-shadow:0 0 10px rgba(207,0,255,0.5);">${Math.floor(res.totalMatrixScoreMin).toLocaleString()} ~ ${Math.floor(res.totalMatrixScoreMax).toLocaleString()} ${t('分')}</span>
-            </div>
-            <div style="width: 1px; height: 40px; background: var(--border-glass);"></div>
-            <div>
-                <span style="color:#ffaa00; font-weight:bold; font-size: 1.1em;">🎯 ${t('當前實戰總分')}：</span><br>
-                <span style="color:#ffaa00; font-weight:900; font-size:1.4em;">${Math.floor(res.actualTotalScore).toLocaleString()} ${t('分')}</span>
-            </div>
-        `;
+        dashboard.innerHTML = `<div><span style="color:var(--neon-green); font-weight:bold; font-size: 1.1em;">⚔️ ${t('自動推演區間 (依DPS)')}：</span><br><span style="color:var(--neon-purple); font-weight:900; font-size:1.4em; text-shadow:0 0 10px rgba(207,0,255,0.5);">${Math.floor(res.totalMatrixScoreMin).toLocaleString()} ~ ${Math.floor(res.totalMatrixScoreMax).toLocaleString()} ${t('分')}</span></div><div style="width: 1px; height: 40px; background: var(--border-glass);"></div><div><span style="color:#ffaa00; font-weight:bold; font-size: 1.1em;">🎯 ${t('當前實戰總分')}：</span><br><span style="color:#ffaa00; font-weight:900; font-size:1.4em;">${Math.floor(res.actualTotalScore).toLocaleString()} ${t('分')}</span></div>`;
     } else {
         let confHtml = "";
         if (res.actualTotalScore > 0 && res.totalManualBaseScore > 0) {
             let conf = Math.max(0, (1 - Math.abs(res.actualTotalScore - res.totalManualBaseScore) / res.actualTotalScore) * 100);
             let color = conf >= 80 ? "var(--neon-green)" : "#ff5252";
-            confHtml = `
-                <div style="width: 1px; height: 40px; background: var(--border-glass);"></div>
-                <div>
-                    <span style="color:${color}; font-weight:bold; font-size: 1.1em;">📈 ${t('數據置信度')}：</span><br>
-                    <span style="color:${color}; font-weight:900; font-size:1.4em;">${conf.toFixed(1)}%</span>
-                </div>
-            `;
+            confHtml = `<div style="width: 1px; height: 40px; background: var(--border-glass);"></div><div><span style="color:${color}; font-weight:bold; font-size: 1.1em;">📈 ${t('數據置信度')}：</span><br><span style="color:${color}; font-weight:900; font-size:1.4em;">${conf.toFixed(1)}%</span></div>`;
         }
-
-        dashboard.innerHTML = `
-            <div style="flex: 1; min-width: 250px;">
-                <span style="color:var(--gold); font-weight:bold; font-size: 1.1em;">🗺️ ${t('實戰總得分')}：</span><br>
-                <span style="color:var(--gold); font-weight:900; font-size:1.4em;">${Math.floor(res.actualTotalScore).toLocaleString()} ${t('分')}</span>
-            </div>
-            <div style="width: 1px; height: 40px; background: var(--border-glass);"></div>
-            <div style="flex: 1; min-width: 250px;">
-                <span style="color:#aaa; font-weight:bold; font-size: 1.1em;">📊 ${t('殘血推演預估')}：</span><br>
-                <span style="color:#aaa; font-weight:900; font-size:1.4em;">${Math.floor(res.totalManualBaseScore).toLocaleString()} ~ ${Math.floor(res.totalManualMaxScore).toLocaleString()} ${t('分')}</span>
-            </div>
-            ${confHtml}
-        `;
+        dashboard.innerHTML = `<div style="flex: 1; min-width: 250px;"><span style="color:var(--gold); font-weight:bold; font-size: 1.1em;">🗺️ ${t('實戰總得分')}：</span><br><span style="color:var(--gold); font-weight:900; font-size:1.4em;">${Math.floor(res.actualTotalScore).toLocaleString()} ${t('分')}</span></div><div style="width: 1px; height: 40px; background: var(--border-glass);"></div><div style="flex: 1; min-width: 250px;"><span style="color:#aaa; font-weight:bold; font-size: 1.1em;">📊 ${t('殘血推演預估')}：</span><br><span style="color:#aaa; font-weight:900; font-size:1.4em;">${Math.floor(res.totalManualBaseScore).toLocaleString()} ~ ${Math.floor(res.totalManualMaxScore).toLocaleString()} ${t('分')}</span></div>${confHtml}`;
     }
 
     const ps = document.getElementById('preset-select');
     let ph = `<option value="">-- ${t("選擇推薦配隊")} --</option>`;
     if (ps) {
-        dpsData.filter(d => checkedRotations.has(d.id) && isOwned(d.c1) && isOwned(d.c2) && isOwned(d.c3) && 
-            (activePresetAttrs.size===0 || activePresetAttrs.has(typeof charAttrMap !== 'undefined' ? charAttrMap[d.c1] : "未知")) &&
-            (activePresetGens.size===0 || activePresetGens.has(d.gen.toString()))
-        ).forEach(d => {
+        dpsData.filter(d => checkedRotations.has(d.id) && isOwned(d.c1) && isOwned(d.c2) && isOwned(d.c3) && (activePresetAttrs.size===0 || activePresetAttrs.has(typeof charAttrMap !== 'undefined' ? charAttrMap[d.c1] : "未知")) && (activePresetGens.size===0 || activePresetGens.has(d.gen.toString()))).forEach(d => {
             let r = getRotDpsRange(d), dpsStr = (r.max > 0 || r.isCustom) ? `${r.min.toFixed(2)}~${r.max.toFixed(2)}w` : t('無DPS');
             ph += `<option value="${d.c1},${d.c2},${d.c3}">${t(d.c1)} + ${t(d.c2)} + ${t(d.c3)} (${dpsStr})</option>`;
         });
@@ -433,19 +469,10 @@ function renderDashboard(res, env) {
 }
 
 // ==========================================
-// --- 6. 互動與微調邏輯 (Interactions & Sliders) ---
+// --- 6. 互動與微調邏輯 ---
 // ==========================================
-function updateOwnedCharacters() { 
-    ownedCharacters.clear(); 
-    document.querySelectorAll('#roster-setup input:checked').forEach(i => ownedCharacters.add(i.value)); 
-    debouncedRenderAndTrack(); 
-}
-
-function updateRotationState() { 
-    checkedRotations.clear(); 
-    document.querySelectorAll('#rotation-setup input:checked').forEach(i => checkedRotations.add(i.value)); 
-    debouncedRenderAndTrack(); 
-}
+function updateOwnedCharacters() { ownedCharacters.clear(); document.querySelectorAll('#roster-setup input:checked').forEach(i => ownedCharacters.add(i.value)); debouncedRenderAndTrack(); }
+function updateRotationState() { checkedRotations.clear(); document.querySelectorAll('#rotation-setup input:checked').forEach(i => checkedRotations.add(i.value)); debouncedRenderAndTrack(); }
 
 let _filterCharTimeout = null;
 function filterCharacters() {
@@ -471,38 +498,37 @@ function filterRotations() {
     clearTimeout(_filterRotTimeout);
     _filterRotTimeout = setTimeout(() => {
         let q = document.getElementById('rot-search').value.toLowerCase();
-        document.querySelectorAll('#rotation-setup .rot-row').forEach(row => { 
-            row.style.display = row.getAttribute('data-search').includes(q) ? 'inline-flex' : 'none'; 
-        });
-        document.querySelectorAll('#rotation-setup > div').forEach(g => { 
-            g.style.display = Array.from(g.querySelectorAll('.rot-row')).some(l => l.style.display !== 'none') ? 'block' : 'none'; 
-        });
+        document.querySelectorAll('#rotation-setup .rot-row').forEach(row => { row.style.display = row.getAttribute('data-search').includes(q) ? 'inline-flex' : 'none'; });
+        document.querySelectorAll('#rotation-setup > div').forEach(g => { g.style.display = Array.from(g.querySelectorAll('.rot-row')).some(l => l.style.display !== 'none') ? 'block' : 'none'; });
         updateToggleButtons();
     }, 150);
 }
 
 function togglePresetAttr(attr) { activePresetAttrs.has(attr) ? activePresetAttrs.delete(attr) : activePresetAttrs.add(attr); document.querySelector(`button[data-attr="${attr}"]`).classList.toggle(`active-attr-${attr}`); debouncedRenderAndTrack(); }
 function togglePresetGen(gen) { activePresetGens.has(gen) ? activePresetGens.delete(gen) : activePresetGens.add(gen); document.querySelector(`button[data-gen="${gen}"]`).classList.toggle(`active-gen`); debouncedRenderAndTrack(); }
-
 function manualUpdateHP(key) { let val = parseFloat(document.getElementById(`hp_${key}`).value); if (!isNaN(val) && val > 0) { bossHPMap[key] = { value: val, isDefault: false }; safeStorageSet('ww_boss_hp', bossHPMap); renderIndividualHPPanel(); updateTracker(); } }
 function applyCalibratedHP(key, avgValue) { bossHPMap[key] = { value: avgValue, isDefault: false }; safeStorageSet('ww_boss_hp', bossHPMap); renderIndividualHPPanel(); updateTracker(); alert(t(`已成功校正為平均值`) + `：${avgValue.toFixed(2)} ` + t(`萬`) + `！`); }
-function resetIndividualHP() { bossHPMap = {}; bossHPHistory = {}; try { localStorage.removeItem('ww_boss_hp'); localStorage.removeItem('ww_boss_hp_history'); } catch(e) {} initBossHPMap(); renderIndividualHPPanel(); updateTracker(); }
+function resetIndividualHP() { 
+    if (typeof clearDataCategoryStorage === 'function') {
+        clearDataCategoryStorage('hp'); 
+    } else {
+        bossHPMap = {}; bossHPHistory = {}; 
+        try { localStorage.removeItem('ww_boss_hp'); localStorage.removeItem('ww_boss_hp_history'); } catch(e) {} 
+    }
+    if (typeof initBossHPMap === 'function') initBossHPMap(); 
+    renderIndividualHPPanel(); 
+    updateTracker(); 
+}
 
-// 🚀 全局操作達成率：加入物理下限與永久記憶
 function updateMasterSkill() {
     let slider = document.getElementById('skill-slider');
     if (!slider) return;
     let val = parseInt(slider.value);
-
-    // 🚀 物理下限防護：強制操作達成率最低只能到 50%，不允許歸零
-    if (val < 50) { val = 50; slider.value = 50; }
-
-    safeStorageSet('ww_skill_slider', val); // 🚀 狀態記憶：存入 localStorage
-    
+    if (val < 50) { val = 50; slider.value = 50; } 
+    safeStorageSet('ww_skill_slider', val);
     let displayEl = document.getElementById('skill-display');
     if (displayEl) displayEl.innerText = val + '%';
     
-    // 🚀 數學下限防護：為各難度設定絕對最低保底 (避免高難度掉到 0 傷害)
     diffStability['⚠️'] = Math.max(10, 100 - (100 - val) * 1.8); 
     diffStability['⭐'] = Math.max(20, 100 - (100 - val) * 1.4);
     diffStability['🔵'] = Math.max(30, 100 - (100 - val) * 1.1); 
@@ -529,24 +555,17 @@ function updateIndividualSkill(diffKey, val, displayId) {
 function updateTeamDisplayCount() {
     let count = parseInt(document.getElementById('team-count-select').value) || 16;
     safeStorageSet('ww_display_count', count);
-    
     let rows = document.querySelectorAll('#team-board tr');
     let needsTrackerUpdate = false;
-    
     rows.forEach((row, index) => {
-        if (index < count) {
-            row.classList.remove('hidden-row');
-        } else {
+        if (index < count) { row.classList.remove('hidden-row'); } 
+        else {
             if (!row.classList.contains('hidden-row')) {
                 row.classList.add('hidden-row');
                 let selects = row.querySelectorAll('select.char-select');
                 let hasData = Array.from(selects).some(s => s.value !== "");
                 if (hasData || row.querySelector('.score-input').value !== "") {
-                    selects.forEach(s => s.value = "");
-                    row.querySelector('.score-input').value = "";
-                    row.querySelector('.end-boss-r').value = "";
-                    row.querySelector('.end-boss-idx').value = "";
-                    row.querySelector('.end-boss-hp').value = "";
+                    selects.forEach(s => s.value = ""); row.querySelector('.score-input').value = ""; row.querySelector('.end-boss-r').value = ""; row.querySelector('.end-boss-idx').value = ""; row.querySelector('.end-boss-hp').value = "";
                     needsTrackerUpdate = true;
                 }
             }
@@ -582,19 +601,19 @@ function resetRowDps(btn) {
 }
 
 // ==========================================
-// --- 7. Modals (彈窗邏輯 - 計算器、自訂編隊、資料管理) ---
+// --- 7. Modals (軸穩定度計算機) ---
 // ==========================================
 let speedTestCallback = null; 
 let lastCalculatedStability = 100;
 
 function openCalcModal(callback = null) { 
     speedTestCallback = callback; 
-    let modal = document.getElementById('calc-modal');
+    let modal = document.getElementById('calc-modal'); 
     modal.style.display = 'flex'; 
     modal.style.zIndex = '2050'; 
     document.getElementById('calc-result').style.display = 'none'; 
-    document.getElementById('calc-base-time').value = '';
-    document.getElementById('calc-times').value = '';
+    document.getElementById('calc-base-time').value = ''; 
+    document.getElementById('calc-times').value = ''; 
 }
 
 function closeCalcModal() { 
@@ -605,518 +624,244 @@ function closeCalcModal() {
 function calculateStability() {
     let baseTime = parseFloat(document.getElementById('calc-base-time').value);
     let times = document.getElementById('calc-times').value.split(/[\n,]+/).map(s => parseFloat(s.trim())).filter(n => !isNaN(n) && n > 0);
-    if (isNaN(baseTime) || baseTime <= 0 || times.length < 2) { alert(t("請確認資料正確並輸入至少2筆。")); return; }
-    let n = times.length, mean = times.reduce((a, b) => a + b, 0) / n, stdDev = Math.sqrt(times.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / n);
+    
+    if (isNaN(baseTime) || baseTime <= 0 || times.length < 2) { 
+        alert(t("請確認資料正確並輸入至少2筆。")); 
+        return; 
+    }
+    
+    let n = times.length;
+    let mean = times.reduce((a, b) => a + b, 0) / n;
+    let stdDev = Math.sqrt(times.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / n);
     let stability = Math.max(0, Math.min(100, ((baseTime / mean) * 100) - (stdDev * 1.5)));
+    
     lastCalculatedStability = Math.round(stability);
-    document.getElementById('calc-res-mean').innerText = mean.toFixed(2) + ' 秒'; document.getElementById('calc-res-std').innerText = stdDev.toFixed(2) + ' 秒';
-    document.getElementById('calc-res-stab').innerText = lastCalculatedStability + ' %'; document.getElementById('calc-result').style.display = 'block';
+    
+    document.getElementById('calc-res-mean').innerText = mean.toFixed(2) + ' 秒'; 
+    document.getElementById('calc-res-std').innerText = stdDev.toFixed(2) + ' 秒';
+    document.getElementById('calc-res-stab').innerText = lastCalculatedStability + ' %'; 
+    document.getElementById('calc-result').style.display = 'block';
 }
 
 function applyCalculatedStability() { 
-    if (typeof speedTestCallback === 'function') {
-        speedTestCallback(lastCalculatedStability);
-    } else {
+    if (typeof speedTestCallback === 'function') { 
+        speedTestCallback(lastCalculatedStability); 
+    } else { 
         document.getElementById('skill-slider').value = lastCalculatedStability; 
         if(typeof updateMasterSkill === 'function') updateMasterSkill(); 
     }
     closeCalcModal(); 
 }
 
-function openStatsModal(e, rotId) {
-    e.preventDefault(); e.stopPropagation(); currentEditRotId = rotId;
-    let d = dpsData.find(x => x.id === rotId); 
-    document.getElementById('stats-modal-rot').innerText = `${t(d.c1)} + ${t(d.c2)} + ${t(d.c3)}`;
-    
-    let stats = customStatsMap[rotId];
-    if (stats) { 
-        document.getElementById('stats-dps').value = parseFloat(stats.dps).toFixed(2); 
-        document.getElementById('stats-stab').value = parseFloat(stats.stability).toFixed(1); 
-        document.getElementById('stats-nuke-cr').value = stats.nukeCR || '';
-        document.getElementById('stats-nuke-loss').value = stats.nukeLoss || '';
-        document.getElementById('stats-curve-k').value = stats.curvePoints ? JSON.stringify(stats.curvePoints) : (stats.curveK || ''); 
-    } else { 
-        document.getElementById('stats-dps').value = d.dps > 0 ? parseFloat(d.dps).toFixed(2) : ''; 
-        document.getElementById('stats-stab').value = 100; 
-        document.getElementById('stats-nuke-cr').value = '';
-        document.getElementById('stats-nuke-loss').value = '';
-        document.getElementById('stats-curve-k').value = ''; 
-        document.getElementById('stats-burst-t').value = '';
-        document.getElementById('stats-burst-d').value = '';
+// ==========================================
+// --- 8. 全域資料庫管理與分項控制中心 (頁籤版 + 單軸分享) ---
+// ==========================================
+let currentDMTab = 'dm-tab-custom'; 
+
+function switchDMTab(tabId) {
+    currentDMTab = tabId;
+    document.querySelectorAll('.dm-content-panel').forEach(el => el.style.display = 'none');
+    document.querySelectorAll('.dm-tab-btn').forEach(btn => { btn.style.background = 'rgba(255,255,255,0.05)'; btn.style.color = '#aaa'; btn.style.borderBottom = '1px solid #444'; });
+    let targetContent = document.getElementById(tabId + '-content'), targetBtn = document.getElementById(tabId + '-btn');
+    if (targetContent) targetContent.style.display = 'block';
+    if (targetBtn) {
+        targetBtn.style.background = 'rgba(0,0,0,0.6)'; targetBtn.style.color = '#fff';
+        if (tabId === 'dm-tab-custom') targetBtn.style.borderBottom = '2px solid var(--gold)';
+        if (tabId === 'dm-tab-lineup') targetBtn.style.borderBottom = '2px solid var(--neon-purple)';
+        if (tabId === 'dm-tab-hp') targetBtn.style.borderBottom = '2px solid #ff5252';
+        if (tabId === 'dm-tab-backup') targetBtn.style.borderBottom = '2px solid #00ffaa';
     }
-    
-    document.getElementById('magic-total-time').value = d.duration || 25;
-    document.getElementById('magic-total-dmg').value = d.totalDmg || (d.dps && d.duration ? (d.dps * d.duration).toFixed(2) : '');
-
-    document.getElementById('stats-modal').style.display = 'flex';
-}
-
-function openCustomTeamModal() {
-    let m = document.getElementById('custom-team-modal');
-    if (typeof charData === 'undefined') return;
-    
-    let charOpts = '';
-    if (typeof characterOrder !== 'undefined') {
-        characterOrder.forEach(n => { 
-            if (n === '漂泊者') { charOpts += `<option value="光主">${t("光主")}</option><option value="暗主">${t("暗主")}</option><option value="風主">${t("風主")}</option>`; } 
-            else if (charData[n]) { charOpts += `<option value="${n}">${t(n)}</option>`; } 
-        });
-    }
-
-    m.innerHTML = `
-        <div style="background:var(--bg-panel); backdrop-filter:blur(20px); padding:25px; border-radius:16px; border:1px solid var(--gold); width:450px; max-width:90%; max-height:85vh; overflow-y:auto; box-shadow: 0 10px 40px rgba(0,0,0,0.8);">
-            <h3 style="margin-top:0; color:var(--gold); text-align:center;">➕ ${t('新增自訂編隊')}</h3>
-            
-            <select id="ct-c1" class="char-select" style="margin-bottom:10px;"><option value="">-- ${t('選擇主輸出')} --</option>${charOpts}</select>
-            <select id="ct-c2" class="char-select" style="margin-bottom:10px;"><option value="">-- ${t('選擇副C/輔助')} --</option>${charOpts}</select>
-            <select id="ct-c3" class="char-select" style="margin-bottom:10px;"><option value="">-- ${t('選擇生存/輔助')} --</option>${charOpts}</select>
-            
-            <div style="display:flex; gap:8px; margin-bottom:10px; align-items: stretch;">
-                <div style="flex:1; display:flex; flex-direction:column; gap:4px;">
-                    <label style="color:#aaa; font-size:0.8em;">循環軸長 (秒) <span style="color:var(--neon-green)">*必填</span></label>
-                    <input type="number" id="ct-duration" value="25" class="score-input" style="margin-bottom:0; border-color:var(--neon-green); color:var(--neon-green);">
-                </div>
-                <div style="flex:1; display:flex; flex-direction:column; gap:4px;">
-                    <label style="color:#aaa; font-size:0.8em;">預設 DPS (萬)</label>
-                    <input type="number" id="ct-dps" placeholder="例: 6.5" class="score-input" style="margin-bottom:0;">
-                </div>
-            </div>
-
-            <details style="margin-bottom: 10px; border-top: 1px dashed #ffaa00; padding-top: 10px;">
-                <summary style="color:#ffaa00; font-size:0.9em; cursor:pointer; outline:none;">🎲 蒙地卡羅期望運算設定</summary>
-                <div style="display:flex; gap:10px; margin-top:8px;">
-                    <label style="flex:1; color:#fff; font-size:0.8em;">🎯 核心暴率(%): <input type="number" id="ct-nuke-cr" class="score-input" placeholder="例: 75" style="margin-top:4px; border-color:#ffaa00; color:#ffaa00;"></label>
-                    <label style="flex:1; color:#fff; font-size:0.8em;">📉 未暴損失(萬): <input type="number" id="ct-nuke-loss" class="score-input" placeholder="例: 15" style="margin-top:4px; border-color:#ffaa00; color:#ffaa00;"></label>
-                </div>
-            </details>
-
-            <details style="margin-bottom: 15px; border-top: 1px dashed var(--gold); padding-top: 10px;">
-                <summary style="color:var(--gold); font-size:0.9em; cursor:pointer; outline:none;">📊 貼上動作排軸解析傷害曲線 (點擊展開)</summary>
-                <div style="margin-top: 8px; background: rgba(0,0,0,0.3); padding: 10px; border-radius: 8px; border: 1px solid #555;">
-                    
-                    <div style="display:flex; gap:10px; margin-bottom:10px;">
-                        <label style="flex:2; color:#aaa; font-size:0.75em; margin-bottom:0;">
-                            解析模式:
-                            <select id="ct-magic-parse-mode" class="score-input" style="width:100%; height:28px; padding:0 4px; margin-top:4px; margin-bottom:0; font-size:1em;">
-                                <option value="auto">🤖 自動偵測 (2~3欄)</option>
-                                <option value="2col">⚖️ 雙欄 (動作, 傷害)</option>
-                                <option value="3col-dur">⏱️ 三欄 (動作, 耗時, 傷害)</option>
-                                <option value="3col-time">⏳ 三欄 (動作, 出傷時間, 傷害)</option>
-                            </select>
-                        </label>
-                        <label style="flex:1; color:#aaa; font-size:0.75em; margin-bottom:0;">
-                            總傷害(萬):
-                            <input type="number" id="ct-magic-total-dmg" class="score-input" placeholder="選填" step="1" style="width:100%; height:28px; padding:2px 4px; margin-top:4px; margin-bottom:0; font-size:1em;">
-                        </label>
-                    </div>
-
-                    <div style="display:flex; gap:8px; margin-bottom: 8px;">
-                        <label style="flex:1; color:#fff; font-size:0.75em;">
-                            🕒 參考時間(%): <input type="number" id="ct-burst-t" class="score-input" style="margin-top:4px;" oninput="autoCalcK_CT()">
-                        </label>
-                        <label style="flex:1; color:#fff; font-size:0.75em;">
-                            💥 累積總傷(%): <input type="number" id="ct-burst-d" class="score-input" style="margin-top:4px;" oninput="autoCalcK_CT()">
-                        </label>
-                        <label style="flex:1; color:#fff; font-size:0.75em;">
-                            🧮 曲線參數: <input type="text" id="ct-curve-k" class="score-input" style="margin-top:4px; border-color:var(--neon-green); color:var(--neon-green);">
-                        </label>
-                    </div>
-                    <textarea id="ct-magic-paste" placeholder="請依上方模式貼上排軸數值資料..." style="width:100%; height:80px; background:rgba(0,0,0,0.5); color:#fff; border:1px solid var(--border-glass); padding:8px; border-radius:6px; outline:none; font-family:monospace; resize:vertical; font-size:0.8em; box-sizing:border-box;"></textarea>
-                    <button type="button" onclick="runMagicParser_CT()" style="width:100%; margin-top:8px; background:var(--gold); color:#000; font-weight:bold; border:none; padding:6px; border-radius:6px; cursor:pointer; box-shadow: 0 0 10px rgba(212, 175, 55, 0.4);">
-                        📊 匯入解析並填入曲線參數與 DPS
-                    </button>
-                </div>
-            </details>
-
-            <select id="ct-diff" class="char-select" style="margin-bottom:20px;">
-                <option value="🟩">🟩 ${t('輪椅')}</option><option value="🔵">🔵 ${t('中等')}</option><option value="⭐" selected>⭐ ${t('進階')}</option><option value="⚠️">⚠️ ${t('極難')}</option><option value="🧩">🧩 ${t('非主流')}</option>
-            </select>
-            
-            <div style="display:flex; gap:10px;">
-                <button onclick="document.getElementById('custom-team-modal').style.display='none'" class="btn-action-clear" style="flex:1; background:#555; border:none;">${t('取消')}</button>
-                <button onclick="saveCustomTeam()" class="btn-action-all" style="flex:1;">${t('儲存')}</button>
-            </div>
-        </div>`;
-        
-    if (typeof translateDOM === 'function') translateDOM(m);
-    m.style.display = 'flex';
-}
-
-function extractKeyframes(parsedPoints, d_total, t_total, mode) {
-    let cumulativeDmg = 0;
-    let cumulativeTime = 0;
-    let normalizedPath = [{ t: 0, d: 0 }];
-    
-    for (let i = 0; i < parsedPoints.length; i++) {
-        let currentT;
-        if (parsedPoints[i].time !== null && parsedPoints[i].time !== undefined) {
-            if (mode === '3col-dur') {
-                cumulativeTime += parsedPoints[i].time;
-                currentT = cumulativeTime / t_total;
-            } else if (mode === '3col-time') {
-                currentT = parsedPoints[i].time / t_total;
-            } else {
-                currentT = (i + 1) / parsedPoints.length;
-            }
-        } else {
-            currentT = (i + 1) / parsedPoints.length;
-        }
-        
-        currentT = Math.min(1.0, Math.max(0, currentT));
-        
-        cumulativeDmg += parsedPoints[i].dmg;
-        let currentD = cumulativeDmg / d_total;
-        normalizedPath.push({ t: currentT, d: currentD });
-    }
-
-    let keyframes = [{ t: 0, d: 0 }];
-    let avgSlope = 1.0; 
-    
-    for (let i = 1; i < normalizedPath.length; i++) {
-        let prev = normalizedPath[i - 1];
-        let curr = normalizedPath[i];
-        
-        let t_diff = curr.t - prev.t;
-        if (t_diff <= 0) t_diff = 0.0001;
-        
-        let slope = (curr.d - prev.d) / t_diff;
-        
-        if (slope > avgSlope * 2.5 || (curr.d - prev.d) > 0.08) {
-            if (keyframes.length === 0 || Math.abs(keyframes[keyframes.length - 1].t - prev.t) > 0.02) {
-                keyframes.push({ t: parseFloat(prev.t.toFixed(3)), d: parseFloat(prev.d.toFixed(3)) });
-            }
-            keyframes.push({ t: parseFloat(curr.t.toFixed(3)), d: parseFloat(curr.d.toFixed(3)) });
-        }
-    }
-    
-    if (Math.abs(keyframes[keyframes.length - 1].t - 1) > 0.01) {
-        keyframes.push({ t: 1, d: 1 });
-    }
-    return keyframes;
-}
-
-function autoCalcK() {
-    let tPct = parseFloat(document.getElementById('stats-burst-t').value);
-    let dPct = parseFloat(document.getElementById('stats-burst-d').value);
-    if (!isNaN(tPct) && !isNaN(dPct) && tPct > 0 && tPct < 100 && dPct > 0 && dPct < 100) {
-        let calcK = Math.log(dPct / 100) / Math.log(tPct / 100);
-        document.getElementById('stats-curve-k').value = Math.max(0.01, calcK).toFixed(3);
-    }
-}
-function autoCalcK_CT() {
-    let tPct = parseFloat(document.getElementById('ct-burst-t').value);
-    let dPct = parseFloat(document.getElementById('ct-burst-d').value);
-    if (!isNaN(tPct) && !isNaN(dPct) && tPct > 0 && tPct < 100 && dPct > 0 && dPct < 100) {
-        let calcK = Math.log(dPct / 100) / Math.log(tPct / 100);
-        document.getElementById('ct-curve-k').value = Math.max(0.01, calcK).toFixed(3);
-    }
-}
-
-function runMagicParser_CT() {
-    let mode = document.getElementById('ct-magic-parse-mode').value;
-    let totalDmgStr = document.getElementById('ct-magic-total-dmg').value;
-    let rawData = document.getElementById('ct-magic-paste').value;
-    
-    if (!rawData.trim()) return alert(t("請先在文字框貼上排軸資料！"));
-    
-    let lines = rawData.split('\n').map(l => l.trim()).filter(l => l);
-    if (lines.length < 2) return alert(t("資料過少，無法解析！"));
-
-    let d_total = 0;
-    let parsedPoints = [];
-
-    lines.forEach(line => {
-        let parts = line.replace(/[\s\t]+/g, '\t').split('\t'); 
-        if (parts.length >= 2) {
-            let dmgMatch = parts[parts.length - 1].replace(/,/g, '').match(/[\d.]+/);
-            let timeVal = null;
-            
-            if (mode === '3col-time' || mode === '3col-dur') {
-                dmgMatch = parts.length >= 3 ? parts[2].replace(/,/g, '').match(/[\d.]+/) : dmgMatch;
-                let timeMatch = parts.length >= 3 ? parts[1].replace(/,/g, '').match(/[\d.]+/) : null;
-                if (timeMatch) timeVal = parseFloat(timeMatch[0]);
-            }
-            
-            if (dmgMatch) {
-                let dmgVal = parseFloat(dmgMatch[0]);
-                parsedPoints.push({ raw: line, dmg: dmgVal, time: timeVal });
-                d_total += dmgVal;
-            }
-        }
-    });
-
-    if (parsedPoints.length < 2) return alert(t("無法從貼上的文字中辨識出有效的數值格式！"));
-    if (totalDmgStr && !isNaN(parseFloat(totalDmgStr))) d_total = parseFloat(totalDmgStr);
-
-    let t_total = parseFloat(document.getElementById('ct-duration').value) || 25;
-    let inferredDps = d_total / t_total;
-    document.getElementById('ct-dps').value = inferredDps.toFixed(2);
-
-    let maxPoint = parsedPoints.reduce((max, p) => p.dmg > max.dmg ? p : max, parsedPoints[0]);
-    let burstDmgPct = (maxPoint.dmg / d_total) * 100;
-    document.getElementById('ct-burst-t').value = 60;
-    document.getElementById('ct-burst-d').value = burstDmgPct.toFixed(1);
-
-    let keyframes = extractKeyframes(parsedPoints, d_total, t_total, mode);
-    document.getElementById('ct-curve-k').value = JSON.stringify(keyframes);
-
-    let pointCount = keyframes.length;
-    alert(t("解析完成。\n共擷取 ") + pointCount + t(" 個特徵轉折點，\n已套用多點線性插值矩陣。"));
-}
-
-function runMagicParser() {
-    let mode = document.getElementById('magic-parse-mode').value;
-    let totalTimeStr = document.getElementById('magic-total-time').value;
-    let totalDmgStr = document.getElementById('magic-total-dmg').value;
-    let rawData = document.getElementById('magic-paste-area').value;
-    
-    if (!rawData.trim()) return alert(t("請先在文字框貼上排軸資料！"));
-    
-    let lines = rawData.split('\n').map(l => l.trim()).filter(l => l);
-    if (lines.length < 2) return alert(t("資料過少，無法解析！"));
-
-    let t_total = parseFloat(totalTimeStr) || 25; 
-    let d_total = 0;
-    let parsedPoints = [];
-
-    lines.forEach(line => {
-        let parts = line.replace(/[\s\t]+/g, '\t').split('\t'); 
-        if (parts.length >= 2) {
-            let dmgMatch = parts[parts.length - 1].replace(/,/g, '').match(/[\d.]+/);
-            let timeVal = null;
-            
-            if (mode === '3col-time' || mode === '3col-dur') {
-                dmgMatch = parts.length >= 3 ? parts[2].replace(/,/g, '').match(/[\d.]+/) : dmgMatch;
-                let timeMatch = parts.length >= 3 ? parts[1].replace(/,/g, '').match(/[\d.]+/) : null;
-                if (timeMatch) timeVal = parseFloat(timeMatch[0]);
-            }
-            
-            if (dmgMatch) {
-                let dmgVal = parseFloat(dmgMatch[0]);
-                parsedPoints.push({ raw: line, dmg: dmgVal, time: timeVal });
-                d_total += dmgVal;
-            }
-        }
-    });
-
-    if (parsedPoints.length < 2) return alert(t("無法從貼上的文字中辨識出有效的數值格式！"));
-    if (totalDmgStr && !isNaN(parseFloat(totalDmgStr))) d_total = parseFloat(totalDmgStr);
-
-    let maxPoint = parsedPoints.reduce((max, p) => p.dmg > max.dmg ? p : max, parsedPoints[0]);
-    let burstDmgPct = (maxPoint.dmg / d_total) * 100;
-    
-    document.getElementById('stats-burst-t').value = 60;
-    document.getElementById('stats-burst-d').value = burstDmgPct.toFixed(1);
-    
-    let keyframes = extractKeyframes(parsedPoints, d_total, t_total, mode);
-    document.getElementById('stats-curve-k').value = JSON.stringify(keyframes);
-
-    let pointCount = keyframes.length;
-    alert(t("解析完成。\n共擷取 ") + pointCount + t(" 個特徵轉折點，\n已套用多點線性插值矩陣。"));
-}
-
-function saveCustomTeam() {
-    let c1 = document.getElementById('ct-c1').value, c2 = document.getElementById('ct-c2').value, c3 = document.getElementById('ct-c3').value;
-    let dps = parseFloat(document.getElementById('ct-dps').value) || 0, diff = document.getElementById('ct-diff').value;
-    let duration = parseFloat(document.getElementById('ct-duration').value) || 25; 
-    
-    let curveKVal = document.getElementById('ct-curve-k') ? document.getElementById('ct-curve-k').value : "";
-    let nukeCrVal = document.getElementById('ct-nuke-cr') ? parseFloat(document.getElementById('ct-nuke-cr').value) || 0 : 0;
-    let nukeLossVal = document.getElementById('ct-nuke-loss') ? parseFloat(document.getElementById('ct-nuke-loss').value) || 0 : 0;
-    
-    if (!c1 || !c2 || !c3) return alert(t('請完整選擇三名角色！'));
-    if (dps <= 0) return alert(t('請輸入有效大於0的 DPS！(或透過匯入排軸自動產生)'));
-    
-    let totalDmg = dps * duration; 
-    let newId = Date.now(), internalId = 'custom_rot_' + newId;
-    let newRot = { id: newId, c1: c1, c2: c2, c3: c3, dps: dps, rot: "自訂", diff: diff, duration: duration, totalDmg: totalDmg };
-    
-    customRotations.push(newRot); 
-    safeStorageSet('ww_custom_rotations_v2', customRotations);
-    
-    let genVal = charData[getBase(c1)] ? charData[getBase(c1)].gen : 1;
-    dpsData.push({ id: internalId, c1: c1, c2: c2, c3: c3, dps: dps, rot: "自訂", diff: diff, gen: genVal, isUserCustom: true, duration: duration, totalDmg: totalDmg });
-    
-    if (curveKVal || nukeCrVal > 0) {
-        let diffKey = diff.includes('⚠️') ? '⚠️' : diff.includes('⭐') ? '⭐' : diff.includes('🔵') ? '🔵' : diff.includes('🟩') ? '🟩' : '🧩';
-        let isArray = curveKVal.trim().startsWith('[');
-        let parsedPointsArray = null;
-        
-        if (isArray) {
-            try { 
-                parsedPointsArray = JSON.parse(curveKVal); 
-            } catch (e) { 
-                return alert(t("⚠️ 特徵陣列格式錯誤，請確認 JSON 格式！(或清空以使用預設值)")); 
-            }
-        }
-        
-        customStatsMap[internalId] = {
-            dps: dps,
-            stability: diffStability[diffKey] || 100,
-            buff: 0,
-            nukeCR: nukeCrVal,
-            nukeLoss: nukeLossVal,
-            curveK: isArray ? null : curveKVal,
-            curvePoints: parsedPointsArray
-        };
-        safeStorageSet('ww_custom_stats', customStatsMap);
-    }
-
-    checkedRotations.add(internalId);
-    safeStorageSet('ww_rotations', [...checkedRotations]);
-
-    ownedCharacters.add(getBase(c1)); ownedCharacters.add(getBase(c2)); ownedCharacters.add(getBase(c3));
-    safeStorageSet('ww_roster', [...ownedCharacters]);
-    document.querySelectorAll('#roster-setup input[type="checkbox"]').forEach(chk => {
-        if ([getBase(c1), getBase(c2), getBase(c3)].includes(chk.value)) chk.checked = true;
-    });
-
-    document.getElementById('custom-team-modal').style.display = 'none'; 
-    debouncedRenderAndTrack(); 
-    alert(t('自訂編隊已成功加入！'));
-}
-
-function closeStatsModal() { document.getElementById('stats-modal').style.display = 'none'; currentEditRotId = null; }
-function clearStatsModal() { if (currentEditRotId) { delete customStatsMap[currentEditRotId]; safeStorageSet('ww_custom_stats', customStatsMap); debouncedRenderAndTrack(); } closeStatsModal(); }
-
-function saveStatsModal() {
-    let dpsVal = parseFloat(document.getElementById('stats-dps').value);
-    let stabVal = parseFloat(document.getElementById('stats-stab').value);
-    let nukeCrVal = parseFloat(document.getElementById('stats-nuke-cr').value) || 0;
-    let nukeLossVal = parseFloat(document.getElementById('stats-nuke-loss').value) || 0;
-    let curveKVal = document.getElementById('stats-curve-k').value;
-
-    if (isNaN(dpsVal) || isNaN(stabVal)) return alert(t("請輸入有效的數字！"));
-    
-    if (currentEditRotId) { 
-        let isArray = curveKVal.trim().startsWith('[');
-        let parsedPointsArray = null;
-        
-        if (isArray) {
-            try { 
-                parsedPointsArray = JSON.parse(curveKVal); 
-            } catch (e) { 
-                return alert(t("⚠️ 特徵陣列格式錯誤，請確認 JSON 格式！(或清空以使用預設值)")); 
-            }
-        }
-        
-        customStatsMap[currentEditRotId] = { 
-            dps: dpsVal, 
-            stability: Math.min(100, Math.max(0, stabVal)), 
-            buff: 0,
-            nukeCR: nukeCrVal,
-            nukeLoss: nukeLossVal,
-            curveK: isArray ? null : curveKVal,
-            curvePoints: parsedPointsArray
-        }; 
-        safeStorageSet('ww_custom_stats', customStatsMap); 
-        debouncedRenderAndTrack(); 
-    }
-    closeStatsModal();
 }
 
 function openDataManager() {
     let content = document.getElementById('data-manager-content'); if (!content) return;
-    content.innerHTML = `<div style="display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap;"><div style="flex: 1; background: rgba(0, 255, 170, 0.1); border: 1px solid var(--neon-green); padding: 10px; border-radius: 8px; text-align: center;"><div style="font-size: 1.5em; font-weight: bold; color: var(--neon-green);">${ownedCharacters.size}</div><div style="font-size: 0.8em; color: #aaa;">👤 ${t('已解鎖角色')}</div></div><div style="flex: 1; background: rgba(212, 175, 55, 0.1); border: 1px solid var(--gold); padding: 10px; border-radius: 8px; text-align: center;"><div style="font-size: 1.5em; font-weight: bold; color: var(--gold);">${customRotations.length}</div><div style="font-size: 0.8em; color: #aaa;">⚔️ ${t('自訂編隊')}</div></div><div style="flex: 1; background: rgba(207, 0, 255, 0.1); border: 1px solid var(--neon-purple); padding: 10px; border-radius: 8px; text-align: center;"><div style="font-size: 1.5em; font-weight: bold; color: var(--neon-purple);">${savedLineups.length}</div><div style="font-size: 0.8em; color: #aaa;">💾 ${t('已記憶編隊')}</div></div></div><div style="margin-bottom:20px;"><p style="color:#aaa; font-size:0.9em;">${t('備份將包含上述所有數據及當前排軸設定與隊伍編排。')}</p><textarea id="dm-code" rows="3" style="width:100%; padding:10px; background:rgba(0,0,0,0.5); color:var(--neon-green); border:1px solid var(--border-glass); border-radius:8px; resize:none;"></textarea><div style="display:flex; gap:10px; margin-top:10px;"><button onclick="generateExportCode()" class="btn-action-all" style="flex:1;">📥 ${t('產生備份代碼')}</button><button onclick="confirmImportFromCode()" class="btn-action-clear" style="flex:1; background:#ff9800; border-color:#ff9800;">📤 ${t('匯入存檔代碼')}</button></div></div><div style="border-top:1px dashed var(--border-glass); padding-top:15px;"><h4 style="color:var(--gold); margin-top:0;">📝 ${t('自訂編隊庫管理')}</h4><div id="dm-teams" style="max-height: 150px; overflow-y: auto; padding-right: 5px;"></div></div>`;
-    document.getElementById('dm-teams').innerHTML = customRotations.length === 0 ? `<p style="color:#666; text-align:center;">${t('無自訂資料')}</p>` : customRotations.map((cr, i) => `<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; background:rgba(0,0,0,0.3); padding:10px 12px; border-radius:8px; border: 1px solid var(--border-glass);"><span style="color:#ddd; font-size: 0.95em;">${cr.diff} <span style="color:var(--gold); font-weight:bold;">${t(cr.c1)} + ${t(cr.c2)} + ${t(cr.c3)}</span> (DPS: ${cr.dps}w)</span><button onclick="deleteCustomTeam(${i})" class="btn-action-clear" style="padding:4px 10px; font-size:0.85em; border-radius:6px; box-shadow:none;">❌ ${t('刪除')}</button></div>`).join('');
+    
+    let calibratedBossKeys = Object.keys(bossHPMap).filter(k => bossHPMap[k] && !bossHPMap[k].isDefault);
+    let envSavedState = safeStorageGet('ww_env_dom_state', null) ? '已自訂' : '預設';
+    // 呼叫 data_manager.js 的 getStorageUsageKB
+    let usageKB = typeof getStorageUsageKB === 'function' ? getStorageUsageKB() : "0.0";
+    let usagePct = Math.min(100, (usageKB / 5120) * 100).toFixed(1);
+
+    let customTeamsHtml = customRotations.length === 0 ? `<p style="color:#666; text-align:center; margin-top:20px;">${t('無自訂排軸資料')}</p>` : customRotations.map((cr, i) => `
+        <div style="display:flex; flex-direction:column; margin-bottom:8px; background:rgba(0,0,0,0.5); padding:10px 12px; border-radius:8px; border: 1px solid #555;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                <span style="color:#ddd; font-size: 0.9em;">${cr.diff} <span style="color:var(--gold); font-weight:bold;">${t(cr.c1)} + ${t(cr.c2)} + ${t(cr.c3)}</span> (${parseFloat(cr.dps).toFixed(2)}w)</span>
+            </div>
+            <div style="display:flex; gap:6px;">
+                <button onclick="loadCustomTeamAsTemplate(${i})" class="btn-action-all" style="flex:1; padding:6px; font-size:0.75em; background:rgba(212,175,55,0.2); color:var(--gold); border-color:var(--gold); border-radius:4px;">📝 載入作範本</button>
+                <button onclick="exportSingleRotation(${i})" class="btn-action-all" style="flex:1; padding:6px; font-size:0.75em; background:rgba(0,255,170,0.2); color:var(--neon-green); border-color:var(--neon-green); border-radius:4px;">🔗 複製分享碼</button>
+                <button onclick="deleteCustomTeam(${i})" class="btn-action-clear" style="flex:0.4; padding:6px; font-size:0.75em; background:#d9534f; color:#fff; border-color:#d9534f; border-radius:4px;">❌</button>
+            </div>
+        </div>`).join('');
+
+    let lineupsHtml = savedLineups.length === 0 ? `<p style="color:#666; text-align:center; margin-top:20px;">${t('無記憶編隊')}</p>` : savedLineups.map((l, i) => `
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; background:rgba(0,0,0,0.5); padding:10px 12px; border-radius:8px; border: 1px solid #555;">
+            <span style="color:#ddd; font-size: 0.9em;"><strong style="color:var(--neon-purple);">${l.name}</strong> (${t('總分')}: ${l.totalScore.toLocaleString()})</span>
+            <button onclick="deleteSavedLineupFromDM(${i})" class="btn-action-clear" style="padding:6px 12px; font-size:0.8em; border-radius:6px; background:#d9534f; border-color:#d9534f; color:#fff;">❌ 刪除</button>
+        </div>`).join('');
+
+    let bossHpHtml = calibratedBossKeys.length === 0 ? `<p style="color:#666; text-align:center; margin-top:20px;">${t('無血量校正數據')}</p>` : calibratedBossKeys.map(k => `
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; background:rgba(0,0,0,0.5); padding:10px 12px; border-radius:8px; border: 1px solid #555;">
+            <span style="color:#ddd; font-size: 0.9em;">${t('關卡')} <strong style="color:#ff5252;">${k}</strong> ${t('校正為')}: ${bossHPMap[k].value.toFixed(2)} ${t('萬')}</span>
+            <button onclick="deleteCalibratedHP('${k}')" class="btn-action-clear" style="padding:6px 12px; font-size:0.8em; border-radius:6px; background:#d9534f; border-color:#d9534f; color:#fff;">❌ 刪除</button>
+        </div>`).join('');
+
+    content.innerHTML = `
+        <div style="display:flex; flex-direction:column; gap:15px; margin-bottom:10px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; font-size:0.85em; color:#aaa; margin-bottom:-5px;">
+                <span>💾 本機記憶體容量使用率</span>
+                <span><strong style="color:#00ffaa;">${usageKB} KB</strong> / 5120 KB (${usagePct}%)</span>
+            </div>
+            <div style="width:100%; height:6px; background:#333; border-radius:3px; overflow:hidden;">
+                <div style="width:${usagePct}%; height:100%; background:linear-gradient(90deg, #00ffaa, #d4af37);"></div>
+            </div>
+
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-top:10px;">
+                <div style="background:rgba(0,255,170,0.05); border:1px solid rgba(0,255,170,0.3); padding:10px; border-radius:8px; display:flex; justify-content:space-between; align-items:center;">
+                    <div><div style="color:#aaa; font-size:0.8em;">👤 角色與排軸</div><div style="color:var(--neon-green); font-weight:bold; font-size:1.1em;">解鎖 ${ownedCharacters.size} 名</div></div>
+                    <button onclick="clearDataCategory('roster')" class="btn-action-clear" style="padding:4px 10px; font-size:0.8em; background:#d9534f; border-color:#d9534f; color:#fff; border-radius:6px; font-weight:bold;">清空</button>
+                </div>
+                <div style="background:rgba(212,175,55,0.05); border:1px solid rgba(212,175,55,0.3); padding:10px; border-radius:8px; display:flex; justify-content:space-between; align-items:center;">
+                    <div><div style="color:#aaa; font-size:0.8em;">⚙️ 環境與抗性</div><div style="color:var(--gold); font-weight:bold; font-size:1.1em;">狀態: ${envSavedState}</div></div>
+                    <button onclick="clearDataCategory('env')" class="btn-action-clear" style="padding:4px 10px; font-size:0.8em; background:#d9534f; border-color:#d9534f; color:#fff; border-radius:6px; font-weight:bold;">還原</button>
+                </div>
+                <div style="background:rgba(207,0,255,0.05); border:1px solid rgba(207,0,255,0.3); padding:10px; border-radius:8px; display:flex; justify-content:space-between; align-items:center;">
+                    <div><div style="color:#aaa; font-size:0.8em;">💾 記憶沙盤編隊</div><div style="color:var(--neon-purple); font-weight:bold; font-size:1.1em;">已存 ${savedLineups.length} 組</div></div>
+                    <button onclick="clearDataCategory('lineups')" class="btn-action-clear" style="padding:4px 10px; font-size:0.8em; background:#d9534f; border-color:#d9534f; color:#fff; border-radius:6px; font-weight:bold;">清空</button>
+                </div>
+                <div style="background:rgba(255,82,82,0.05); border:1px solid rgba(255,82,82,0.3); padding:10px; border-radius:8px; display:flex; justify-content:space-between; align-items:center;">
+                    <div><div style="color:#aaa; font-size:0.8em;">🎯 Boss 血量校正</div><div style="color:#ff5252; font-weight:bold; font-size:1.1em;">校正 ${calibratedBossKeys.length} 隻</div></div>
+                    <button onclick="clearDataCategory('hp')" class="btn-action-clear" style="padding:4px 10px; font-size:0.8em; background:#d9534f; border-color:#d9534f; color:#fff; border-radius:6px; font-weight:bold;">還原</button>
+                </div>
+            </div>
+
+            <div style="display:flex; margin-top:5px; border-bottom:1px solid #444;">
+                <button id="dm-tab-custom-btn" class="dm-tab-btn" onclick="switchDMTab('dm-tab-custom')" style="flex:1; padding:10px; background:transparent; color:#aaa; border:none; border-bottom:1px solid #444; cursor:pointer; font-weight:bold; transition:0.2s;">⚔️ 自訂排軸</button>
+                <button id="dm-tab-lineup-btn" class="dm-tab-btn" onclick="switchDMTab('dm-tab-lineup')" style="flex:1; padding:10px; background:transparent; color:#aaa; border:none; border-bottom:1px solid #444; cursor:pointer; font-weight:bold; transition:0.2s;">💾 記憶編隊</button>
+                <button id="dm-tab-hp-btn" class="dm-tab-btn" onclick="switchDMTab('dm-tab-hp')" style="flex:1; padding:10px; background:transparent; color:#aaa; border:none; border-bottom:1px solid #444; cursor:pointer; font-weight:bold; transition:0.2s;">🎯 血量校正</button>
+                <button id="dm-tab-backup-btn" class="dm-tab-btn" onclick="switchDMTab('dm-tab-backup')" style="flex:1; padding:10px; background:transparent; color:#aaa; border:none; border-bottom:1px solid #444; cursor:pointer; font-weight:bold; transition:0.2s;">📦 備份還原</button>
+            </div>
+
+            <div style="background:rgba(0,0,0,0.3); border:1px solid #444; border-top:none; border-radius:0 0 12px 12px; padding:15px; min-height:180px;">
+                <div id="dm-tab-custom-content" class="dm-content-panel" style="display:none;">
+                    <div style="display:flex; gap:8px; margin-bottom:12px; padding-bottom:12px; border-bottom:1px dashed #555;">
+                        <input type="text" id="dm-single-import-code" placeholder="貼上分享碼 (WWZ_開頭)..." style="flex:2; padding:6px 10px; background:rgba(0,0,0,0.6); color:var(--neon-green); border:1px solid var(--border-glass); border-radius:6px; outline:none; font-family:monospace; font-size:0.8em;">
+                        <button onclick="importSingleRotation()" class="btn-action-all" style="flex:1; padding:6px; font-size:0.85em; background:var(--neon-green); color:#000; font-weight:bold;">📥 匯入</button>
+                    </div>
+                    
+                    <p style="color:#888; font-size:0.8em; margin:0 0 10px 0; text-align:right;">(此系統已導入 Base85 壓縮，匯出不包含備註)</p>
+
+                    <div style="max-height: 250px; overflow-y: auto; padding-right: 5px;">${customTeamsHtml}</div>
+                </div>
+
+                <div id="dm-tab-lineup-content" class="dm-content-panel" style="display:none;"><div style="max-height: 250px; overflow-y: auto; padding-right: 5px;">${lineupsHtml}</div></div>
+                
+                <div id="dm-tab-hp-content" class="dm-content-panel" style="display:none;"><div style="max-height: 250px; overflow-y: auto; padding-right: 5px;">${bossHpHtml}</div></div>
+                
+                <div id="dm-tab-backup-content" class="dm-content-panel" style="display:none;">
+                    <p style="color:#888; font-size:0.85em; margin:0 0 10px 0;">產生代碼將包含您目前的所有設定，可用於跨裝置轉移或備份。</p>
+                    <textarea id="dm-code" rows="3" placeholder="${t('全域備份代碼將顯示於此，或在此貼上代碼以還原...')}" style="width:100%; padding:10px; background:rgba(0,0,0,0.6); color:var(--neon-green); border:1px solid var(--border-glass); border-radius:6px; resize:none; font-family:monospace; font-size:0.85em; box-sizing:border-box;"></textarea>
+                    <div style="display:flex; gap:10px; margin-top:10px;">
+                        <button onclick="generateExportCode()" class="btn-action-all" style="flex:1; padding:10px;">📥 ${t('產生全域備份')}</button>
+                        <button onclick="confirmImportFromCode()" class="btn-action-clear" style="flex:1; background:#ff9800; border-color:#ff9800; padding:10px; color:#fff;">📤 ${t('全域匯入覆蓋')}</button>
+                    </div>
+                </div>
+            </div>
+
+            <button onclick="factoryResetWW()" style="width:100%; margin-top:10px; padding:12px; background:rgba(255,0,0,0.1); color:#ff5252; border:1px solid #ff5252; border-radius:8px; font-weight:bold; cursor:pointer; transition:0.2s;">
+                ⚠️ ${t('徹底清除所有本機數據 (恢復原廠設定)')}
+            </button>
+        </div>`;
+        
     document.getElementById('data-manager-modal').style.display = 'flex';
+    switchDMTab(currentDMTab);
 }
 
 function closeDataManager() { document.getElementById('data-manager-modal').style.display = 'none'; }
 
-function generateExportCode() {
-    let currentEnv = getEnvSettings();
-    let data = { 
-        roster: [...ownedCharacters], 
-        rotations: [...checkedRotations], 
-        customStats: customStatsMap, 
-        bossHp: bossHPHistory, 
-        customTeams: customRotations, 
-        savedLineups: savedLineups, 
-        bossHPMap: bossHPMap,
-        envSettings: currentEnv 
-    };
-    document.getElementById('dm-code').value = btoa(encodeURIComponent(JSON.stringify(data))); 
-    alert(t('✅ 存檔代碼已產生，請複製保存。'));
-}
-
-function confirmImportFromCode() { if(confirm(t('這將會覆寫您目前所有的自訂與記憶隊伍設定，確定執行嗎？'))) { importFromCode(); } }
-
-function importFromCode() {
-    let code = document.getElementById('dm-code').value; if(!code) return;
-    try {
-        let data = JSON.parse(decodeURIComponent(atob(code)));
-        if(data.roster) safeStorageSet('ww_roster', data.roster);
-        if(data.rotations) safeStorageSet('ww_rotations', data.rotations);
-        if(data.customStats) safeStorageSet('ww_custom_stats', data.customStats);
-        if(data.bossHp) safeStorageSet('ww_boss_hp_history', data.bossHp);
-        if(data.customTeams) safeStorageSet('ww_custom_rotations_v2', data.customTeams);
-        if(data.savedLineups) safeStorageSet('ww_saved_lineups', data.savedLineups);
-        if(data.bossHPMap) safeStorageSet('ww_boss_hp', data.bossHPMap);
-        
-        if(data.envSettings) {
-            let e = data.envSettings;
-            let setVal = (id, val) => { if(val !== undefined && document.getElementById(id)) document.getElementById(id).value = val; };
-            
-            setVal('env-ratio', e.scoreRatio);
-            setVal('env-r1', e.r1_hp);
-            setVal('env-r2', e.r2_hp);
-            setVal('env-r3', e.r3_hp);
-            setVal('env-growth', e.growth ? e.growth * 100 : undefined); 
-            setVal('env-trans', e.transTime);
-            setVal('env-time', e.battleTime);
-            setVal('env-res', e.resPenalty);
-            setVal('env-pen110', e.pen110);
-            setVal('env-pen120', e.pen120);
-            
-            if (e.resTags && Array.isArray(e.resTags)) {
-                setVal('env-res-1', e.resTags[0]);
-                setVal('env-res-2', e.resTags[1]);
-                setVal('env-res-3', e.resTags[2]);
-                setVal('env-res-4', e.resTags[3]);
-            }
-        }
-        alert(t('✅ 設定與全域環境參數已完整還原！即將重新載入頁面。')); window.location.reload();
-    } catch(e) { alert(t('❌ 解析失敗，請確認代碼正確。')); }
-}
-
-function deleteCustomTeam(index) {
-    if(!confirm(t('確定刪除？'))) return; let cr = customRotations.splice(index, 1)[0]; safeStorageSet('ww_custom_rotations_v2', customRotations); dpsData = dpsData.filter(d => d.id !== 'custom_rot_' + cr.id); debouncedRenderAndTrack(); openDataManager(); 
-}
 
 // ==========================================
-// --- 9. 實戰等級減傷校正器 (Anti-Ninja Nerf) ---
+// 以下是連接 ui.js 與 data_manager.js 的橋樑函式
+// 負責接收 UI 點擊事件 -> 呼叫資料庫運算 -> 更新畫面
 // ==========================================
-function calibratePenalty(level) {
-    let baseStr = prompt(t("請輸入打 Lv.100 怪物的【基礎傷害】（未衰減）：\n（例如今汐噴了：100000）"), "100000");
-    if (!baseStr) return;
-    let baseDmg = parseFloat(baseStr);
-    
-    let defaultActual = level === 110 ? "97500" : "95100";
-    let actualStr = prompt(t("請輸入打 Lv.") + level + t(" 怪物的【實測傷害】（已衰減）：\n（例如實際只噴了：") + defaultActual + t("）"), defaultActual);
-    if (!actualStr) return;
-    let actualDmg = parseFloat(actualStr);
 
-    if (isNaN(baseDmg) || isNaN(actualDmg) || baseDmg <= 0) {
-        return alert(t("⚠️ 請輸入有效的數字！"));
-    }
+function deleteSavedLineupFromDM(index) {
+    if (typeof deleteSavedLineupData === 'function') deleteSavedLineupData(index);
+    openDataManager(); 
+}
 
-    let penalty = actualDmg / baseDmg;
-    
-    if (level === 110) {
-        let el = document.getElementById('env-pen110');
-        if(el) el.value = penalty.toFixed(3);
-    } else if (level === 120) {
-        let el = document.getElementById('env-pen120');
-        if(el) el.value = penalty.toFixed(3);
-    }
-    
-    alert(t("🎯 Lv.") + level + t(" 減傷係數已自動校正為：") + penalty.toFixed(3));
+function deleteCalibratedHP(key) {
+    if (typeof deleteCalibratedHPData === 'function') deleteCalibratedHPData(key);
+    openDataManager(); 
+    if (typeof renderIndividualHPPanel === 'function') renderIndividualHPPanel();
     if (typeof updateTracker === 'function') updateTracker();
 }
 
+function deleteCustomTeam(index) {
+    if(!confirm(t('確定要刪除這組自訂排軸嗎？'))) return; 
+    
+    // 呼叫 data_manager.js 的刪除 API
+    if (typeof deleteCustomRotationData === 'function') {
+        deleteCustomRotationData(index);
+    }
+    
+    if(typeof debouncedRenderAndTrack === 'function') debouncedRenderAndTrack(); 
+    openDataManager(); 
+}
+
+function clearDataCategory(category) {
+    if (!confirm(t("確定要清除此項目的所有記憶數據嗎？\n(此操作無法復原)"))) return;
+    try {
+        if (typeof clearDataCategoryStorage === 'function') clearDataCategoryStorage(category);
+        if (category === 'env') alert(t("環境參數已清除，將於頁面重整後恢復預設。"));
+        window.location.reload(); 
+    } catch(e) { alert("清除失敗: " + e.message); }
+}
+
+function factoryResetWW() {
+    if (!confirm(t("⚠️ 嚴重警告：\n這將會徹底刪除您所有的自訂隊伍、記憶編隊、環境設定與解鎖進度！\n\n確定要將工具完全恢復到剛打開的初始狀態嗎？"))) return;
+    if (typeof factoryResetStorage === 'function') factoryResetStorage();
+    alert(t("✅ 所有數據已清除，系統即將重新啟動。")); 
+    window.location.reload();
+}
+
+function generateExportCode() {
+    if (typeof exportGlobalData === 'function') {
+        let code = exportGlobalData();
+        document.getElementById('dm-code').value = code; 
+        alert(t('✅ 存檔代碼已產生，請複製保存。'));
+    }
+}
+
+function confirmImportFromCode() { 
+    if(confirm(t('這將會覆寫您目前所有的自訂與記憶隊伍設定，確定執行嗎？'))) { 
+        let code = document.getElementById('dm-code').value; 
+        if(!code) return;
+        try {
+            if (typeof importGlobalData === 'function') importGlobalData(code);
+            alert(t('✅ 數據已完整還原！即將重新載入頁面。')); 
+            window.location.reload();
+        } catch(e) { 
+            alert(t('❌ 解析失敗，請確認代碼是否完整複製。')); 
+        }
+    } 
+}
 // ==========================================
-// --- 10. 記憶編隊管理 (Lineup Memory) ---
+// --- 9. 實戰等級減傷校正器 ---
+// ==========================================
+function calibratePenalty(level) {
+    let baseStr = prompt(t("請輸入打 Lv.100 怪物的【基礎傷害】（未衰減）：\n（例如今汐噴了：100000）"), "100000"); if (!baseStr) return; let baseDmg = parseFloat(baseStr);
+    let defaultActual = level === 110 ? "97500" : "95100";
+    let actualStr = prompt(t("請輸入打 Lv.") + level + t(" 怪物的【實測傷害】（已衰減）：\n（例如實際只噴了：") + defaultActual + t("）"), defaultActual); if (!actualStr) return; let actualDmg = parseFloat(actualStr);
+    if (isNaN(baseDmg) || isNaN(actualDmg) || baseDmg <= 0) { return alert(t("⚠️ 請輸入有效的數字！")); }
+    let penalty = actualDmg / baseDmg;
+    if (level === 110) { let el = document.getElementById('env-pen110'); if(el) el.value = penalty.toFixed(3); } 
+    else if (level === 120) { let el = document.getElementById('env-pen120'); if(el) el.value = penalty.toFixed(3); }
+    alert(t("🎯 Lv.") + level + t(" 減傷係數已自動校正為：") + penalty.toFixed(3)); if (typeof updateTracker === 'function') updateTracker();
+}
+
+// ==========================================
+// --- 10. 記憶編隊 ---
 // ==========================================
 function saveCurrentLineup() {
     let teams = []; let totalActualScore = 0; let rows = document.querySelectorAll('#team-board tr');
@@ -1124,25 +869,23 @@ function saveCurrentLineup() {
         if (r.classList.contains('hidden-row')) return;
         let ss = r.querySelectorAll('select.char-select'), scoreInput = r.querySelector('.score-input').value, score = parseFloat(scoreInput) || 0;
         let ebR = r.querySelector('.end-boss-r').value, ebIdx = r.querySelector('.end-boss-idx').value, ebHp = r.querySelector('.end-boss-hp').value;
-        if (ss[0].value || ss[1].value || ss[2].value) { 
-            teams.push({ c1: ss[0].value, c2: ss[1].value, c3: ss[2].value, scoreInput: scoreInput, score: score, ebR: ebR, ebIdx: ebIdx, ebHp: ebHp }); 
-            totalActualScore += score; 
-        }
+        if (ss[0].value || ss[1].value || ss[2].value) { teams.push({ c1: ss[0].value, c2: ss[1].value, c3: ss[2].value, scoreInput: scoreInput, score: score, ebR: ebR, ebIdx: ebIdx, ebHp: ebHp }); totalActualScore += score; }
     });
     if (teams.length === 0) return alert(t("編隊為空，無法記憶！請先編排隊伍。"));
     let name = prompt(t("請為此實戰編隊輸入記憶名稱："), `${new Date().toLocaleDateString()} 實戰`); if (!name) return;
     let lineup = { id: Date.now(), name: name, totalScore: totalActualScore, teams: teams };
-    savedLineups.unshift(lineup); if (savedLineups.length > 10) savedLineups.pop();
-    safeStorageSet('ww_saved_lineups', savedLineups); alert(t("✅ 實戰編隊已成功記憶！"));
+    
+    // 儲存邏輯
+    savedLineups.unshift(lineup); 
+    if (savedLineups.length > 10) savedLineups.pop();
+    safeStorageSet('ww_saved_lineups', savedLineups); 
+    alert(t("✅ 實戰編隊已成功記憶！"));
 }
 
 function openLineupModal() {
     let container = document.getElementById('lineup-list');
-    if (savedLineups.length === 0) {
-        container.innerHTML = `<p style="color:#aaa; text-align:center;">${t('尚無記憶的編隊，請先在沙盤點擊「💾 記憶當前實戰」')}</p>`;
-    } else {
-        container.innerHTML = savedLineups.map((l, i) => `<div style="background:rgba(0,0,0,0.4); border:1px solid #555; border-radius:8px; padding:12px; margin-bottom:10px;"><div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px dashed #444; padding-bottom:8px; margin-bottom:8px;"><strong style="color:var(--neon-purple); font-size:1.1em;">${l.name}</strong><span style="color:#ffaa00; font-weight:bold;">🎯 ${t('總分')}: ${l.totalScore.toLocaleString()}</span></div><div style="font-size:0.85em; color:#aaa; margin-bottom:10px;">${l.teams.map(t => `<span style="color:#ddd">${t.c1?t.c1:'?'}</span>+${t.c2?t.c2:'?'}+${t.c3?t.c3:'?'}`).join(' | ')}</div><div style="display:flex; gap:10px;"><button onclick="loadLineup(${i})" class="btn-action-all" style="flex:1; padding:6px;">📥 ${t('載入此編隊')}</button><button onclick="deleteLineup(${i})" class="btn-action-clear" style="padding:6px 12px; background:#555; border:none; box-shadow:none;">❌ ${t('刪除')}</button></div></div>`).join('');
-    }
+    if (savedLineups.length === 0) { container.innerHTML = `<p style="color:#aaa; text-align:center;">${t('尚無記憶的編隊，請先在沙盤點擊「💾 記憶當前實戰」')}</p>`; } 
+    else { container.innerHTML = savedLineups.map((l, i) => `<div style="background:rgba(0,0,0,0.4); border:1px solid #555; border-radius:8px; padding:12px; margin-bottom:10px;"><div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px dashed #444; padding-bottom:8px; margin-bottom:8px;"><strong style="color:var(--neon-purple); font-size:1.1em;">${l.name}</strong><span style="color:#ffaa00; font-weight:bold;">🎯 ${t('總分')}: ${l.totalScore.toLocaleString()}</span></div><div style="font-size:0.85em; color:#aaa; margin-bottom:10px;">${l.teams.map(t => `<span style="color:#ddd">${t.c1?t.c1:'?'}</span>+${t.c2?t.c2:'?'}+${t.c3?t.c3:'?'}`).join(' | ')}</div><div style="display:flex; gap:10px;"><button onclick="loadLineup(${i})" class="btn-action-all" style="flex:1; padding:6px;">📥 ${t('載入此編隊')}</button><button onclick="deleteLineup(${i})" class="btn-action-clear" style="padding:6px 12px; background:#555; border:none; box-shadow:none;">❌ ${t('刪除')}</button></div></div>`).join(''); }
     document.getElementById('lineup-modal').style.display = 'flex';
 }
 
@@ -1169,19 +912,21 @@ function loadLineup(index) {
 
 function deleteLineup(index) { 
     if(!confirm(t("確定刪除此紀錄？"))) return; 
-    savedLineups.splice(index, 1); 
-    safeStorageSet('ww_saved_lineups', savedLineups); 
+    if (typeof deleteSavedLineupData === 'function') {
+        deleteSavedLineupData(index); // 呼叫 data_manager 的函式
+    } else {
+        savedLineups.splice(index, 1); 
+        safeStorageSet('ww_saved_lineups', savedLineups); 
+    }
     openLineupModal(); 
 }
-
 // ==========================================
-// --- 11. 匯出、分享與大數據收集 (Export & Share) ---
+// --- 11. 匯出與表單 ---
 // ==========================================
 function exportImage() {
     try {
         const rows = document.querySelectorAll('#team-board tr'); let completed = [];
-        let env = typeof getEnvSettings === 'function' ? getEnvSettings() : {};
-        let globalResInfo = [];
+        let env = typeof getEnvSettings === 'function' ? getEnvSettings() : {}; let globalResInfo = [];
         if(env.resTags && env.resTags[0]) globalResInfo.push(`[1]${env.resTags[0]}`);
         if(env.resTags && env.resTags[1]) globalResInfo.push(`[2]${env.resTags[1]}`);
         if(env.resTags && env.resTags[2]) globalResInfo.push(`[3]${env.resTags[2]}`);
@@ -1207,7 +952,7 @@ function exportImage() {
         let scoreElem = document.getElementById('dashboard-scores'); let currentScore = scoreElem ? scoreElem.innerText.replace(/\n/g, '  ') : '0 分';
         box.innerHTML = h + `</table><div style="margin-top:20px; text-align:right; color:#888; font-size:0.9em;">${t("全局數據統計")}：${currentScore}${envResStr} | ${t("生成時間")}：${new Date().toLocaleString()}</div>`;
         document.body.appendChild(box); html2canvas(box, { backgroundColor: '#1e1e24', scale: 2 }).then(c => { let l = document.createElement('a'); l.download = '鳴潮矩陣推演編隊表.png'; l.href = c.toDataURL('image/png'); l.click(); document.body.removeChild(box); });
-    } catch(err) { alert(t("截圖失敗，請確定隊伍資料填寫完整。錯誤資訊：") + err.message); }
+    } catch(err) { alert(t("截圖失敗，請確定隊伍資料填寫完整。") + err.message); }
 }
 
 function submitToGoogleForm() {
@@ -1220,26 +965,16 @@ function submitToGoogleForm() {
             let ss = r.querySelectorAll('select.char-select'), scoreInput = r.querySelector('.score-input');
             let score = scoreInput ? parseFloat(scoreInput.value) : NaN, ebR = parseInt(r.querySelector('.end-boss-r').value), ebIdx = parseInt(r.querySelector('.end-boss-idx').value), ebHp = parseFloat(r.querySelector('.end-boss-hp').value);
             if(ss.length >= 3 && ss[0].value && ss[1].value && ss[2].value && !isNaN(score)) {
-                let c1 = ss[0].value;
-                let teamAttr = typeof charAttrMap !== 'undefined' ? charAttrMap[c1] : null;
-
+                let c1 = ss[0].value; let teamAttr = typeof charAttrMap !== 'undefined' ? charAttrMap[c1] : null;
                 let dmg_left = score / Math.max(0.0001, env.scoreRatio), kills = 0, effective_dmg_sum = 0, tmp_r = 1, tmp_idx = 1, tmp_hp = getBossMaxHP(1, 1), dmgDealtToKilledBosses = 0;
                 let calculatedTotalHP = 0, loopGuard = 0;
-                
                 while (dmg_left > 0 && loopGuard < 50) { 
-                    loopGuard++; 
-                    let isResisted = teamAttr && teamAttr === env.resTags[tmp_idx - 1];
-                    let r_factor = isResisted ? (1 - env.resPenalty / 100) : 1; 
-                    if (r_factor <= 0) r_factor = 0.1; 
+                    loopGuard++; let isResisted = teamAttr && teamAttr === env.resTags[tmp_idx - 1]; let r_factor = isResisted ? (1 - env.resPenalty / 100) : 1; if (r_factor <= 0) r_factor = 0.1; 
                     if (dmg_left >= tmp_hp) { dmg_left -= tmp_hp; dmgDealtToKilledBosses += tmp_hp; effective_dmg_sum += (tmp_hp / r_factor); kills++; tmp_idx++; if (tmp_idx > 4) { tmp_r++; tmp_idx = 1; } tmp_hp = getBossMaxHP(tmp_r, tmp_idx); } 
                     else { effective_dmg_sum += (dmg_left / r_factor); if (!isNaN(ebR) && !isNaN(ebIdx) && !isNaN(ebHp) && ebR === tmp_r && ebIdx === tmp_idx) { let dmgDoneToEndBoss = (score / env.scoreRatio) - dmgDealtToKilledBosses; let hp_factor = 1 - (ebHp / 100); if (hp_factor <= 0) hp_factor = 0.0001; calculatedTotalHP = dmgDoneToEndBoss / hp_factor; } dmg_left = 0; }
                 }
-                
                 let effective_time = env.battleTime - (kills * env.transTime), trueBaseDps = effective_time > 0 ? (effective_dmg_sum / effective_time) : 0;
-                let t1 = env.resTags && env.resTags[0] ? env.resTags[0] : '無';
-                let t2 = env.resTags && env.resTags[1] ? env.resTags[1] : '無';
-                let t3 = env.resTags && env.resTags[2] ? env.resTags[2] : '無';
-                let t4 = env.resTags && env.resTags[3] ? env.resTags[3] : '無';
+                let t1 = env.resTags && env.resTags[0] ? env.resTags[0] : '無'; let t2 = env.resTags && env.resTags[1] ? env.resTags[1] : '無'; let t3 = env.resTags && env.resTags[2] ? env.resTags[2] : '無'; let t4 = env.resTags && env.resTags[3] ? env.resTags[3] : '無';
                 dataParams.push(`${ss[0].value},${ss[1].value},${ss[2].value},${score},${trueBaseDps.toFixed(2)},${ebR||''},${ebIdx||''},${ebHp||''},${calculatedTotalHP ? calculatedTotalHP.toFixed(2) : ''},${t1},${t2},${t3},${t4}`);
             }
         });
@@ -1249,7 +984,7 @@ function submitToGoogleForm() {
 }
 
 // ==========================================
-// --- 12. 雜項與輔助介面 (Misc UI Interactions) ---
+// --- 11.5 雜項與輔助介面 (導覽與報錯模組) ---
 // ==========================================
 function toggleGuideMode(mode) {
     const btnBriefs = document.querySelectorAll('.btn-guide-brief');
@@ -1260,26 +995,19 @@ function toggleGuideMode(mode) {
     if (mode === 'brief') {
         btnBriefs.forEach(btn => { btn.style.background = 'var(--neon-green)'; btn.style.color = '#1e1e24'; btn.style.border = '1px solid var(--neon-green)'; btn.style.boxShadow = '0 0 10px rgba(0,255,170,0.4)'; });
         btnDetails.forEach(btn => { btn.style.background = 'transparent'; btn.style.color = '#aaa'; btn.style.border = '1px solid #555'; btn.style.boxShadow = 'none'; });
-        guideDetails.forEach(el => el.style.display = 'none');
-        guideBriefs.forEach(el => el.style.display = 'block');
+        guideDetails.forEach(el => el.style.display = 'none'); guideBriefs.forEach(el => el.style.display = 'block');
     } else {
         btnDetails.forEach(btn => { btn.style.background = 'var(--neon-purple)'; btn.style.color = '#fff'; btn.style.border = '1px solid var(--neon-purple)'; btn.style.boxShadow = '0 0 10px rgba(207,0,255,0.4)'; });
         btnBriefs.forEach(btn => { btn.style.background = 'transparent'; btn.style.color = '#aaa'; btn.style.border = '1px solid #555'; btn.style.boxShadow = 'none'; });
-        guideBriefs.forEach(el => el.style.display = 'none');
-        guideDetails.forEach(el => el.style.display = 'block');
+        guideBriefs.forEach(el => el.style.display = 'none'); guideDetails.forEach(el => el.style.display = 'block');
     }
 }
 
-// ==========================================
-// --- 13. 系統報錯與防呆機制 (Error Handling) ---
-// ==========================================
 const DEVELOPER_EMAIL = "dpm.builder@outlook.com"; 
 
 function showErrorModal(info) {
     const preview = document.getElementById('error-preview');
-    if (preview) {
-        preview.textContent = `[${t('時間')}]: ${info.time}\n[${t('錯誤')}]: ${info.message}\n[${t('位置')}]: ${info.location}\n[${t('設備')}]: ${info.userAgent.substring(0, 50)}...`;
-    }
+    if (preview) { preview.textContent = `[${t('時間')}]: ${info.time}\n[${t('錯誤')}]: ${info.message}\n[${t('位置')}]: ${info.location}\n[${t('設備')}]: ${info.userAgent.substring(0, 50)}...`; }
     const modal = document.getElementById('error-modal');
     if (modal) modal.style.display = 'flex';
 }
@@ -1293,45 +1021,55 @@ function closeErrorModal() {
 function sendErrorReport() {
     if (!currentErrorInfo) return;
     const subject = encodeURIComponent(`[矩陣編隊工具 - 自動報錯] ${currentErrorInfo.message.substring(0, 40)}`);
-    const rawBody = `開發者您好，我在使用矩陣編隊工具時遇到了錯誤。
-
-【錯誤詳細資訊】
-時間: ${currentErrorInfo.time}
-錯誤訊息: ${currentErrorInfo.message}
-發生位置: ${currentErrorInfo.location}
-
-【玩家設備與環境】
-瀏覽器: ${currentErrorInfo.userAgent}
-
-【堆疊追蹤 (Stack Trace)】
-${currentErrorInfo.stack}
-`;
+    const rawBody = `開發者您好，我在使用矩陣編隊工具時遇到了錯誤。\n\n【錯誤詳細資訊】\n時間: ${currentErrorInfo.time}\n錯誤訊息: ${currentErrorInfo.message}\n發生位置: ${currentErrorInfo.location}\n\n【玩家設備與環境】\n瀏覽器: ${currentErrorInfo.userAgent}\n\n【堆疊追蹤 (Stack Trace)】\n${currentErrorInfo.stack}\n`;
     window.location.href = `mailto:${DEVELOPER_EMAIL}?subject=${subject}&body=${encodeURIComponent(rawBody)}`;
     closeErrorModal();
 }
 
 // ==========================================
-// --- 13.5. 畫面初始化 (App Bootstrapper) ---
+// --- 12. 全域環境狀態記憶體 (State Manager) ---
+// ==========================================
+function saveEnvDOMState() {
+    let envData = {};
+    let idsToSave = [
+        'env-res-1', 'env-res-2', 'env-res-3', 'env-res-4',
+        'env-buff-1', 'env-buff-2', 'env-buff-3', 'env-buff-4',
+        'env-ratio', 'env-r1', 'env-r2', 'env-r3', 'env-growth', 
+        'env-trans', 'env-time', 'env-res', 'env-pen110', 'env-pen120'
+    ];
+    idsToSave.forEach(id => { let el = document.getElementById(id); if (el) envData[id] = el.value; });
+    safeStorageSet('ww_env_dom_state', envData);
+}
+
+function loadEnvDOMState() {
+    let saved = safeStorageGet('ww_env_dom_state', null);
+    if (saved) {
+        Object.keys(saved).forEach(id => {
+            let el = document.getElementById(id);
+            if (el && saved[id] !== undefined && saved[id] !== null) { el.value = saved[id]; }
+        });
+    }
+}
+
+// ==========================================
+// --- 13. 畫面初始化 ---
 // ==========================================
 function initializeApp() {
     initCoreData(); 
     initBoard(); 
-    
     if (isSimp) document.getElementById('lang-toggle').innerText = "🌐 繁 / 简";
     
-    let savedCount = localStorage.getItem('ww_display_count');
-    if (savedCount && document.getElementById('team-count-select')) {
-        document.getElementById('team-count-select').value = savedCount;
-    }
+    if (typeof loadEnvDOMState === 'function') loadEnvDOMState();
 
+    let savedCount = localStorage.getItem('ww_display_count');
+    if (savedCount && document.getElementById('team-count-select')) { document.getElementById('team-count-select').value = savedCount; }
+    
     let savedSkill = safeStorageGet('ww_skill_slider', 100);
     let skillSlider = document.getElementById('skill-slider');
-    if (skillSlider) {
-        skillSlider.value = savedSkill;
-    }
-    updateMasterSkill();
-    renderCheckboxes(); 
-    renderRotations();
+    if (skillSlider) { skillSlider.value = savedSkill; }
+    updateMasterSkill(); 
+    
+    renderCheckboxes(); renderRotations();
     
     const savedTeams = safeStorageGet('ww_teams', null);
     if (Array.isArray(savedTeams)) {
@@ -1345,17 +1083,10 @@ function initializeApp() {
         });
     }
     
-    updateTeamDisplayCount(); 
-    updateToggleButtons(); 
+    updateTeamDisplayCount(); updateToggleButtons(); 
     if(document.querySelectorAll('.tab-btn').length > 0) document.querySelectorAll('.tab-btn')[0].click(); 
     translateDOM(document.body);
-    requestAnimationFrame(() => {
-        document.body.classList.add('loaded');
-    });
+    requestAnimationFrame(() => { document.body.classList.add('loaded'); });
 }
 
-// ==========================================
-// --- 14. 系統啟動 (App Bootstrap) ---
-// ==========================================
-// 確保所有模組與函數加載完畢後，再執行初始化
 initializeApp();
