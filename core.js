@@ -1,5 +1,5 @@
 // ==========================================
-// 鳴潮矩陣編隊工具 v4.8.2 [核心運算模組 - 智慧剪枝特化版]
+// 鳴潮矩陣編隊工具 v4.8.3 [核心運算模組 - 智慧剪枝特化版]
 // 檔案：core.js
 // 職責：資料存取、數學推演、動態時間判定、雙引擎洗牌(DP+Beam)、專屬增傷、A*潛力估價、防呆機制
 // ==========================================
@@ -34,6 +34,7 @@ let savedLineups = [];
 let show5Star = true, show4Star = true, showG1 = true, showG2 = true, showG3 = true;
 let activePresetAttrs = new Set(); 
 let activePresetGens = new Set();
+let globalCharStats = {};
 let currentEditRotId = null;
 
 // --- 2. 基礎工具 (Utils) ---
@@ -252,7 +253,8 @@ function initCoreData() {
 
     savedLineups = safeStorageGet('ww_saved_lineups', []);
     customStatsMap = safeStorageGet('ww_custom_stats', {});
-
+    //讀取全域角色參數存檔
+    globalCharStats = safeStorageGet('ww_global_char_stats', {});
     let parsedRoster = safeStorageGet('ww_roster', null);
     if (Array.isArray(parsedRoster)) {
         parsedRoster.forEach(name => { if (charData[name] || ['光主','暗主','風主'].includes(name)) ownedCharacters.add(name); });
@@ -371,26 +373,88 @@ function getMaxTeams(usedObj) {
 }
 
 function runMonteCarlo(expectedDps, rotId) {
-    let stats = customStatsMap[rotId];
-    if (!stats || stats.nukeCR === undefined || stats.nukeLoss === undefined) return null;
-    
-    let cr = parseFloat(stats.nukeCR);
-    let loss = parseFloat(stats.nukeLoss);
-    if (isNaN(cr) || isNaN(loss)) return null;
+    // 1. 抓取該排軸的基本資料
+    let rotData = dpsData.find(d => d.id === rotId);
+    if (!rotData) return null;
 
-    cr = cr / 100;
-    let rotTime = 25; 
+    let stats = customStatsMap[rotId];
+
+    // 2. 🌟 雙層架構：獲取暴擊率 (先看有沒有專屬覆寫，沒有就去抓全域角色白板)
+    let getCr = (cName, overrideVal) => {
+        // A. 若排軸有專屬覆寫值，絕對優先使用！
+        if (overrideVal !== undefined && overrideVal !== "" && !isNaN(parseFloat(overrideVal))) {
+            return parseFloat(overrideVal); 
+        }
+        // B. 若排軸留空，去抓角色清單的全域值
+        if (!cName) return 0;
+        let b = getBase(cName);
+        return (globalCharStats[b] && globalCharStats[b].cr) ? globalCharStats[b].cr : 0; 
+    };
+
+    let cr1 = getCr(rotData.c1, stats?.mcCrit?.c1);
+    let cr2 = getCr(rotData.c2, stats?.mcCrit?.c2);
+    let cr3 = getCr(rotData.c3, stats?.mcCrit?.c3);
+    
+    // 如果三個角色的暴擊率（不論全域或覆寫）都沒填，就不跑蒙地卡羅
+    if (cr1 === 0 && cr2 === 0 && cr3 === 0) return null;
+
+    let rotTime = rotData.duration || 25; 
     let expectedTotalDmg = expectedDps * rotTime;
+    
+    // 3. 動態精算傷害佔比
+    let share1 = 0.70, share2 = 0.20, share3 = 0.10; 
+
+    if (rotData.isUserCustom) {
+        let customId = rotId.replace('custom_rot_', '');
+        let cr = customRotations.find(x => x.id == customId);
+        
+        if (cr && cr.gridData && cr.gridData.length > 0) {
+            let dmg1 = 0, dmg2 = 0, dmg3 = 0, totalGridDmg = 0;
+            cr.gridData.forEach(row => {
+                let d = parseFloat(row.dmg) || 0;
+                if (row.char === rotData.c1) dmg1 += d;
+                else if (row.char === rotData.c2) dmg2 += d;
+                else if (row.char === rotData.c3) dmg3 += d;
+                totalGridDmg += d;
+            });
+            if (totalGridDmg > 0) {
+                share1 = dmg1 / totalGridDmg;
+                share2 = dmg2 / totalGridDmg;
+                share3 = dmg3 / totalGridDmg;
+            }
+        }
+    } 
+
+    // 4. 設定爆傷參數與還原白字傷害
+    let cdBonus = 1.5; // 爆傷加成 150%
+    
+    let getBaseDmg = (expectedShare, cr) => {
+        if (cr === 0) return expectedShare;
+        return expectedShare / (1 + (cr / 100) * cdBonus);
+    };
+    
+    let base1 = getBaseDmg(expectedTotalDmg * share1, cr1);
+    let base2 = getBaseDmg(expectedTotalDmg * share2, cr2);
+    let base3 = getBaseDmg(expectedTotalDmg * share3, cr3);
+
     let minDmg = Infinity, maxDmg = 0;
     
+    // 5. 執行 10,000 次蒙地卡羅模擬
     for (let i = 0; i < 10000; i++) {
-        let dmgFluctuation = expectedTotalDmg * 0.03 * (Math.random() * 2 - 1);
-        let runDmg = expectedTotalDmg + dmgFluctuation;
-        if (Math.random() > cr) runDmg -= loss; 
+        let hit1 = (Math.random() * 100 < cr1) ? base1 * (1 + cdBonus) : base1;
+        let hit2 = (Math.random() * 100 < cr2) ? base2 * (1 + cdBonus) : base2;
+        let hit3 = (Math.random() * 100 < cr3) ? base3 * (1 + cdBonus) : base3;
+        
+        let runDmg = hit1 + hit2 + hit3;
+        
         if (runDmg < minDmg) minDmg = runDmg;
         if (runDmg > maxDmg) maxDmg = runDmg;
     }
-    return { min: Math.max(0.1, minDmg / rotTime), max: Math.max(0.1, maxDmg / rotTime) };
+    
+    return { 
+        min: Math.max(0.1, minDmg / rotTime), 
+        max: Math.max(0.1, maxDmg / rotTime) 
+    };
 }
 
 function runSimulations(env) {
@@ -437,9 +501,17 @@ function runSimulations(env) {
                     let rotId = possibleRots[0].id;
                     let dpsRange = getRotDpsRange(possibleRots[0]);
                     
+                    // 🌟 1. 先抓出這條排軸原本的「穩定度折損比例」
+                    let stabRate = (dpsRange.max > 0) ? (dpsRange.min / dpsRange.max) : 1;
+                    
                     if (mcMode === 'on') {
                         let mcRes = runMonteCarlo(dpsRange.max, rotId);
-                        if (mcRes) { dpsRange.min = mcRes.min; dpsRange.max = mcRes.max; }
+                        if (mcRes) { 
+                            // 🌟 2. 下限 = 臉最黑的基底傷害 × 手殘的穩定度折損
+                            dpsRange.min = mcRes.min * stabRate; 
+                            // 🌟 3. 上限 = 臉最白 (且假設完美操作不扣穩定度)
+                            dpsRange.max = mcRes.max; 
+                        }
                     }
                     
                     if (dpsRange.max <= 0) { 
