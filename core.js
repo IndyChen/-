@@ -661,6 +661,7 @@ async function reverseInferAndOptimize() {
         let start_r = 1, start_idx = 1, start_hp = getBossMaxHP(1, 1);
         
         let hasIncompleteScore = false; // 🚀 防呆標記
+        let needsRebuild = false;       // 🚀 新增：標記是否需要重新渲染左側清單
 
         rows.forEach((row) => {
             if (row.classList.contains('hidden-row')) return;
@@ -670,8 +671,12 @@ async function reverseInferAndOptimize() {
             let ebR = row.querySelector('.end-boss-r').value;
             let ebIdx = row.querySelector('.end-boss-idx').value;
             let ebHp = row.querySelector('.end-boss-hp').value;
+            
+            // 抓取目前該行的排軸選單
+            let rotSelect = row.querySelector('.rot-select');
+            let rotId = rotSelect ? rotSelect.value : "";
 
-            if (c1) { 
+            if (c1 && c2 && c3) { 
                 let actualScore = parseFloat(scoreInput);
                 
                 // 🚀 防呆攔截：若選了主C卻未填寫分數或分數異常
@@ -680,14 +685,57 @@ async function reverseInferAndOptimize() {
                     return; 
                 }
 
+                // --- 🌟 核心修復：自動補全、配對與新建邏輯 ---
+                let validRotId = rotId;
+
+                // 1. 如果沒有選擇有效排軸 (空值或無預設)，執行自動配對或新建
+                if (!validRotId || validRotId === "" || validRotId.includes("無預設") || validRotId.includes("無適配")) {
+                    // 先找是否有現存的「自訂排軸」
+                    let foundCustom = typeof customRotations !== 'undefined' ? customRotations.find(cr => cr.c1 === c1 && cr.c2 === c2 && cr.c3 === c3) : null;
+                    if (foundCustom) {
+                        validRotId = 'custom_rot_' + foundCustom.id;
+                    } 
+                    // 沒自訂，找「資料庫適配隊伍」
+                    else if (window.teamDB && window.teamDB[c1]) {
+                        let foundDB = window.teamDB[c1].find(db => db.c2 === c2 && db.c3 === c3);
+                        if (foundDB) validRotId = `db_rot_${c1}_${c2}_${c3}_${foundDB.rot}`;
+                    }
+
+                    // 2. 如果對不上任何資料，直接加進自訂並給予代號
+                    if (!validRotId && typeof addCustomRotation === 'function') {
+                        validRotId = addCustomRotation(c1, c2, c3, 0, "🧩");
+                        needsRebuild = true;
+                    }
+                }
+
+                // 3. 確保該排軸與對應角色處於「已勾選並啟用」狀態
+                if (validRotId && !checkedRotations.has(validRotId)) {
+                    checkedRotations.add(validRotId);
+                    ownedCharacters.add(getBase(c1));
+                    ownedCharacters.add(getBase(c2));
+                    ownedCharacters.add(getBase(c3));
+                    safeStorageSet('ww_rotations', [...checkedRotations]);
+                    safeStorageSet('ww_roster', [...ownedCharacters]);
+                    needsRebuild = true;
+                }
+
+                // 4. 防呆更新 UI：把剛配對到(或新建)的 ID 塞進這行的 select 裡面，避免存錯
+                if (rotSelect && validRotId !== rotId) {
+                    if (![...rotSelect.options].some(opt => opt.value === validRotId)) {
+                        rotSelect.innerHTML += `<option value="${validRotId}">${t("自動啟用排軸")}</option>`;
+                    }
+                    rotSelect.value = validRotId;
+                }
+
+                rotId = validRotId; // 將後續運算的目標鎖定為我們找到的正確 ID
+                // --------------------------------------------------------
+
                 let ebRInt = parseInt(ebR), ebIdxInt = parseInt(ebIdx), ebHpPct = parseFloat(ebHp);
-                let calculatedMinDps = 0, rotId = null;
+                let calculatedMinDps = 0;
                 let possibleRots = getBestPossibleRots(c1, c2, c3); 
-                
-                if (possibleRots.length > 0) rotId = possibleRots[0].id;
                 let teamAttr = typeof charAttrMap !== 'undefined' ? charAttrMap[c1] : null;
 
-                if (actualScore > 0 && possibleRots.length > 0) {
+                if (actualScore > 0 && rotId) {
                     let dmg_left = actualScore / Math.max(0.0001, env.scoreRatio);
                     let kills = 0, effective_dmg_sum = 0, tmp_r = start_r, tmp_idx = start_idx, tmp_hp = start_hp, dmgDealtToKilledBosses = 0;
                     let loopGuard = 0;
@@ -725,8 +773,14 @@ async function reverseInferAndOptimize() {
                         let buffMult = 1 + ((currStats.buff || 0) / 100);
                         let restoredBaseDps = trueBaseDps / buffMult;
                         
-                        let originalBaseDps = currStats.dps || possibleRots[0].dps;
-                        let diffKey = possibleRots[0].diff.includes('⚠️') ? '⚠️' : possibleRots[0].diff.includes('⭐') ? '⭐' : possibleRots[0].diff.includes('🔵') ? '🔵' : possibleRots[0].diff.includes('🟩') ? '🟩' : '🧩';
+                        let fallbackOriginal = possibleRots.length > 0 ? possibleRots[0].dps : 1;
+                        let originalBaseDps = currStats.dps || fallbackOriginal;
+                        
+                        let diffKey = '⭐';
+                        if (possibleRots.length > 0) {
+                            diffKey = possibleRots[0].diff.includes('⚠️') ? '⚠️' : possibleRots[0].diff.includes('⭐') ? '⭐' : possibleRots[0].diff.includes('🔵') ? '🔵' : possibleRots[0].diff.includes('🟩') ? '🟩' : '🧩';
+                        }
+                        
                         let currentStab = (currStats.stability !== null && currStats.stability !== undefined) ? currStats.stability : (diffStability[diffKey] !== undefined ? diffStability[diffKey] : 100);
                         
                         let minDps = originalBaseDps * (currentStab / 100);
@@ -751,9 +805,25 @@ async function reverseInferAndOptimize() {
                         } else {
                             customStatsMap[rotId] = { dps: newDps, stability: newStab, buff: 0 }; 
                         }
+                        
+                        // 🌟 新增：同步更新全局 dpsData 與自訂資料庫，避免重新整理後失憶
+                        let targetRot = typeof dpsData !== 'undefined' ? dpsData.find(d => d.id === rotId) : null;
+                        if (targetRot) {
+                            targetRot.dps = newDps;
+                            if (targetRot.isUserCustom) {
+                                let customId = rotId.replace('custom_rot_', '');
+                                let customTarget = typeof customRotations !== 'undefined' ? customRotations.find(cr => cr.id == customId) : null;
+                                if (customTarget) {
+                                    customTarget.dps = newDps;
+                                    if (customTarget.duration) customTarget.totalDmg = newDps * customTarget.duration;
+                                    safeStorageSet('ww_custom_rotations_v2', customRotations);
+                                }
+                            }
+                        }
+
                         calculatedMinDps = trueBaseDps; 
                     } else if (rotId) { 
-                        calculatedMinDps = getRotDpsRange(possibleRots[0]).min; 
+                        calculatedMinDps = possibleRots.length > 0 ? getRotDpsRange(possibleRots[0]).min : 0; 
                     }
                     
                     let sim_dmg = actualScore / Math.max(0.0001, env.scoreRatio), sim_r = start_r, sim_idx = start_idx, sim_hp = start_hp;
@@ -767,7 +837,7 @@ async function reverseInferAndOptimize() {
                     start_r = sim_r; start_idx = sim_idx; start_hp = sim_hp;
 
                 } else if (rotId) {
-                    calculatedMinDps = getRotDpsRange(possibleRots[0]).min;
+                    calculatedMinDps = possibleRots.length > 0 ? getRotDpsRange(possibleRots[0]).min : 0;
                     let t_left = env.battleTime;
                     let simLoopGuard = 0;
                     while (t_left > 0 && simLoopGuard < 50) {
@@ -797,6 +867,12 @@ async function reverseInferAndOptimize() {
                 currentTeams.push({ c1: c1, c2: c2, c3: c3, scoreInput: scoreInput, ebR: ebR, ebIdx: ebIdx, ebHp: ebHp, calculatedMinDps: calculatedMinDps, teamAttr: teamAttr, rotId: rotId });
             }
         });
+
+        // 🌟 處理完所有列後，若觸發了自動新增或勾選，重新渲染
+        if (needsRebuild && typeof renderRotations === 'function') {
+            renderRotations();
+            if (typeof updateTracker === 'function') updateTracker();
+        }
 
         // 🚀 防呆執行
         if (hasIncompleteScore) {
