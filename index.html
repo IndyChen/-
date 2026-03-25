@@ -22,6 +22,7 @@
       gtag('config', 'G-FYW9EX8V5G');
     </script>
     <script defer src="html2canvas.min.js"></script>
+    <script src="lz-string.min.js"></script>
     <style>
         body { opacity: 0; transition: opacity 0.3s ease-in-out; }
         body.loaded { opacity: 1; }
@@ -228,12 +229,16 @@
 <body>
 
     <div class="top-toolbar">
-        <button id="theme-toggle" class="btn-top" onclick="toggleTheme()">🌿 護眼模式</button>
-        <button id="lang-toggle" class="btn-top" onclick="toggleLang()">🌐 简 / 繁</button>
-        <button class="btn-top" onclick="openDataManager()" style="color:var(--neon-green); border-color:var(--border-glass);">⚙️ 數據總管與備份</button>
-    </div>
+    <button id="theme-toggle" class="btn-top" onclick="toggleTheme()">🌿 護眼模式</button>
+    <button id="lang-toggle" class="btn-top" onclick="toggleLang()">🌐 简 / 繁</button>
     
-    <h2>鳴潮矩陣編隊工具 <span style="font-size: 0.5em; color: var(--neon-purple); vertical-align: middle;">v4.8.3</span></h2>
+    <div style="display: flex; flex-direction: column; gap: 8px;">
+        <button class="btn-top" onclick="openDataManager()" style="color:var(--neon-green); border-color:var(--border-glass); margin: 0;">⚙️ 數據總管與備份</button>
+        <button class="btn-top" onclick="openWorkshopModal()" style="color:#cf00ff; border-color:#cf00ff; margin: 0; box-shadow: 0 0 8px rgba(207,0,255,0.3);">🌐 排軸工作坊</button>
+    </div>
+</div>
+    
+    <h2>鳴潮矩陣編隊工具 <span style="font-size: 0.5em; color: var(--neon-purple); vertical-align: middle;">v4.8.4</span></h2>
     
     <div class="data-source">
         <span>📊 數據庫設計與邏輯：AI架構 / 數據提供：QuichilOvO、南邊 / 整理：Kolton</span>
@@ -261,13 +266,13 @@
                             <strong style="color: #fff; font-size: 1.05em;">【三步完成基礎設定】</strong>
                             <ol style="margin: 5px 0 10px 20px; padding: 0; color: #ccc;">
                                 <li><strong>勾選角色：</strong>選擇您目前持有的角色。點擊名稱旁的 `⚙️` 可設定全域預設暴擊率。</li>
-                                <li><strong>選擇難度：</strong>過濾未達預期或不符合需求的排軸難度。</li>
+                                <li><strong>選擇難度：</strong>過濾不符合需求的操作難度。</li>
                                 <li><strong>前往下一步：</strong>點擊右下角按鈕進入編隊沙盤。</li>
                             </ol>
                             <strong style="color: var(--gold); font-size: 1.05em; margin-top: 10px; display: inline-block;">【快捷按鈕與輔助功能】</strong>
                             <ul style="margin: 5px 0 0 20px; padding: 0; color: #ccc;">
                                 <li><strong>🔍 快速篩選：</strong>利用頂部星級、世代按鈕或搜尋框過濾角色。</li>
-                                <li><strong>➕ 新增自訂：</strong>手動建立排軸，或利用智能解析直接貼上動作數據。</li>
+                                <li><strong>➕ 新增自訂：</strong>手動建立排軸，或利用解析工具直接貼上動作數據。</li>
                                 <li><strong>🎯 達成率拉桿：</strong>依照個人操作熟練度調整，系統將自動套用對應的傷害折損。</li>
                             </ul>
                         </div>
@@ -279,83 +284,72 @@
                             </ul>
                             <strong style="color: var(--neon-purple); font-size: 1.05em;">【全局設定：達成率與折損】</strong>
                             <ul style="margin: 5px 0 10px 20px; padding: 0; color: #ccc;">
-                                <li><strong>運算邏輯：</strong>依據全局設定值與各排軸的「難度權重」計算折損率，給出實戰 DPS 下限預估值。</li>
-                                <li><strong>穩定性計算機：</strong>輸入標準耗時與實測紀錄，利用標準差自動評估您的手部乘區穩定度。</li>
+                                <li><strong>運算邏輯：</strong>依據全局設定值與各排軸的「難度權重」計算折損率，提供實戰 DPS 下限預估值。</li>
+                                <li><strong>穩定性計算機：</strong>輸入標準耗時與實測紀錄，利用標準差評估實際操作穩定度。</li>
                             </ul>
                             <strong style="color: #00ffaa; font-size: 1.05em;">【進階自訂與資料解析面板】</strong>
                             <ul style="margin: 5px 0 10px 20px; padding: 0; color: #ccc;">
-                                <li><strong>雙層覆寫參數：</strong>點擊排軸數值可開啟參數彈窗。除可修改 DPS 與穩定度外，亦可針對該隊伍覆寫「專屬實戰暴擊率」。</li>
-                                <li><strong>排軸解析與視覺化：</strong>支援直接貼上文字排軸，系統會解析動作並產生多點特徵陣列 (LUT)。面板底部附有傷害曲線圖，滑鼠移入可預覽特定時間點的預估傷害。</li>
+                                <li><strong>雙層覆寫參數：</strong>點擊排軸數值可開啟參數彈窗。除修改 DPS 與穩定度外，亦可針對該隊伍覆寫「專屬實戰暴擊率」。</li>
+                                <li><strong>排軸解析與視覺化：</strong>支援貼上文字排軸，系統會解析動作並產生多點特徵陣列 (LUT)。面板底部附有傷害曲線圖，游標移入可預覽特定時間點的預估傷害。</li>
                             </ul>
-                            <strong style="color: var(--gold); font-size: 1.05em;">【全域視窗：備份與管理】</strong>
+                            <strong style="color: var(--gold); font-size: 1.05em;">【全域視窗：備份與工作坊】</strong>
                             <ul style="margin: 5px 0 10px 20px; padding: 0; color: #ccc;">
-                                <li><strong>數據總管：</strong>透過分頁一站式管理自訂排軸、記憶存檔與 Boss 血量校正。</li>
-                                <li><strong>單軸與全域分享：</strong>支援單隊排軸生成精簡的專屬短碼 (WWZ_ Base85) 進行分享，以及全域設定的完整代碼備份。</li>
+                                <li><strong>數據總管：</strong>透過分頁管理自訂排軸、記憶存檔與 Boss 血量校正。支援單隊短碼 (WW2_ Base85) 及全域設定的完整代碼備份。</li>
+                                <li><strong>排軸工作坊：</strong>提供雲端大廳功能。可將本機自訂排軸發布至雲端，或瀏覽社群排軸並下載套用。系統會自動計算排軸動作密度，並具備防呆查重機制。</li>
                             </ul>
                         </div>
                     </div>
                 </details>
 
                 <div style="background: rgba(30, 30, 36, 0.7); border: 1px solid #9c9c26; border-left: 4px solid #9c9c26; padding: 20px 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.3); flex: 1; min-width: 300px;">
-                    <strong style="color: #d4af37; font-size: 1.1em; display: block; margin-bottom: 15px; border-bottom: 1px dashed #555; padding-bottom: 10px;">🛠️ 開發者備註 (3/24 v4.8.3)：</strong>
+                    <strong style="color: #d4af37; font-size: 1.1em; display: block; margin-bottom: 15px; border-bottom: 1px dashed #555; padding-bottom: 10px;">🛠️ 主持人備註 (3/25 v4.8.4)：</strong>
                     
                     <div style="color: #ddd; font-size: 0.95em; line-height: 1.8;">
                         <p style="margin-top: 0; color: #fff;">致各位使用者：</p>
                         
                         <p style="margin-bottom: 12px; text-align: justify;">
-                            1. 本次更新主要修改了自訂排軸面板體驗。
+                            1. 本次更新主要新增了排軸工作坊，讓大老們可以分享自己的排軸，因工作坊後端採用google試算表api，可能會需要跨區。
                         </p>
 
                         <p style="margin-bottom: 12px; text-align: justify;">
-                            2. 將持續關注「終焉矩陣」的後續更新並進行適配調整，歡迎提供相關反饋。
+                            2. 明日就是「終焉矩陣」的第一期更新，不會是第一時間更新參數，但明日我會找時間進行調整，歡迎提供相關反饋。
                         </p>
-                        
-                        <div style="margin-bottom: 12px; text-align: justify;">
-                            <p style="margin-bottom: 8px;">3. 附上來自日本推友らてぃ(X:@l4ty923)共享表格的西格、尤諾、仇遠的輪椅軸分享碼作為範本。（點擊可複製並於「資料總管」匯入測試）：</p>
-                            <div style="display: flex; gap: 8px; align-items: center; background: rgba(0, 0, 0, 0.4); padding: 8px; border-radius: 6px; border: 1px solid #444;">
-                                <input type="text" id="sample-share-code" readonly value="WWZ_9w#Z^lar[Q/I%rzw-z})PSqJ@xODRUNgIYz=rm(?#K-$l!OEZ4xaj<DJ&=D(=Hew1SJBoa=yT*1@AJ.i?>M+cW:k/*Yb+07(OD#y3yw#W-xM+3xNl#on%#qUflk>[[aa@Rr@OPb&=w}Yc<ughqeJ+%V*h-ne43JeP.[?kU=zzaAd]SQum4R:I)5P>jYLl<uSkVY[-?tVn-$Bk47ycIAmN4nso@65K@CwtWYVRi8}PTR+u#}]7)x<[^n:z-}p.Aqks8PHj]}0c6xpj#n^?WRmawc@fG)m[)i4my7s^0S*4Q{r0%7CqM*i#%Q.k}{SB7FCeMT&&vc.@6^{X%6pGYf-WP6Uifw00{huKe:%bRn4%kzcf#)$S!yN3l2S[kWW<VBiZOz5YXkUbWD)fLT6f)B:J]Cbk/^i{5d?N@UFY/@={<PR/Lk>xC:KuHae}HdM&/M<($AT{HEJo5kplZ5*3![f$6GR>r#}JGV)g#rE8J.mT:W<l=v7s)wwJrY8dz5]9Kr2QH(s*vuhKm+dgUfK?$m2+@omM9.3{11mmyinqp&}@NRCvjQ^-2<00t^nl-n}m7!Xt/}Gn=T" style="flex: 1; padding: 6px; background: transparent; color: #aaa; border: none; outline: none; font-family: monospace; font-size: 0.85em;">
-                                <button onclick="copySampleCode()" class="btn-action-all" style="padding: 6px 12px; font-size: 0.85em; background: rgba(0,255,170,0.2); color: var(--neon-green); border-color: var(--neon-green); border-radius: 4px; white-space: nowrap; cursor: pointer;">📋 複製</button>
-                            </div>
-                        </div>
                     </div>
                 </div>
                 
             </div>
 
             <details style="flex: 1; min-width: 300px; background: rgba(30, 30, 36, 0.7); padding: 15px; border-radius: 12px; border: 1px solid var(--border-glass); cursor: pointer;">
-            <summary style="color: var(--gold); font-weight: bold; outline: none; font-size: 1.1em;">📜 點此查看版本更新說明 (當前: v4.8.3)</summary>
-            <div style="margin-top: 15px; font-size: 0.95em; color: #ccc; line-height: 1.6; border-top: 1px dashed var(--border-glass); padding-top: 15px; cursor: default;" onclick="event.stopPropagation();">
-                
-                <strong style="color: #00ffaa; font-size: 1.05em;">✨ v4.8.3 【排軸編輯與系統適配更新】</strong>
-                <ul style="margin: 5px 0 15px 20px; padding: 0; color: #ccc;">
-                    <li><strong>3.2 版資料庫同步：</strong>更新主流配隊數據，並實裝「首輪暖機」與「平穩期」精確分軸機制。</li>
-                    <li><strong>自訂排軸面板升級：</strong>介面重新排版，新增視覺化「傷害曲線預覽圖」與時間排序等快捷功能。</li>
-                    <li><strong>雙層暴擊率設定：</strong>新增「全域角色面板」與「單一隊伍覆寫」設定，蒙地卡羅期望值運算更精準。</li>
-                    <li><strong>數據總管改版：</strong>介面改為分頁設計，並支援自訂排軸「專屬分享碼」的匯出與匯入。</li>
-                    <li><strong>【Hotfix】實戰反推防呆機制：</strong>未選排軸時將自動配對或新建，並修復反推 DPS 存檔失憶與覆寫其他隊伍的問題。</li>
-                </ul>
+        <summary style="color: var(--gold); font-weight: bold; outline: none; font-size: 1.1em;">📜 點此查看版本更新說明 (當前: v4.8.4)</summary>
+        <div style="margin-top: 15px; font-size: 0.95em; color: #ccc; line-height: 1.6; border-top: 1px dashed var(--border-glass); padding-top: 15px; cursor: default;" onclick="event.stopPropagation();">
+            
+            <strong style="color: #00ffaa; font-size: 1.05em;">✨ v4.8.4 【排軸工作坊與核心架構升級】</strong>
+            <ul style="margin: 5px 0 15px 20px; padding: 0; color: #ccc;">
+                <li><strong>排軸雲端工作坊：</strong>新增雲端大廳，支援本機排軸一鍵發布、社群排軸下載套用，並提供雙向自訂命名功能。</li>
+                <li><strong>多維度檢索與排序：</strong>實裝條件疊加過濾器（高輸出、輪椅軸等）與多重條件排序佇列（支援 DPS、動作密度、吻合度之同鍵雙向反轉）。</li>
+                <li><strong>曲線吻合度與防呆查重：</strong>導入餘弦相似度演算法比對打法，上傳時若吻合度 ≥ 85% 將提示覆蓋舊版，避免大廳充斥重複排軸。</li>
+                <li><strong>動作密度解析引擎：</strong>自動解析並於面板顯示排軸的「總動作數」、「平均排軸密度」以及「5 秒最高爆發密度」。</li>
+                <li><strong>階梯推演與二元搜尋：</strong>捨棄線性平滑推估，改用階梯判定與二元搜尋法，大幅提升殘血推演的擊殺時間精準度。</li>
+                <li><strong>效能降載與高密度壓縮：</strong>實裝 TTK 記憶化快取與 AOT 預處理矩陣降低運算負載；導入 Base85 壓縮技術，分享碼體積無損縮減並向下相容舊版。</li>
+            </ul>
 
-                <strong style="color: var(--neon-purple); font-size: 1.05em;">✨ v4.8.0 ~ 4.8.2 【核心演算法與機制更新】</strong>
-                <ul style="margin: 5px 0 15px 20px; padding: 0; color: #ccc;">
-                    <li><strong>潛力評估與深度調整 (4.8.2)：</strong>調整篩選機制保留具潛力的組合，並依可用排軸數量動態推估搜尋深度。</li>
-                    <li><strong>數值檢查與邏輯修復 (4.8.2)：</strong>新增實戰反推完整度檢查，並修正穩定度記憶及轉場預估分數倒置問題。</li>
-                    <li><strong>運算效能與解析最佳化 (4.8.1)：</strong>改用雜湊集合 (Set) 演算法降低推演耗時，並支援多點動態斜率偵測 (LUT) 提高殘血推演準確度。</li>
-                    <li><strong>雙演算法調度與首輪特化 (4.8.0~4.8.1)：</strong>實裝狀態壓縮 DP 並依隊伍數自動切換演算法；支援讀取排軸真實循環秒數與首輪暖機特化時間。</li>
-                    <li><strong>蒙地卡羅運算與減傷校正 (4.8.0)：</strong>新增亂數抽樣計算單發高傷未暴擊期望值；新增實測傷害輸入自動計算減傷係數。</li>
-                </ul>
+            <strong style="color: var(--gold); font-size: 1.05em;">✨ v4.8.0 ~ 4.8.3 【排軸編輯與系統適配更新】</strong>
+            <ul style="margin: 5px 0 15px 20px; padding: 0; color: #ccc;">
+                <li><strong>資料庫同步與排軸編輯升級 (4.8.3)：</strong>更新主流配隊數據，實裝「首輪暖機」與「平穩期」精確分軸；自訂面板新增「傷害曲線預覽圖」與雙層暴擊率設定；數據總管改版並支援專屬分享碼。</li>
+                <li><strong>防呆機制與邏輯修復 (4.8.2~4.8.3)：</strong>實戰反推未選排軸時將自動配對，修復存檔失憶與覆寫問題；新增完整度檢查並修正轉場預估分數倒置問題。</li>
+                <li><strong>潛力評估與運算最佳化 (4.8.1~4.8.2)：</strong>依可用排軸數量動態推估搜尋深度以保留潛力組合；改用雜湊集合 (Set) 演算法降低推演耗時，支援多點動態斜率偵測 (LUT)。</li>
+                <li><strong>雙演算法調度與首輪特化 (4.8.0~4.8.1)：</strong>實裝狀態壓縮 DP 並依隊伍數自動切換演算法；支援讀取排軸真實循環秒數與首輪暖機特化時間。</li>
+                <li><strong>蒙地卡羅運算與減傷校正 (4.8.0)：</strong>新增亂數抽樣計算單發高傷未暴擊期望值；新增實測傷害輸入自動計算減傷係數。</li>
+            </ul>
 
-                <strong style="color: #888; font-size: 1em;">【v4.7.0 ~ 4.7.6 近期版本回顧】</strong>
-                <div style="margin: 5px 0 0 10px; color: #888; line-height: 1.6; font-size: 0.95em;">
-                    - (4.7.6) Beam Search 升級、全局環境抗性、自動填補空位、精確數據剝離。<br>
-                    - (4.7.5) 指南擴充、穩定度計算器、編隊拖曳互動、記憶擴充(10套)。<br>
-                    - (4.7.4) 實戰洗牌反推、一鍵重設預設 DPS、雙檔分離 UI。<br>
-                    - (4.7.3) 序列王血量代數反解引擎、大數據貢獻問卷。<br>
-                    - (4.7.2) 實裝「動態壓軸」編制邏輯。<br>
-                    - (4.7.1) 新增「內建軸穩定性計算器」。<br>
-                    - (4.7.0) 實裝「手法折損全局與微調拉桿」。
-                </div>
-            </div>
-        </details>
+            <strong style="color: #888; font-size: 1.05em;">✨ v4.7.0 ~ 4.7.6 【近期版本回顧】</strong>
+            <ul style="margin: 5px 0 0 20px; padding: 0; color: #888;">
+                <li><strong>核心機制與反推升級 (4.7.3~4.7.6)：</strong>實裝 Beam Search 升級、全局環境抗性、實戰洗牌反推與序列王血量代數反解引擎。</li>
+                <li><strong>操作體驗與系統擴充 (4.7.0~4.7.5)：</strong>實裝動態壓軸、內建軸穩定性計算器、手法折損系統，並新增編隊拖曳互動、雙檔分離 UI 與 10 套記憶擴充。</li>
+            </ul>
+
+        </div>
+    </details>
         </div>
 
         <div class="panel">
@@ -457,38 +451,38 @@
                     </ul>
                     <strong style="color: var(--gold); font-size: 1.05em;">【右側沙盤：推演模式】</strong>
                     <ul style="margin: 5px 0 10px 20px; padding: 0; color: #ccc;">
-                        <li><strong>⚙️ 自動最佳化編制：</strong>可選擇優先考量「下限保底」或「理論上限」，系統將自動過濾並填入適合的陣容。</li>
-                        <li><strong>🔄 實戰洗牌反推：</strong>填寫實戰得分後點擊，系統會計算最佳出戰順序。若沙盤有空位，系統會利用剩餘角色補齊陣容。</li>
+                        <li><strong>⚙️ 自動最佳化編制：</strong>可選擇優先考量「下限保底」或「理論上限」，系統將過濾並填入適合的陣容。</li>
+                        <li><strong>🔄 實戰洗牌反推：</strong>填寫實戰得分後點擊，系統會計算最佳出戰順序。若沙盤有空位，會利用剩餘角色補齊陣容。</li>
                     </ul>
                     <strong style="color: var(--neon-purple); font-size: 1.05em;">【右側面板：環境與進階設定】</strong>
                     <ul style="margin: 5px 0 0 20px; padding: 0; color: #ccc;">
-                        <li><strong>環境參數：</strong>精確設定轉場耗時、Boss 抗性、增益標籤與減傷校正。</li>
+                        <li><strong>環境參數：</strong>設定轉場耗時、Boss 抗性、增益標籤與減傷校正。</li>
                         <li><strong>快捷填入與記憶：</strong>支援透過屬性/世代篩選推薦配隊，並提供 10 組實戰編隊存檔。</li>
                     </ul>
                 </div>
                 <div class="guide-detail-content" style="display: none; font-size: 0.95em; color: #ddd; line-height: 1.6;">
                     <strong style="color: #fff; font-size: 1.05em;">【頂部操作：動態演算法調度】</strong>
                     <ul style="margin: 5px 0 10px 20px; padding: 0; color: #ccc;">
-                        <li><strong>編隊運算：</strong>點擊自動編制或洗牌反推後，系統會依據候選隊伍數量，彈窗建議合適的演算法。
+                        <li><strong>編隊運算：</strong>點擊自動編制或洗牌反推後，系統會依據候選隊伍數量，建議合適的演算法。
                             <ul style="margin: 5px 0 5px 20px; color: #aaa;">
                                 <li><strong style="color:#00ffaa;">狀態壓縮 DP：</strong>計算全域最佳解。複雜度較高，建議於隊伍數較少時 (N≤14) 使用。</li>
-                                <li><strong style="color:#00ffaa;">束式搜索 (Beam Search)：</strong>導入潛力評估機制，系統會依設備當前算力與候選數量，自動推估安全的搜尋深度以提供近似解。</li>
+                                <li><strong style="color:#00ffaa;">束式搜索 (Beam Search)：</strong>導入潛力評估機制，系統依設備當前算力與候選數量，推估安全的搜尋深度以提供近似解。</li>
                             </ul>
                         </li>
                     </ul>
 
                     <strong style="color: var(--gold); font-size: 1.05em;">【環境參數與推演機制】</strong>
                     <ul style="margin: 5px 0 10px 20px; padding: 0; color: #ccc;">
-                        <li><strong>首輪暖機機制：</strong>系統在進行殘血推演時，會自動判斷排軸是否具備首輪特化數據，精確計算開場與後續平穩期的真實耗時差異。</li>
-                        <li><strong>蒙地卡羅期望運算：</strong>開啟後，系統會讀取排軸專屬或全域暴擊率，並依據排軸內主/副C的傷害佔比進行亂數抽樣，給出具備操作折損的實戰下限。</li>
+                        <li><strong>首輪暖機機制：</strong>系統在進行殘血推演時，會判斷排軸是否具備首輪特化數據，精算開場與後續平穩期的真實耗時差異。</li>
+                        <li><strong>蒙地卡羅期望運算：</strong>開啟後，系統讀取排軸專屬或全域暴擊率，並依據排軸內主/副C的傷害佔比進行亂數抽樣，給出具備操作折損的實戰下限。</li>
                         <li><strong>減傷自動校正：</strong>點選 110 或 120 級的校正按鈕，輸入裸傷與實戰傷害以精算減傷係數。</li>
-                        <li><strong>血量代數反解：</strong>在手動模式下填寫分數與殘血百分比，系統會估算目標真實血量供參考校正。</li>
+                        <li><strong>血量代數反解：</strong>手動模式下填寫分數與殘血百分比，系統會估算目標真實血量供參考校正。</li>
                     </ul>
 
                     <strong style="color: var(--neon-purple); font-size: 1.05em;">【數據檢視與沙盤操作】</strong>
                     <ul style="margin: 5px 0 10px 20px; padding: 0; color: #ccc;">
                         <li><strong>數據儀表板：</strong>動態顯示推演分數區間與資料置信度 (低於 70% 將觸發警告)。</li>
-                        <li><strong>實戰數據覆寫：</strong>執行洗牌反推時，若您的實戰分數高於理論值，系統會調升該排軸的自訂 DPS；反之則自動下修穩定度。(可隨時點擊「重設預設 DPS」還原)。</li>
+                        <li><strong>實戰數據覆寫：</strong>執行洗牌反推時，若您的實戰分數高於理論值，系統會調升該排軸的自訂 DPS；反之則下修穩定度。(可隨時點擊「重設預設 DPS」還原)。</li>
                     </ul>
                 </div>
             </div>
@@ -754,8 +748,98 @@
         </div>
     </div>
     <div id="custom-team-modal" class="modal-overlay"></div>
+    
+    <div id="workshop-modal" class="modal-overlay" style="display:none; z-index: 2500;">
+        <style>
+            /* 工作坊專屬自適應排版 */
+            .ws-layout { display: flex; gap: 15px; flex: 1; overflow: hidden; }
+            .ws-sidebar { width: 160px; overflow-y: auto; border-right: 1px solid #444; padding-right: 10px; display: flex; flex-direction: column; gap: 5px; flex-shrink: 0; }
+            .ws-content { flex: 1; overflow-y: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 15px; align-content: start; padding-left: 5px; padding-right: 10px; }
+            
+            /* 手機版直式排版 */
+            @media (max-width: 768px) {
+                .ws-layout { flex-direction: column; overflow-y: auto; }
+                .ws-sidebar { width: 100%; border-right: none; border-bottom: 1px solid #444; padding-bottom: 10px; max-height: 160px; }
+                .ws-content { overflow-y: visible; padding-bottom: 20px; }
+            }
+        </style>
+        
+        <div style="background:var(--bg-panel); backdrop-filter:blur(20px); padding:20px; border-radius:16px; border:1px solid #cf00ff; width:1000px; max-width:98vw; height:90vh; display:flex; flex-direction:column; box-shadow: 0 10px 40px rgba(0,0,0,0.8);">
+            
+            <div style="border-bottom:1px solid rgba(207, 0, 255, 0.3); padding-bottom:15px; margin-bottom:15px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+                    <h3 style="margin:0; color:#cf00ff; font-size:1.4em;">🌐 終端機：排軸工作坊</h3>
+                    <div style="display:flex; gap: 10px; align-items:center; flex-wrap:wrap;">
+                        <input type="text" id="ws-search-input" placeholder="🔍 搜尋角色、作者或關鍵字..." oninput="updateWorkshopSearch()" style="padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border-glass); background: rgba(0,0,0,0.5); color: #fff; outline: none; width: 220px; font-size: 0.9em;">
+                        
+                        <select id="ws-sort-select" onchange="renderWorkshopCards()" style="padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border-glass); background: rgba(0,0,0,0.8); color: #00ffaa; outline: none; font-size: 0.9em; cursor:pointer;">
+                            <option value="default">預設排序 (最新發布)</option>
+                            <option value="smart_score">👑 綜合 CP 值 (高傷+輪椅)</option>
+                            <option value="dps_desc">💥 DPS (高 ➔ 低)</option>
+                            <option value="dps_asc">📉 DPS (低 ➔ 高)</option>
+                            <option value="action_asc">♿ 動作數 (少 ➔ 多) - 輪椅推薦</option>
+                            <option value="action_desc">🎹 動作數 (多 ➔ 少) - 細節操作</option>
+                            <option value="sim_asc">💡 吻合度 (低 ➔ 高) - 找新流派</option>
+                            <option value="sim_desc">🤝 吻合度 (高 ➔ 低) - 找熟悉感</option>
+                        </select>
+
+                        <button onclick="closeWorkshopModal()" class="btn-action-clear" style="padding: 8px 15px; background:#444; border:none; border-radius:6px; color:#fff; cursor:pointer; font-weight:bold;">✖ 關閉</button>
+                    </div>
+                </div>
+                
+                <div style="display:flex; align-items:center; background: rgba(0,0,0,0.6); border: 1px solid var(--border-glass); border-radius: 8px; overflow: hidden; font-size: 0.9em;">
+                            <button id="sort-btn-dps" onclick="setWorkshopSort('dps')" style="padding: 8px 12px; background: rgba(0,255,170,0.2); color: var(--neon-green); border: none; border-right: 1px solid var(--border-glass); cursor: pointer; font-weight: bold; outline: none; transition: 0.2s;">💥 DPS ↓</button>
+                            <button id="sort-btn-density" onclick="setWorkshopSort('density')" style="padding: 8px 12px; background: transparent; color: #aaa; border: none; border-right: 1px solid var(--border-glass); cursor: pointer; font-weight: bold; outline: none; transition: 0.2s;">🎹 密度</button>
+                            <button id="sort-btn-duration" onclick="setWorkshopSort('duration')" style="padding: 8px 12px; background: transparent; color: #aaa; border: none; border-right: 1px solid var(--border-glass); cursor: pointer; font-weight: bold; outline: none; transition: 0.2s;">⏱️ 軸長</button>
+                            <button id="sort-btn-sim" onclick="setWorkshopSort('sim')" style="padding: 8px 12px; background: transparent; color: #aaa; border: none; cursor: pointer; font-weight: bold; outline: none; transition: 0.2s;">📊 吻合度</button>
+                        </div>
+            </div>
+
+            <div style="display:flex; gap:10px; margin-bottom:15px; border-bottom:1px solid #444; padding-bottom:10px;">
+                <button id="ws-tab-local" onclick="setWorkshopMode('local')" style="flex:1; padding:10px; border-radius:8px; font-weight:bold; cursor:pointer; border:none; background:rgba(207,0,255,0.3); color:#fff; transition:0.2s; box-shadow: 0 2px 10px rgba(207,0,255,0.2);">
+                    💾 本機收藏庫
+                </button>
+                <button id="ws-tab-cloud" onclick="setWorkshopMode('cloud')" style="flex:1; padding:10px; border-radius:8px; font-weight:bold; cursor:pointer; border:1px solid #555; background:rgba(255,255,255,0.05); color:#aaa; transition:0.2s;">
+                    ☁️ 雲端大廳 (社群)
+                </button>
+            </div>
+
+            <div class="ws-layout">
+                <div id="workshop-sidebar" class="ws-sidebar"></div>
+                <div id="workshop-content" class="ws-content"></div>
+            </div>
+
+        </div>
+    </div>
+
+    <div id="upload-cloud-modal" class="modal-overlay" style="z-index: 3000;">
+        <div style="background:var(--bg-panel); border: 1px solid var(--neon-purple); border-radius:12px; padding:20px; width:90%; max-width:400px; color:#fff; box-shadow: 0 0 30px rgba(207, 0, 255, 0.4); backdrop-filter:blur(20px);">
+            <h3 style="margin-top:0; color:var(--neon-purple); border-bottom:1px solid var(--border-glass); padding-bottom:10px;">☁️ 發布排軸至工作坊</h3>
+            
+            <div style="margin-bottom: 15px;">
+                <label style="display:block; margin-bottom:5px; font-size:0.9em; color:#aaa;">陣容確認：</label>
+                <div id="upload-team-preview" style="background:rgba(0,0,0,0.5); padding:10px; border-radius:6px; font-weight:bold; color:var(--neon-green); border:1px solid var(--border-glass);"></div>
+            </div>
+
+            <div style="margin-bottom: 15px;">
+                <label style="display:block; margin-bottom:5px; font-size:0.9em; color:#aaa;">您的社群暱稱 (選填)：</label>
+                <input type="text" id="upload-author-name" placeholder="例如：推友-らてぃ" class="score-input" style="border-color:var(--border-glass); color:#fff; text-align:left;">
+            </div>
+
+            <div style="margin-bottom: 20px;">
+                <label style="display:block; margin-bottom:5px; font-size:0.9em; color:#aaa;">排軸介紹 / 輸出手法 (選填)：</label>
+                <textarea id="upload-description" placeholder="例如：這套軸特別優化了協同攻擊的覆蓋率..." class="score-input" style="height:80px; border-color:var(--border-glass); color:#fff; text-align:left; resize:none; font-size:0.9em;"></textarea>
+            </div>
+
+            <div style="display:flex; justify-content:flex-end; gap:10px;">
+                <button onclick="document.getElementById('upload-cloud-modal').style.display='none'" class="btn-action-clear" style="flex:1; background:#444; border:none; padding:10px;">取消</button>
+                <button id="upload-submit-btn" class="btn-action-all" style="flex:2; background:var(--neon-purple); border:none; padding:10px; font-weight:bold;">🚀 確認發布</button>
+            </div>
+        </div>
+    </div>
     <script>
     // 護眼模式的切換按鈕
+
     function toggleTheme() {
         let body = document.body;
         body.classList.toggle('theme-eyecare');
