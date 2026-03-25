@@ -1,5 +1,5 @@
 // ==========================================
-// 鳴潮矩陣編隊工具 v4.8.3版 [畫面渲染與互動模組]
+// 鳴潮矩陣編隊工具 v4.8.4版 [畫面渲染與互動模組]
 // 檔案：ui.js
 // 職責：DOM 操作、畫布互動 Tooltip
 // ==========================================
@@ -749,7 +749,7 @@ function openDataManager() {
                         <button onclick="importSingleRotation()" class="btn-action-all" style="flex:1; padding:6px; font-size:0.85em; background:var(--neon-green); color:#000; font-weight:bold;">📥 匯入</button>
                     </div>
                     
-                    <p style="color:#888; font-size:0.8em; margin:0 0 10px 0; text-align:right;">(此系統已導入 Base85 壓縮，匯出不包含備註)</p>
+                    <p style="color:#888; font-size:0.8em; margin:0 0 10px 0; text-align:right;">(系統已導入壓縮引擎，分享碼將完整保留排軸與備註)</p>
 
                     <div style="max-height: 250px; overflow-y: auto; padding-right: 5px;">${customTeamsHtml}</div>
                 </div>
