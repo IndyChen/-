@@ -7,8 +7,10 @@ const SAFE_BASE85 = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVW
 const BASE = BigInt(85);
 
 // ==========================================
-// --- 1. 高密度加解密引擎 (Base85) ---
+// --- 1. 高密度加解密引擎 (LZ-String V2 + Base85) ---
 // ==========================================
+
+// 核心：純 Base85 二進位轉換
 function encodeBase85(bytes) {
     if (bytes.length === 0) return "";
     let hex = "0x";
@@ -47,6 +49,79 @@ function decodeBase85(str) {
     return new Uint8Array(bytes);
 }
 
+// ------------------------------------------
+// 🚀 V2 混合壓縮 API (供外部呼叫)
+// ------------------------------------------
+
+/**
+ * 匯出：將排軸物件(或任意 JSON) 壓縮為 WW2_ 開頭的超短分享碼
+ * @param {Object} dataObj - 要分享的排軸資料物件
+ * @returns {string} - WW2_ 開頭的 Base85 壓縮碼
+ */
+function compressRotationDataV2(dataObj) {
+    try {
+        // 1. 將物件轉為 JSON 字串
+        let jsonStr = JSON.stringify(dataObj);
+        
+        // 2. 使用 lz-string 將 JSON 字串極致壓縮為 Uint8Array
+        if (typeof LZString === 'undefined') {
+            console.error("尚未載入 lz-string 庫！請確認 HTML 中有引入。");
+            return "";
+        }
+        let compressedBytes = LZString.compressToUint8Array(jsonStr);
+        
+        // 3. 將壓好的二進位陣列，透過您的引擎轉為 Base85 字串
+        let base85Str = encodeBase85(compressedBytes);
+        
+        // 4. 加上版號前綴，確保向下相容性
+        return "WW2_" + base85Str;
+    } catch (e) {
+        console.error("壓縮失敗:", e);
+        return "";
+    }
+}
+
+/**
+ * 匯入：自動辨識 WW2_ (新版 JSON) 或 WWZ_ (舊版二進位)，並還原為物件
+ * @param {string} shareCode - 玩家貼上的分享碼
+ * @returns {Object|null} - 成功則回傳資料物件，失敗回傳 null
+ */
+function decompressRotationData(shareCode) {
+    if (!shareCode || typeof shareCode !== 'string') return null;
+    shareCode = shareCode.trim();
+
+    try {
+        if (shareCode.startsWith("WW2_")) {
+            // --- 處理 V2 新版代碼 ---
+            let actualCode = shareCode.substring(4);
+            
+            // 1. 將 Base85 還原回 Uint8Array
+            let compressedBytes = decodeBase85(actualCode);
+            
+            // 2. 將 Uint8Array 解壓縮回 JSON 字串
+            let jsonStr = LZString.decompressFromUint8Array(compressedBytes);
+            if (!jsonStr) throw new Error("LZ 解壓縮失敗，資料可能損毀");
+            
+            // 3. 轉回物件
+            return JSON.parse(jsonStr);
+            
+        } else if (shareCode.startsWith("WWZ_")) {
+            // --- 向下兼容：處理 V1 舊版代碼 ---
+            // 這裡保留您原本在 ui_custom_team.js 裡寫的舊版 ByteArray 解析邏輯
+            // 假設您原本的函數叫做 parseLegacyV1Code，請將其替換為實際函數名
+            if (typeof parseLegacyV1Code === 'function') {
+                return parseLegacyV1Code(shareCode);
+            } else {
+                 throw new Error("找不到舊版解析器 parseLegacyV1Code");
+            }
+        } else {
+            throw new Error("未知的分享碼版本前綴");
+        }
+    } catch (e) {
+        console.error("分享碼解析失敗:", e);
+        return null;
+    }
+}
 // ==========================================
 // --- 2. 全域資料庫管理與儲存容量 API ---
 // ==========================================
