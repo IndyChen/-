@@ -515,13 +515,14 @@ function runSimulations(env) {
     let auto_r_max = 1, auto_idx_max = 1, auto_hp_max = getBossMaxHP(1, 1);
     let man_start_r = 1, man_start_idx = 1, man_start_hp_pct = 100;
 
-    let getCumDmg = (r, idx, hpPct) => {
+   let getCumDmg = (r, idx, hpPct) => {
         let dmg = 0;
         for (let i = 1; i <= r; i++) {
             let maxJ = (i === r) ? idx : 5;
             for (let j = 1; j <= maxJ; j++) {
                 let maxHp = getBossMaxHP(i, j);
-                if (i === r && j === idx) dmg += maxHp * (1 - hpPct / 100); else dmg += maxHp;
+                let scoreMult = (j === 5) ? 1.1 : 1.0;
+                if (i === r && j === idx) dmg += maxHp * (1 - hpPct / 100) * scoreMult; else dmg += maxHp * scoreMult;
             }
         }
         return dmg;
