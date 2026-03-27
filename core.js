@@ -3,7 +3,32 @@
 // 檔案：core.js
 // 職責：資料存取、數學推演、動態時間判定、雙引擎洗牌(DP+Beam)、專屬增傷、A*潛力估價、防呆機制
 // ==========================================
+// ==========================================
+// --- 核心環境與賽季參數設定 (MATRIX_CONFIG) ---
+// ==========================================
+const MATRIX_CONFIG = {
+    SCORE_RATIO: 10,
+    RES_PENALTY: 40,
+    BUFF_BONUS: 30,
+    PEN110: 0.975,
+    PEN120: 0.951,
+    TRANS_TIME: 1.5,
+    BATTLE_TIME: 120,
 
+    HP_BASE: {
+        R1: [400, 400, 400, 400, 440], 
+        R2: [681, 681, 681, 681, 911], 
+        R3: [1384, 1384, 1384, 1384, 1384]
+    },
+
+    DEFAULT_GROWTH: 5,
+    calcDynamicHP: function(r, i, customGrowthPct) {
+        let baseHP = 1384; 
+        let growthRate = customGrowthPct / 100;
+        let step = (r - 4) * 5 + i;
+        return baseHP * (1 + growthRate * step);
+    }
+};
 // --- 0. 全域崩潰攔截系統 ---
 let currentErrorInfo = null;
 
@@ -327,19 +352,36 @@ function initBossHPMap() {
             if (!bossHPMap[key] || bossHPMap[key].isDefault) { 
                 let hpValue = 0;
                 
-                if (r === 1) {
-                    hpValue = 400;
-                } else if (r === 2) {
-                    hpValue = (i === 5) ? 911 : 681;
-                } else if (r === 3) {
-                    hpValue = 1384;
+                if (r <= 3) {
+                    hpValue = MATRIX_CONFIG.HP_BASE[`R${r}`][i - 1];
+
+                    if (r === 1 && env.r1_hp !== null && i !== 5) hpValue = env.r1_hp;
+                    if (r === 2 && env.r2_hp !== null && i !== 5) hpValue = env.r2_hp;
+                    if (r === 3 && env.r3_hp !== null) hpValue = env.r3_hp;
                 } else {
-                    hpValue = 1384 * (1 + 0.05 * ((r - 4) * 5 + i));
+                    let growth = (env.hpGrowth !== null) ? env.hpGrowth : MATRIX_CONFIG.DEFAULT_GROWTH;
+                    hpValue = MATRIX_CONFIG.calcDynamicHP(r, i, growth);
                 }
 
                 bossHPMap[key] = { value: hpValue, isDefault: true }; 
             } 
         } 
+    }
+
+    const uiElements = {
+        'env-ratio': MATRIX_CONFIG.SCORE_RATIO,
+        'env-r1': MATRIX_CONFIG.HP_BASE.R1[0],
+        'env-r2': MATRIX_CONFIG.HP_BASE.R2[0],
+        'env-r3': MATRIX_CONFIG.HP_BASE.R3[0],
+        'env-growth': MATRIX_CONFIG.DEFAULT_GROWTH,
+        'env-res': MATRIX_CONFIG.RES_PENALTY,
+        'env-buff': MATRIX_CONFIG.BUFF_BONUS,
+        'env-trans': MATRIX_CONFIG.TRANS_TIME,
+        'env-time': MATRIX_CONFIG.BATTLE_TIME
+    };
+    for (let id in uiElements) {
+        let el = document.getElementById(id);
+        if (el && !el.value) { el.value = uiElements[id]; }
     }
 }
 
@@ -489,18 +531,23 @@ function getEnvSettings() {
         wTags.push(el && el.value ? el.value : "");
     }
 
+    let parseUI = (id) => {
+        let val = document.getElementById(id)?.value;
+        return (val && val !== "") ? parseFloat(val) : null;
+    };
+
     return {
-        scoreRatio: isNaN(rawRatio) || rawRatio <= 0 ? 10 : rawRatio,
-        r1_hp: parseFloat(document.getElementById('env-r1')?.value) || 400,
-        r2_hp: parseFloat(document.getElementById('env-r2')?.value) || 681,
-        r3_hp: parseFloat(document.getElementById('env-r3')?.value) || 1384,
-        hpGrowth: parseFloat(document.getElementById('env-growth')?.value) || 5,
-        resPenalty: parseFloat(document.getElementById('env-res')?.value) || 40,
-        buffBonus: parseFloat(document.getElementById('env-buff')?.value) || 30,
-        pen110: parseFloat(document.getElementById('env-pen110')?.value) || 0.975,
-        pen120: parseFloat(document.getElementById('env-pen120')?.value) || 0.951,
-        transTime: parseFloat(document.getElementById('env-trans')?.value) || 1.5,
-        battleTime: parseFloat(document.getElementById('env-time')?.value) || 120,
+        scoreRatio: isNaN(rawRatio) || rawRatio <= 0 ? MATRIX_CONFIG.SCORE_RATIO : rawRatio,
+        r1_hp: parseUI('env-r1'),
+        r2_hp: parseUI('env-r2'),
+        r3_hp: parseUI('env-r3'),
+        hpGrowth: parseUI('env-growth'),
+        resPenalty: parseUI('env-res') || MATRIX_CONFIG.RES_PENALTY,
+        buffBonus: parseUI('env-buff') || MATRIX_CONFIG.BUFF_BONUS,
+        pen110: parseUI('env-pen110') || MATRIX_CONFIG.PEN110,
+        pen120: parseUI('env-pen120') || MATRIX_CONFIG.PEN120,
+        transTime: parseUI('env-trans') || MATRIX_CONFIG.TRANS_TIME,
+        battleTime: parseUI('env-time') || MATRIX_CONFIG.BATTLE_TIME,
         resTags: tags,
         weakTags: wTags
     };
