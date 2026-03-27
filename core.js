@@ -817,8 +817,26 @@ async function reverseInferAndOptimize() {
                         if (foundDB) validRotId = `db_rot_${c1}_${c2}_${c3}_${foundDB.rot}`;
                     }
 
+                    // 修改這裡：不僅建軸，連隊伍一起建！
                     if (!validRotId && typeof addCustomRotation === 'function') {
+                        // 1. 建立排軸
                         validRotId = addCustomRotation(c1, c2, c3, 0, "🧩");
+                        
+                        // 2. 建立實體隊伍並存入資料庫
+                        let savedTeams = safeStorageGet('ww_teams', []);
+                        let newTeamId = 'team_auto_' + Date.now().toString();
+                        let newTeam = {
+                            id: newTeamId,
+                            name: `${c1} 反推隊伍`,
+                            c1: c1, 
+                            c2: c2 || '無', 
+                            c3: c3 || '無',
+                            rotId: validRotId,
+                            score: actualScore > 0 ? actualScore : 1
+                        };
+                        savedTeams.push(newTeam);
+                        safeStorageSet('ww_teams', savedTeams);
+                        
                         needsRebuild = true;
                     }
                 }
