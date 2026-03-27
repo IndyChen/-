@@ -641,6 +641,9 @@ function runSimulations(env) {
                                     
                                     let true_eff_dps = Math.max(0.0001, (baseTotalDmg / rotTime) * r_factor * lvlPenalty);
                                     let scoreMult = (idx === 5) ? 1.1 : 1.0;
+
+                                    let actualDmgDealt = true_eff_dps * t_left;
+                                    if (actualDmgDealt > hp) actualDmgDealt = hp;
                                     dmg += (true_eff_dps * t_left * scoreMult); hp -= true_eff_dps * t_left; t_left = 0; 
                                 }
                             }
