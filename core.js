@@ -1,5 +1,5 @@
 // ==========================================
-// 鳴潮矩陣編隊工具 v4.8.4 [核心運算模組 - 智慧剪枝特化版]
+// 鳴潮矩陣編隊工具 v4.8.5 [核心運算模組 - 智慧剪枝特化版]
 // 檔案：core.js
 // 職責：資料存取、數學推演、動態時間判定、雙引擎洗牌(DP+Beam)、專屬增傷、A*潛力估價、防呆機制
 // ==========================================
@@ -38,6 +38,7 @@ let globalCharStats = {};
 let currentEditRotId = null;
 // --- 新增：效能優化專用快取與狀態 ---
 let ttkCache = new Map(); // 格式: "rotId_bossHp_rFactor_lvlPenalty" -> 預先算好的秒數
+let dpsDataMap = {};
 
 // --- 2. 基礎工具 (Utils) ---
 const t_cache = {}; 
@@ -168,7 +169,7 @@ function getTtkFromMathCurve(hpToKill, baseDps, r_factor, lvlPenalty, mainC, rot
     let cacheKey = `${rotId}_${Math.round(hpToKill)}_${Math.round(r_factor*100)}_${Math.round(lvlPenalty*100)}_${Math.round(timeSpentOnField*10)}`;
     if (ttkCache.has(cacheKey)) return ttkCache.get(cacheKey);
 
-    let d = dpsData.find(x => x.id === rotId);
+    let d = dpsDataMap[rotId];
     let isFirstRotation = (timeSpentOnField === 0);
     
     let rotTime = (isFirstRotation && d && d.firstDuration) ? d.firstDuration : ((d && d.duration) ? d.duration : 25);
@@ -299,6 +300,8 @@ function initCoreData() {
     } else {
         checkedRotations = new Set(dpsData.map(d => d.id));
     }
+    dpsDataMap = {};
+    dpsData.forEach(d => dpsDataMap[d.id] = d);
 }
 
 function saveData() { 
@@ -313,44 +316,28 @@ function saveData() {
     safeStorageSet('ww_teams', teams); 
 }
 
-function getEnvSettings() { 
-    return { 
-        scoreRatio: parseFloat(document.getElementById('env-ratio').value) || 10, 
-        r1_hp: parseFloat(document.getElementById('env-r1').value) || 400.89, 
-        r2_hp: parseFloat(document.getElementById('env-r2').value) || 783.56, 
-        r3_hp: parseFloat(document.getElementById('env-r3').value) || 1384.9, 
-        growth: (parseFloat(document.getElementById('env-growth').value) || 5) / 100, 
-        transTime: parseFloat(document.getElementById('env-trans').value) || 1.5, 
-        battleTime: parseFloat(document.getElementById('env-time').value) || 120, 
-        resPenalty: parseFloat(document.getElementById('env-res').value) || 40,
-        buffBonus: parseFloat(document.getElementById('env-buff') ? document.getElementById('env-buff').value : 30) || 30,
-        pen110: parseFloat(document.getElementById('env-pen110').value) || 0.975, 
-        pen120: parseFloat(document.getElementById('env-pen120').value) || 0.951,
-        resTags: [
-            document.getElementById('env-res-1') ? document.getElementById('env-res-1').value : "",
-            document.getElementById('env-res-2') ? document.getElementById('env-res-2').value : "",
-            document.getElementById('env-res-3') ? document.getElementById('env-res-3').value : "",
-            document.getElementById('env-res-4') ? document.getElementById('env-res-4').value : ""
-        ],
-        weakTags: [
-            document.getElementById('env-weak-1') ? document.getElementById('env-weak-1').value : "",
-            document.getElementById('env-weak-2') ? document.getElementById('env-weak-2').value : "",
-            document.getElementById('env-weak-3') ? document.getElementById('env-weak-3').value : "",
-            document.getElementById('env-weak-4') ? document.getElementById('env-weak-4').value : ""
-        ]
-    }; 
-}
-
 function initBossHPMap() {
     let env = getEnvSettings();
     bossHPMap = safeStorageGet('ww_boss_hp', {});
     bossHPHistory = safeStorageGet('ww_boss_hp_history', {});
 
     for (let r = 1; r <= 10; r++) { 
-        for (let i = 1; i <= 4; i++) { 
+        for (let i = 1; i <= 5; i++) {
             let key = `R${r}-${i}`; 
             if (!bossHPMap[key] || bossHPMap[key].isDefault) { 
-                bossHPMap[key] = { value: (r === 1) ? env.r1_hp : (r === 2 && i === 1) ? 546.67 : (r === 2) ? env.r2_hp : (r === 3) ? env.r3_hp : env.r3_hp * (1 + env.growth * ((r - 4) * 4 + i)), isDefault: true }; 
+                let hpValue = 0;
+                
+                if (r === 1) {
+                    hpValue = 400;
+                } else if (r === 2) {
+                    hpValue = (i === 5) ? 911 : 681;
+                } else if (r === 3) {
+                    hpValue = 1384;
+                } else {
+                    hpValue = 1384 * (1 + 0.05 * ((r - 4) * 5 + i));
+                }
+
+                bossHPMap[key] = { value: hpValue, isDefault: true }; 
             } 
         } 
     }
@@ -404,7 +391,7 @@ function getMaxTeams(usedObj) {
 
 function runMonteCarlo(expectedDps, rotId) {
     // 1. 抓取該排軸的基本資料
-    let rotData = dpsData.find(d => d.id === rotId);
+    let rotData = dpsDataMap[rotId];
     if (!rotData) return null;
 
     let stats = customStatsMap[rotId];
@@ -487,6 +474,38 @@ function runMonteCarlo(expectedDps, rotId) {
     };
 }
 
+function getEnvSettings() {
+    let rawRatio = parseFloat(document.getElementById('env-ratio')?.value);
+    
+    let tags = [];
+    for(let i=1; i<=4; i++) {
+        let sel = document.getElementById(`env-res-${i}`);
+        tags.push(sel && sel.value ? sel.value : null);
+    }
+    
+    let wTags = [];
+    for(let i=1; i<=4; i++) {
+        let el = document.getElementById(`env-weak-${i}`);
+        wTags.push(el && el.value ? el.value : "");
+    }
+
+    return {
+        scoreRatio: isNaN(rawRatio) || rawRatio <= 0 ? 10 : rawRatio,
+        r1_hp: parseFloat(document.getElementById('env-r1')?.value) || 400,
+        r2_hp: parseFloat(document.getElementById('env-r2')?.value) || 681,
+        r3_hp: parseFloat(document.getElementById('env-r3')?.value) || 1384,
+        hpGrowth: parseFloat(document.getElementById('env-growth')?.value) || 5,
+        resPenalty: parseFloat(document.getElementById('env-res')?.value) || 40,
+        buffBonus: parseFloat(document.getElementById('env-buff')?.value) || 30,
+        pen110: parseFloat(document.getElementById('env-pen110')?.value) || 0.975,
+        pen120: parseFloat(document.getElementById('env-pen120')?.value) || 0.951,
+        transTime: parseFloat(document.getElementById('env-trans')?.value) || 1.5,
+        battleTime: parseFloat(document.getElementById('env-time')?.value) || 120,
+        resTags: tags,
+        weakTags: wTags
+    };
+}
+
 function runSimulations(env) {
     let simMode = document.getElementById('sim-mode') ? document.getElementById('sim-mode').value : 'auto';
     let mcMode = document.getElementById('mc-select') ? document.getElementById('mc-select').value : 'off';
@@ -499,7 +518,7 @@ function runSimulations(env) {
     let getCumDmg = (r, idx, hpPct) => {
         let dmg = 0;
         for (let i = 1; i <= r; i++) {
-            let maxJ = (i === r) ? idx : 4;
+            let maxJ = (i === r) ? idx : 5;
             for (let j = 1; j <= maxJ; j++) {
                 let maxHp = getBossMaxHP(i, j);
                 if (i === r && j === idx) dmg += maxHp * (1 - hpPct / 100); else dmg += maxHp;
@@ -556,21 +575,28 @@ function runSimulations(env) {
                                 let lvlPenalty = (r === 1) ? 1.0 : (r === 2 ? (env.pen110 || 1.0) : (env.pen120 || 1.0));
                                 let r_factor = getCombatMultiplier(env, teamAttr, mainC, idx);
                                 
+                                if (idx === 5) {
+                                    r_factor = 1.0; 
+                                }
+
                                 let timeOnField = env.battleTime - t_left; 
                                 let ttk = getTtkFromMathCurve(hp, baseDps, r_factor, lvlPenalty, mainC, rotId, timeOnField);
 
-                                if (ttk <= t_left) { 
-                                    dmg += hp; t_left -= (ttk + env.transTime); idx++; 
-                                    if (idx > 4) { r++; idx = 1; } 
+                                if (ttk <= t_left) {
+                                    let scoreMult = (idx === 5) ? 1.1 : 1.0;
+                                    dmg += (hp * scoreMult);
+                                    t_left -= (ttk + env.transTime); idx++; 
+                                    if (idx > 5) { r++; idx = 1; } 
                                     hp = getBossMaxHP(r, idx); 
                                 } else { 
-                                    let d = dpsData.find(x => x.id === rotId);
+                                    let d = dpsDataMap[rotId];
                                     let isFirst = (timeOnField === 0);
                                     let rotTime = (isFirst && d && d.firstDuration) ? d.firstDuration : ((d && d.duration) ? d.duration : 25);
                                     let baseTotalDmg = getEffectiveTotalDmg(d, rotId, isFirst, baseDps, rotTime);
                                     
                                     let true_eff_dps = Math.max(0.0001, (baseTotalDmg / rotTime) * r_factor * lvlPenalty);
-                                    dmg += true_eff_dps * t_left; hp -= true_eff_dps * t_left; t_left = 0; 
+                                    let scoreMult = (idx === 5) ? 1.1 : 1.0;
+                                    dmg += (true_eff_dps * t_left * scoreMult); hp -= true_eff_dps * t_left; t_left = 0; 
                                 }
                             }
                             return { hp, r, idx, dmg, endStr: `R${r}-${idx}(${(hp/getBossMaxHP(r,idx)*100).toFixed(0)}%)`, startStr };
@@ -599,7 +625,7 @@ function runSimulations(env) {
                     let endDmg = getCumDmg(ebRInt, ebIdxInt, ebHpPct);
                     let rowDmg = Math.max(0, endDmg - startDmg);
                     let baseScore = Math.floor(rowDmg * env.scoreRatio);
-                    let stagesCleared = (ebRInt - man_start_r) * 4 + (ebIdxInt - man_start_idx);
+                    let stagesCleared = (ebRInt - man_start_r) * 5 + (ebIdxInt - man_start_idx);
                     let maxScore = baseScore + Math.max(0, stagesCleared * 100 + 50);
                     
                     results.totalManualBaseScore += baseScore; results.totalManualMaxScore += maxScore;
@@ -650,21 +676,27 @@ function runBitmaskDP(teams, env) {
                     let lvlPenalty = (tmp_r === 1) ? 1.0 : (tmp_r === 2 ? (env.pen110 || 1.0) : (env.pen120 || 1.0));
                     let r_factor = getCombatMultiplier(env, team.teamAttr, team.c1, tmp_idx);
                     
+                    if (tmp_idx === 5) {
+                        r_factor = 1.0; 
+                    }
+
                     let timeOnField = env.battleTime - t_left; 
                     let ttk = getTtkFromMathCurve(tmp_hp, team.calculatedMinDps, r_factor, lvlPenalty, team.c1, team.rotId, timeOnField);
 
                     if (ttk <= t_left) {
-                        dmgDone += tmp_hp; t_left -= (ttk + env.transTime);
-                        tmp_idx++; if (tmp_idx > 4) { tmp_r++; tmp_idx = 1; }
+                        let scoreMult = (tmp_idx === 5) ? 1.1 : 1.0;
+                        dmgDone += (tmp_hp * scoreMult); t_left -= (ttk + env.transTime);
+                        tmp_idx++; if (tmp_idx > 5) { tmp_r++; tmp_idx = 1; }
                         tmp_hp = getBossMaxHP(tmp_r, tmp_idx);
                     } else {
-                        let d = dpsData.find(x => x.id === team.rotId);
+                        let d = dpsDataMap[team.rotId];
                         let isFirst = (timeOnField === 0);
                         let rotTime = (isFirst && d && d.firstDuration) ? d.firstDuration : ((d && d.duration) ? d.duration : 25);
                         let baseTotalDmg = getEffectiveTotalDmg(d, team.rotId, isFirst, team.calculatedMinDps, rotTime);
                         
                         let true_eff_dps = Math.max(0.0001, (baseTotalDmg / rotTime) * r_factor * lvlPenalty);
-                        dmgDone += true_eff_dps * t_left; tmp_hp -= true_eff_dps * t_left; t_left = 0;
+                        let scoreMult = (tmp_idx === 5) ? 1.1 : 1.0;
+                        dmgDone += (true_eff_dps * t_left * scoreMult); tmp_hp -= true_eff_dps * t_left; t_left = 0;
                     }
                 }
 
@@ -767,24 +799,32 @@ async function reverseInferAndOptimize() {
                         loopGuard++;
                         let lvlPenalty = (tmp_r === 1) ? 1.0 : (tmp_r === 2 ? (env.pen110 || 1.0) : (env.pen120 || 1.0));
                         let r_factor = getCombatMultiplier(env, teamAttr, c1, tmp_idx);
-                        if (r_factor <= 0) r_factor = 0.1;
+                        
+                        if (tmp_idx === 5) {
+                            r_factor = 1.0; 
+                        }
                         let totalPenalty = r_factor * lvlPenalty;
 
-                        if (dmg_left >= tmp_hp) { 
-                            dmg_left -= tmp_hp; dmgDealtToKilledBosses += tmp_hp; effective_dmg_sum += (tmp_hp / totalPenalty); 
-                            kills++; tmp_idx++; if (tmp_idx > 4) { tmp_r++; tmp_idx = 1; } 
+                        let scoreMult = (tmp_idx === 5) ? 1.1 : 1.0;
+                        let currentDmgCap = tmp_hp * scoreMult;
+
+                        if (dmg_left >= currentDmgCap) { 
+                            dmg_left -= currentDmgCap; dmgDealtToKilledBosses += currentDmgCap; effective_dmg_sum += (tmp_hp / totalPenalty); 
+                            kills++; tmp_idx++; if (tmp_idx > 5) { tmp_r++; tmp_idx = 1; } 
                             tmp_hp = getBossMaxHP(tmp_r, tmp_idx); 
                         } else {
-                            effective_dmg_sum += (dmg_left / totalPenalty);
+                            let actualHpDmg = dmg_left / scoreMult;
+                            effective_dmg_sum += (actualHpDmg / totalPenalty);
                             if (!isNaN(ebRInt) && !isNaN(ebIdxInt) && !isNaN(ebHpPct) && ebRInt === tmp_r && ebIdxInt === tmp_idx) {
                                 let dmgDoneToEndBoss = (actualScore / env.scoreRatio) - dmgDealtToKilledBosses;
+                                let actualHpDmgEndBoss = dmgDoneToEndBoss / scoreMult;
                                 let hp_factor = 1 - (ebHpPct / 100);
                                 if (hp_factor <= 0) hp_factor = 0.0001; 
-                                let calculatedTotalHP = dmgDoneToEndBoss / hp_factor;
+                                let calculatedTotalHP = actualHpDmgEndBoss / hp_factor;
                                 bossHPHistory[`R${ebRInt}-${ebIdxInt}`] = bossHPHistory[`R${ebRInt}-${ebIdxInt}`] || [];
                                 bossHPHistory[`R${ebRInt}-${ebIdxInt}`].push({ dmg: calculatedTotalHP, rawScore: actualScore });
                             }
-                            tmp_hp -= dmg_left; dmg_left = 0;
+                            tmp_hp -= actualHpDmg; dmg_left = 0;
                         }
                     }
 
@@ -829,7 +869,7 @@ async function reverseInferAndOptimize() {
                             customStatsMap[rotId] = { dps: newDps, stability: newStab, buff: 0 }; 
                         }
                         
-                        let targetRot = typeof dpsData !== 'undefined' ? dpsData.find(d => d.id === rotId) : null;
+                        let targetRot = typeof dpsDataMap !== 'undefined' ? dpsDataMap[rotId] : null;
                         if (targetRot) {
                             targetRot.dps = newDps;
                             if (targetRot.isUserCustom) {
@@ -850,12 +890,22 @@ async function reverseInferAndOptimize() {
                     
                     let sim_dmg = actualScore / Math.max(0.0001, env.scoreRatio), sim_r = start_r, sim_idx = start_idx, sim_hp = start_hp;
                     let simLoopGuard = 0;
-                    while (sim_dmg >= sim_hp && simLoopGuard < 50) { 
-                        simLoopGuard++; sim_dmg -= sim_hp; sim_idx++; 
-                        if (sim_idx > 4) { sim_r++; sim_idx = 1; } 
-                        sim_hp = getBossMaxHP(sim_r, sim_idx); 
+                    while (simLoopGuard < 50) {
+                        simLoopGuard++;
+                        let scoreMult = (sim_idx === 5) ? 1.1 : 1.0;
+                        let currentDmgCap = sim_hp * scoreMult;
+                        if (sim_dmg >= currentDmgCap) {
+                            sim_dmg -= currentDmgCap; sim_idx++;
+                            if (sim_idx > 5) { sim_r++; sim_idx = 1; }
+                            sim_hp = getBossMaxHP(sim_r, sim_idx);
+                        } else {
+                            break;
+                        }
                     }
-                    if (sim_dmg > 0) sim_hp -= sim_dmg;
+                    if (sim_dmg > 0) {
+                        let scoreMult = (sim_idx === 5) ? 1.1 : 1.0;
+                        sim_hp -= (sim_dmg / scoreMult);
+                    }
                     start_r = sim_r; start_idx = sim_idx; start_hp = sim_hp;
 
                 } else if (rotId) {
@@ -867,15 +917,19 @@ async function reverseInferAndOptimize() {
                         let lvlPenalty = (start_r === 1) ? 1.0 : (start_r === 2 ? (env.pen110 || 1.0) : (env.pen120 || 1.0));
                         let r_factor = getCombatMultiplier(env, teamAttr, c1, start_idx);
                         
+                        if (start_idx === 5) {
+                            r_factor = 1.0; 
+                        }
+
                         let timeOnField = env.battleTime - t_left;
                         let ttk = getTtkFromMathCurve(start_hp, calculatedMinDps, r_factor, lvlPenalty, c1, rotId, timeOnField);
 
                         if (ttk <= t_left) { 
                             t_left -= (ttk + env.transTime); start_idx++; 
-                            if (start_idx > 4) { start_r++; start_idx = 1; } 
+                            if (start_idx > 5) { start_r++; start_idx = 1; } 
                             start_hp = getBossMaxHP(start_r, start_idx); 
                         } else { 
-                            let d = dpsData.find(x => x.id === rotId);
+                            let d = dpsDataMap[rotId];
                             let isFirst = (timeOnField === 0);
                             let rotTime = (isFirst && d && d.firstDuration) ? d.firstDuration : ((d && d.duration) ? d.duration : 25);
                             let baseTotalDmg = getEffectiveTotalDmg(d, rotId, isFirst, calculatedMinDps, rotTime);
@@ -938,7 +992,7 @@ async function reverseInferAndOptimize() {
                     if (!isDuplicate) {
                         tempUsage[b1] = u1 + 1; tempUsage[b2] = u2 + 1; tempUsage[b3] = u3 + 1;
                         poolToPermute.push({
-                            index: poolToPermute.length, // 🌟 AOT 優化 2
+                            index: poolToPermute.length, 
                             c1: dbTeam.c1, c2: dbTeam.c2, c3: dbTeam.c3, scoreInput: "", ebR: "", ebIdx: "", ebHp: "", 
                             calculatedMinDps: getRotDpsRange(dbTeam).min, 
                             teamAttr: typeof charAttrMap !== 'undefined' ? charAttrMap[dbTeam.c1] : null,
@@ -951,15 +1005,20 @@ async function reverseInferAndOptimize() {
 
         let n = poolToPermute.length;
         
-        // 🌟 AOT 優化 3：預先建立傷害乘區矩陣 (隊伍 index -> Boss R_idx -> multiplier)
         let dmgMultMatrix = new Array(n);
         for(let i = 0; i < n; i++) {
             dmgMultMatrix[i] = {};
             for(let r = 1; r <= 10; r++) {
                 dmgMultMatrix[i][r] = {};
                 let lvlPenalty = (r === 1) ? 1.0 : (r === 2 ? (env.pen110 || 1.0) : (env.pen120 || 1.0));
-                for(let idx = 1; idx <= 4; idx++) {
+                
+                for(let idx = 1; idx <= 5; idx++) {
                     let r_factor = getCombatMultiplier(env, poolToPermute[i].teamAttr, poolToPermute[i].c1, idx);
+                    
+                    if (idx === 5) {
+                        r_factor = 1.0; 
+                    }
+
                     if (r_factor <= 0) r_factor = 0.1;
                     dmgMultMatrix[i][r][idx] = { r_factor: r_factor, lvlPenalty: lvlPenalty };
                 }
@@ -971,7 +1030,13 @@ async function reverseInferAndOptimize() {
         let estDpTimeSec = (dpTransitions / opsPerSec).toFixed(1);
         let dpWarning = (dpTransitions > 1000000) ? t(" (⚠️ 運算時間可能過長)") : "";
 
-        let defaultBeamWidth = Math.min(50000, Math.max(2000, Math.floor(1000 + 3.0 * Math.pow(n, 3))));
+        // 🚀 4.8.6 動態對數深度估算 (因應奇藏加分機制，微調上修容錯深度)
+        let defaultBeamWidth = 3500; // 基礎值由 2500 -> 3500
+        if (n > 1) {
+            defaultBeamWidth = Math.floor(3500 + (Math.log(n) * 1800)); // 乘數由 1500 -> 1800
+        }
+        defaultBeamWidth = Math.max(3500, defaultBeamWidth); // 下限由 3000 -> 3500
+
         let beamTransitions = n * n * defaultBeamWidth; 
         let estBeamTimeSec = (beamTransitions / opsPerSec).toFixed(1);
 
@@ -1004,7 +1069,6 @@ async function reverseInferAndOptimize() {
         if (useDP) {
             updateProgress(50, t(`啟動狀態壓縮 DP 引擎 (預估 `) + `${estDpTimeSec}` + t(` 秒)...`));
             await yieldToMain();
-            // 注意：若要在 runBitmaskDP 中也套用 AOT，需將 dmgMultMatrix 傳進去，這裡為保持簡潔，先確保 BeamSearch 極致化
             let dpRes = runBitmaskDP(poolToPermute, env); 
             bestSequence = dpRes.seq;
             bestSimDmg = dpRes.score;
@@ -1014,143 +1078,181 @@ async function reverseInferAndOptimize() {
                 finalBeamWidth = parseInt(widthChoice);
             }
 
-            // 🌟 AOT 優化 4：初始化 Bitmask 狀態 (1111... 代表所有隊伍可用)
-            let initialMask = (1 << n) - 1;
-            let states = [{ score: 0, evalScore: 0, sequence: [], availableMask: initialMask, r: 1, idx: 1, hp: getBossMaxHP(1, 1) }];
+            // ==========================================
+            // 4.8.5 效能優化：TypedArray 與攤平樹狀結構 (Flat Tree)
+            // ==========================================
+            const MAX_NODES = finalBeamWidth * n; 
+            
+            // 建立連續記憶體池，避免迴圈內產生物件
+            let currentEvals = new Float64Array(finalBeamWidth);
+            let currentScores = new Float64Array(finalBeamWidth);
+            let currentMasks = new Int32Array(finalBeamWidth);
+            let currentR = new Int32Array(finalBeamWidth);
+            let currentIdx = new Int32Array(finalBeamWidth);
+            let currentHp = new Float64Array(finalBeamWidth);
+            
+            // 攤平樹狀結構：紀錄當前選擇的隊伍索引與父節點索引
+            let currentTeamIdx = new Int32Array(finalBeamWidth); 
+            let currentParentIdx = new Int32Array(finalBeamWidth);
+
+            // 二維陣列保存歷史軌跡供溯源使用
+            let historyTeamIdx = new Array(n);
+            let historyParentIdx = new Array(n);
+            for(let step = 0; step < n; step++){
+                historyTeamIdx[step] = new Int32Array(finalBeamWidth);
+                historyParentIdx[step] = new Int32Array(finalBeamWidth);
+            }
+
+            // 初始化起點
+            currentEvals[0] = 0; 
+            currentScores[0] = 0; 
+            currentMasks[0] = (1 << n) - 1; 
+            currentR[0] = 1;
+            currentIdx[0] = 1;
+            currentHp[0] = getBossMaxHP(1, 1);
+            currentTeamIdx[0] = -1; 
+            currentParentIdx[0] = -1;
+            let currentCount = 1;
 
             for (let step = 0; step < n; step++) {
                 updateProgress(Math.floor((step / n) * 100), t(`推演中 (`) + `${step+1}/${n})...`);
-                await yieldToMain(); 
+                if (step % 2 === 0) await yieldToMain(); 
 
-                let nextStates = [];
-                for (let state of states) {
-                    // 🌟 AOT 優化 5：使用 Bitmask 快速遍歷可用隊伍
-                    for (let i = 0; i < n; i++) {
-                        if (state.availableMask & (1 << i)) { // 檢查第 i 隊是否可用
-                            let team = poolToPermute[i];
-                            let t_left = env.battleTime, dmgDone = 0, tmp_r = state.r, tmp_idx = state.idx, tmp_hp = state.hp;
+                let nextEvals = new Float64Array(MAX_NODES);
+                let nextScores = new Float64Array(MAX_NODES);
+                let nextMasks = new Int32Array(MAX_NODES);
+                let nextR = new Int32Array(MAX_NODES);
+                let nextIdx = new Int32Array(MAX_NODES);
+                let nextHp = new Float64Array(MAX_NODES);
+                let nextTeamId = new Int32Array(MAX_NODES);
+                let nextParentId = new Int32Array(MAX_NODES);
+                let nextCount = 0;
+
+                // 狀態去重 Hash Map
+                let seenMasks = new Map(); 
+
+                for (let i = 0; i < currentCount; i++) {
+                    let cMask = currentMasks[i];
+                    let cScore = currentScores[i];
+                    let cR = currentR[i];
+                    let cIdx = currentIdx[i];
+                    let cHp = currentHp[i];
+
+                    for (let j = 0; j < n; j++) {
+                        if (cMask & (1 << j)) { 
+                            let team = poolToPermute[j];
+                            let t_left = env.battleTime, dmgDone = 0, tmp_r = cR, tmp_idx = cIdx, tmp_hp = cHp;
                             let loopGuard = 0;
 
                             while (t_left > 0 && loopGuard < 50) {
                                 loopGuard++;
-                                // 🌟 AOT 優化 6：查表取代計算
-                                let multData = dmgMultMatrix[i][tmp_r][tmp_idx];
-                                
+                                let multData = dmgMultMatrix[j][tmp_r][tmp_idx];
                                 let timeOnField = env.battleTime - t_left;
                                 let ttk = getTtkFromMathCurve(tmp_hp, team.calculatedMinDps, multData.r_factor, multData.lvlPenalty, team.c1, team.rotId, timeOnField);
 
                                 if (ttk <= t_left) { 
-                                    dmgDone += tmp_hp; t_left -= (ttk + env.transTime); tmp_idx++; 
-                                    if (tmp_idx > 4) { tmp_r++; tmp_idx = 1; } 
+                                    let scoreMult = (tmp_idx === 5) ? 1.1 : 1.0;
+                                    dmgDone += (tmp_hp * scoreMult); t_left -= (ttk + env.transTime); tmp_idx++; 
+                                    if (tmp_idx > 5) { tmp_r++; tmp_idx = 1; } 
                                     tmp_hp = getBossMaxHP(tmp_r, tmp_idx); 
                                 } else { 
-                                    let d = dpsData.find(x => x.id === team.rotId);
+                                    let d = dpsDataMap[team.rotId];
                                     let isFirst = (timeOnField === 0);
                                     let rotTime = (isFirst && d && d.firstDuration) ? d.firstDuration : ((d && d.duration) ? d.duration : 25);
                                     let baseTotalDmg = getEffectiveTotalDmg(d, team.rotId, isFirst, team.calculatedMinDps, rotTime);
 
                                     let true_eff_dps = Math.max(0.0001, (baseTotalDmg / rotTime) * multData.r_factor * multData.lvlPenalty);
-                                    dmgDone += true_eff_dps * t_left; tmp_hp -= true_eff_dps * t_left; t_left = 0; 
+                                    let scoreMult = (tmp_idx === 5) ? 1.1 : 1.0;
+                                    dmgDone += (true_eff_dps * t_left * scoreMult); tmp_hp -= true_eff_dps * t_left; t_left = 0; 
                                 }
                             }
 
-                            // 🌟 AOT 優化 7：Bitmask 降維轉移狀態，消滅 filter
-                            let newMask = state.availableMask & ~(1 << i);
-                            
-                            // ==========================================
-                            // 🛡️ 絕對安全版 A* 動態啟發式估價 (Admissible Heuristic)
-                            // ==========================================
+                            let newMask = cMask & ~(1 << j);
+                            let newScore = cScore + dmgDone;
+
+                            // --- A* 啟發式估價 (統一使用純傷害計算) ---
                             let remainingBossHp = 0;
                             let hr_r = tmp_r, hr_idx = tmp_idx, isFirstBoss = true;
                             let lookAheadCount = 0;
 
-                            // 1. 偷看敵人：往後看最多 4 隻王的剩餘總血量 (這是我們必須跨越的最低門檻)
-                            while (hr_r <= 10 && lookAheadCount < 4) { 
+                            while (hr_r <= 10 && lookAheadCount < 5) { 
                                 let hpToAdd = isFirstBoss ? tmp_hp : getBossMaxHP(hr_r, hr_idx);
-                                remainingBossHp += hpToAdd;
+                                let scoreMult = (hr_idx === 5) ? 1.1 : 1.0;
+                                remainingBossHp += (hpToAdd * scoreMult);
                                 isFirstBoss = false;
                                 hr_idx++;
-                                if (hr_idx > 4) { hr_r++; hr_idx = 1; }
+                                if (hr_idx > 5) { hr_r++; hr_idx = 1; }
                                 lookAheadCount++;
                             }
 
                             let maxPossibleDmg = 0;
-                            let maxPossibleScore = 0;
-
-                            // 定義「最樂觀」的環境加成 (假設剩下的王剛好都是弱點，給予 1.0 或 1.2 倍率)
-                            // 這裡用 1.0 代表不打折，若遊戲有 20% 屬性弱點加成，可設為 1.2 以確保絕對安全
-                            let optimisticMultiplier = 1.0; 
-
-                            // 2. 盤點資源：計算「真・理論物理極限」
-                            for (let j = 0; j < n; j++) {
-                                if (newMask & (1 << j)) {
-                                    let tRem = poolToPermute[j];
-                                    
-                                    // 🛡️ 關鍵修正：不是乘上排軸時間 (25s)，而是乘上「整場戰鬥最大可用時間」(env.battleTime)
-                                    // 這代表我們假設這支隊伍能活著把時間打滿！
-                                    let potentialDmg = tRem.calculatedMinDps * env.battleTime * optimisticMultiplier;
-                                    
-                                    maxPossibleDmg += potentialDmg;
-                                    maxPossibleScore += (potentialDmg * (env.scoreRatio || 10));
+                            for (let k = 0; k < n; k++) {
+                                if (newMask & (1 << k)) {
+                                    maxPossibleDmg += (poolToPermute[k].calculatedMinDps * env.battleTime);
                                 }
                             }
 
-                            let heuristic = 0;
+                            // 如果剩餘理論傷害連血量都打不完，給予 0.1% 懲罰使其墊底被淘汰
+                            let heuristic = (maxPossibleDmg < remainingBossHp) ? (maxPossibleDmg * 0.001) : maxPossibleDmg; 
+                            let newEval = newScore + heuristic;
 
-                            // 3. 絕對安全剪枝：如果在「最完美狀態」下打滿全場，總傷依然 < 剩餘血量 ➔ 絕對死局！
-                            if (maxPossibleDmg < remainingBossHp) {
-                                heuristic = maxPossibleScore * 0.001; // 毫不留情地給予 0.1% 的分數，確保被 Beam Search 淘汰
-                            } else {
-                                // 4. 合理估價：如果不死局，我們依舊給予樂觀的潛力分數，交由詳細推演去分高下
-                                heuristic = maxPossibleScore; 
-                            }
-                            // ==========================================
+                            // 狀態比對與去重
+                            let existingEval = seenMasks.get(newMask);
+                            if (existingEval !== undefined && existingEval >= newEval) continue;
+                            seenMasks.set(newMask, newEval);
 
-                            nextStates.push({ 
-                                score: state.score + dmgDone, 
-                                evalScore: state.score + dmgDone + heuristic,
-                                sequence: [...state.sequence, team], 
-                                availableMask: newMask, // 紀錄新的 Mask
-                                r: tmp_r, idx: tmp_idx, hp: tmp_hp 
-                            });
+                            // 寫入 TypedArray 記憶體池
+                            nextEvals[nextCount] = newEval;
+                            nextScores[nextCount] = newScore;
+                            nextMasks[nextCount] = newMask;
+                            nextR[nextCount] = tmp_r;
+                            nextIdx[nextCount] = tmp_idx;
+                            nextHp[nextCount] = tmp_hp;
+                            
+                            nextTeamId[nextCount] = j;
+                            nextParentId[nextCount] = i; 
+                            nextCount++;
                         }
                     }
                 }
-                
-                nextStates.sort((a, b) => b.evalScore - a.evalScore);
-                if (nextStates.length > maxStatesReached) maxStatesReached = nextStates.length;
-                
-                let bestEval = nextStates.length > 0 ? nextStates[0].evalScore : 0;
-                let threshold = bestEval * 0.85; 
 
-                let diverseStates = []; let teamUsageCount = {}; let added = new Set();
-                for (let i = 0; i < nextStates.length; i++) {
-                    let state = nextStates[i];
-                    
-                    if (state.evalScore < threshold && diverseStates.length >= finalBeamWidth * 0.2) break;
+                if (nextCount > maxStatesReached) maxStatesReached = nextCount;
 
-                    let lastTeamId = state.sequence.length > 0 ? state.sequence[state.sequence.length-1].rotId : 'none';
-                    teamUsageCount[lastTeamId] = (teamUsageCount[lastTeamId] || 0) + 1;
-                    
-                    if (finalBeamWidth > 100000) {
-                        diverseStates.push(state); added.add(state);
-                    } else {
-                        if (teamUsageCount[lastTeamId] < finalBeamWidth * 0.2 || diverseStates.length < finalBeamWidth * 0.1) {
-                            diverseStates.push(state); added.add(state);
-                        }
-                    }
-                    if (diverseStates.length >= finalBeamWidth) break;
-                }
+                // 指標排序
+                let indices = new Int32Array(nextCount);
+                for (let i = 0; i < nextCount; i++) indices[i] = i;
+                indices.sort((a, b) => nextEvals[b] - nextEvals[a]); 
+
+                currentCount = Math.min(finalBeamWidth, nextCount);
                 
-                if (diverseStates.length < finalBeamWidth) {
-                    for (let i = 0; i < nextStates.length && diverseStates.length < finalBeamWidth; i++) {
-                        if (!added.has(nextStates[i])) diverseStates.push(nextStates[i]);
-                    }
+                let hTeam = historyTeamIdx[step];
+                let hParent = historyParentIdx[step];
+
+                for (let i = 0; i < currentCount; i++) {
+                    let idx = indices[i];
+                    currentEvals[i] = nextEvals[idx];
+                    currentScores[i] = nextScores[idx];
+                    currentMasks[i] = nextMasks[idx];
+                    currentR[i] = nextR[idx];
+                    currentIdx[i] = nextIdx[idx];
+                    currentHp[i] = nextHp[idx];
+                    
+                    hTeam[i] = currentTeamIdx[i] = nextTeamId[idx];
+                    hParent[i] = currentParentIdx[i] = nextParentId[idx];
                 }
-                states = diverseStates; 
             }
-            bestSequence = states[0].sequence;
-            bestSimDmg = states[0].score;
+            
+            bestSimDmg = currentScores[0];
+            
+            // 從 history 陣列回推最佳路徑
+            let traceIdx = 0; 
+            for (let step = n - 1; step >= 0; step--) {
+                let teamIndexInPool = historyTeamIdx[step][traceIdx];
+                if (teamIndexInPool !== -1) {
+                    bestSequence.unshift(poolToPermute[teamIndexInPool]);
+                }
+                traceIdx = historyParentIdx[step][traceIdx];
+            }
         }
 
         updateProgress(100, t('最佳化排序完成！'));
@@ -1228,7 +1330,6 @@ async function autoBuildMaxDpsTeams() {
             isEngineRunning = false; return alert(t("沒有可用的排軸！請確認已勾選角色與排軸。"));
         }
 
-        let states = [{ minScore: 0, maxScore: 0, score: 0, evalScore: 0, teams: [], usage: {} }];
         let maxStatesReached = 0; 
         let teamsWithScore = [];
         
@@ -1238,17 +1339,12 @@ async function autoBuildMaxDpsTeams() {
         }
         teamsWithScore.sort((a, b) => strategy === 'max' ? b.maxScore - a.maxScore : b.minScore - a.minScore);
         
-        let scoresArr = teamsWithScore.map(t => strategy === 'max' ? t.maxScore : t.minScore);
+        // 🌟 純粹的 DPS 累積估價
         let getHeuristic = (idx, count) => { 
             let sumDmg = 0; 
             for(let c = 0; c < count && (idx + c) < teamsWithScore.length; c++) {
                 let tCand = teamsWithScore[idx + c];
-                let rotData = dpsData.find(x => x.id === tCand.team.rotId);
-                let actualDur = (rotData && rotData.duration > 0) ? parseFloat(rotData.duration) : 25;
-                let addScore = strategy === 'max' ? tCand.maxScore : tCand.minScore;
-                
-                // 這裡的 addScore 已經是 DPS，所以我們乘上真實軸長來還原潛力分數
-                sumDmg += (addScore * actualDur * 10); // 假設 env.scoreRatio = 10
+                sumDmg += (strategy === 'max' ? tCand.maxScore : tCand.minScore);
             } 
             return sumDmg; 
         };
@@ -1256,8 +1352,12 @@ async function autoBuildMaxDpsTeams() {
         let totalCandidates = teamsWithScore.length;
         let opsPerSec = getDeviceBenchmark() * 0.4;
         
-        // 🚀 動態二次方深度估算
-        let defaultBeamWidth = Math.min(50000, Math.max(2000, Math.floor(1000 + 1.5 * Math.pow(totalCandidates, 2))));
+        // 🚀 4.8.6 動態對數深度估算 (因應奇藏加分機制，微調上修容錯深度)
+        let defaultBeamWidth = 3500; // 基礎值由 2500 -> 3500
+        if (totalCandidates > 1) {
+            defaultBeamWidth = Math.floor(3500 + (Math.log(totalCandidates) * 1800)); // 乘數由 1500 -> 1800
+        }
+        defaultBeamWidth = Math.max(3500, defaultBeamWidth); // 下限由 3000 -> 3500
 
         let estTimeSec = ((totalCandidates * defaultBeamWidth) / opsPerSec).toFixed(1);
         if (parseFloat(estTimeSec) < 0.1) estTimeSec = "0.1";
@@ -1286,91 +1386,175 @@ async function autoBuildMaxDpsTeams() {
         let limitMap = {}; for (let key in charData) limitMap[key] = charData[key].max;
         let stepCount = 0; let totalSteps = teamsWithScore.length; let startTime = Date.now(); 
 
-        for (let {team, minScore, maxScore} of teamsWithScore) {
-            let currentScoreAdd = strategy === 'max' ? maxScore : minScore;
+        const MAX_NODES = beamWidth * 2; 
+        let finalBeamWidth = beamWidth;
+        
+        let allCharsList = Object.keys(charData);
+        let charCount = allCharsList.length;
+
+        let currentEvals = new Float64Array(finalBeamWidth);
+        let currentScores = new Float64Array(finalBeamWidth);
+        let currentTeamCounts = new Int32Array(finalBeamWidth); 
+        let currentUsages = new Int8Array(finalBeamWidth * charCount);
+        let currentTeamIdx = new Int32Array(finalBeamWidth); 
+        let currentParentIdx = new Int32Array(finalBeamWidth);
+
+        let historyTeamIdx = new Array(totalSteps);
+        let historyParentIdx = new Array(totalSteps);
+        for(let step = 0; step < totalSteps; step++){
+            historyTeamIdx[step] = new Int32Array(finalBeamWidth);
+            historyParentIdx[step] = new Int32Array(finalBeamWidth);
+        }
+
+        currentEvals[0] = 0; 
+        currentScores[0] = 0; 
+        currentTeamCounts[0] = 0;
+        currentTeamIdx[0] = -1; 
+        currentParentIdx[0] = -1;
+        let currentCount = 1;
+
+        for (let candIdx = 0; candIdx < totalSteps; candIdx++) {
+            let tCand = teamsWithScore[candIdx];
+            let team = tCand.team;
+            let currentScoreAdd = strategy === 'max' ? tCand.maxScore : tCand.minScore;
+            
+            let b1 = getBase(team.c1), b2 = getBase(team.c2), b3 = getBase(team.c3);
+            let b1Id = allCharsList.indexOf(b1), b2Id = allCharsList.indexOf(b2), b3Id = allCharsList.indexOf(b3);
+            let limit1 = limitMap[b1] || 1, limit2 = limitMap[b2] || 1, limit3 = limitMap[b3] || 1;
+
             stepCount++;
             if (stepCount % 2 === 0 || stepCount === 1) {
                 updateProgress(Math.floor((stepCount / totalSteps) * 100), t(`建構中 (`) + `${stepCount}/${totalSteps})...`);
                 await yieldToMain(); 
             }
 
-            let nextStates = [];
-            let b1 = getBase(team.c1), b2 = getBase(team.c2), b3 = getBase(team.c3);
-            let limit1 = limitMap[b1] || 1, limit2 = limitMap[b2] || 1, limit3 = limitMap[b3] || 1;
+            let nextEvals = new Float64Array(MAX_NODES);
+            let nextScores = new Float64Array(MAX_NODES);
+            let nextTeamCounts = new Int32Array(MAX_NODES);
+            let nextUsages = new Int8Array(MAX_NODES * charCount);
+            let nextTeamId = new Int32Array(MAX_NODES);
+            let nextParentId = new Int32Array(MAX_NODES);
+            let nextCount = 0;
 
-            for (let i = 0; i < states.length; i++) {
-                let state = states[i];
-                
-                if (state.teams.length < maxAllowed) {
-                    let u1 = state.usage[b1] || 0, u2 = state.usage[b2] || 0, u3 = state.usage[b3] || 0;
-                    if (u1 < limit1 && u2 < limit2 && u3 < limit3 && b1 !== b2 && b1 !== b3 && b2 !== b3) {
-                        let newUsage = Object.assign({}, state.usage);
-                        newUsage[b1] = u1 + 1; newUsage[b2] = u2 + 1; newUsage[b3] = u3 + 1;
-                        let newTeams = state.teams.slice(); newTeams.push(team);
+            // 🌟 修復核心：使用 BigInt 位元壓縮，取代字串拼接
+            let getUsageHash = (usageOffset) => {
+                let hash = 0n;
+                for (let i = 0; i < charCount; i++) {
+                    let u = nextUsages[usageOffset + i];
+                    if (u > 0) {
+                        hash |= (BigInt(u) << BigInt(i * 3));
+                    }
+                }
+                return hash;
+            };
+
+            let seenStates = new Map();
+
+            for (let i = 0; i < currentCount; i++) {
+                let cScore = currentScores[i];
+                let cTeamCount = currentTeamCounts[i];
+                let cUsageOffset = i * charCount;
+
+                // 選擇加入該隊伍的分支
+                if (cTeamCount < maxAllowed) {
+                    let u1 = currentUsages[cUsageOffset + b1Id] || 0;
+                    let u2 = currentUsages[cUsageOffset + b2Id] || 0;
+                    let u3 = currentUsages[cUsageOffset + b3Id] || 0;
+
+                    if (u1 < limit1 && u2 < limit2 && u3 < limit3 && b1Id !== b2Id && b1Id !== b3Id && b2Id !== b3Id) {
+                        let newTeamCount = cTeamCount + 1;
+                        let newScore = cScore + currentScoreAdd;
+                        let heuristic = getHeuristic(stepCount, maxAllowed - newTeamCount);
+                        // 加上極小偏置值，同分時優先保留隊伍數多的
+                        let newEval = newScore + heuristic + 0.0001; 
                         
-                        let heuristic = getHeuristic(stepCount, maxAllowed - newTeams.length);
-                        // evalScore 直接加上精確的總潛力分
-                        let evalScore = state.score + (currentScoreAdd * 250) + heuristic; 
+                        let nUsageOffset = nextCount * charCount;
+                        for(let k=0; k<charCount; k++) nextUsages[nUsageOffset + k] = currentUsages[cUsageOffset + k];
+                        nextUsages[nUsageOffset + b1Id]++;
+                        nextUsages[nUsageOffset + b2Id]++;
+                        nextUsages[nUsageOffset + b3Id]++;
 
-                        nextStates.push({ 
-                            maxScore: state.maxScore + (strategy==='max'?maxScore:0), 
-                            minScore: state.minScore + (strategy==='min'?minScore:0), 
-                            score: state.score + (currentScoreAdd * 250), // 為了排序權重統一放大
-                            evalScore: evalScore, 
-                            teams: newTeams, 
-                            usage: newUsage 
-                        });
+                        let stateHash = getUsageHash(nUsageOffset);
+                        let existingEval = seenStates.get(stateHash);
+
+                        if (existingEval === undefined || newEval > existingEval) {
+                            seenStates.set(stateHash, newEval);
+                            nextEvals[nextCount] = newEval;
+                            nextScores[nextCount] = newScore;
+                            nextTeamCounts[nextCount] = newTeamCount;
+                            nextTeamId[nextCount] = candIdx;
+                            nextParentId[nextCount] = i;
+                            nextCount++;
+                        }
                     }
                 }
-                
-                let skipHeuristic = getHeuristic(stepCount, maxAllowed - state.teams.length);
-                nextStates.push({
-                    maxScore: state.maxScore,
-                    minScore: state.minScore,
-                    score: state.score,
-                    evalScore: state.score + skipHeuristic,
-                    teams: state.teams,
-                    usage: state.usage
-                });
-            }
 
-            nextStates.sort((a, b) => Math.abs(b.evalScore - a.evalScore) > 0.01 ? b.evalScore - a.evalScore : b.score - a.score);
-
-            if (nextStates.length > maxStatesReached) maxStatesReached = nextStates.length;
-            
-            let bestEval = nextStates.length > 0 ? nextStates[0].evalScore : 0;
-            let threshold = bestEval * 0.90; 
-            
-            let diverseStates = []; let teamUsageCount = {}; let added = new Set();
-            for (let i = 0; i < nextStates.length; i++) {
-                let state = nextStates[i];
+                // 不加入該隊伍的分支 (Skip)
+                let skipHeuristic = getHeuristic(stepCount, maxAllowed - cTeamCount);
+                let skipEval = cScore + skipHeuristic;
                 
-                if (state.evalScore < threshold && diverseStates.length >= beamWidth * 0.2) break;
-
-                let lastTeamId = state.teams.length > 0 ? state.teams[state.teams.length-1].rotId : 'none';
-                teamUsageCount[lastTeamId] = (teamUsageCount[lastTeamId] || 0) + 1;
+                let nUsageOffsetSkip = nextCount * charCount;
+                for(let k=0; k<charCount; k++) nextUsages[nUsageOffsetSkip + k] = currentUsages[cUsageOffset + k];
                 
-                if (beamWidth > 100000) {
-                    diverseStates.push(state); added.add(state);
-                } else {
-                    if (teamUsageCount[lastTeamId] < beamWidth * 0.2 || diverseStates.length < beamWidth * 0.1) {
-                        diverseStates.push(state); added.add(state);
-                    }
-                }
-                if (diverseStates.length >= beamWidth) break;
-            }
-            if (diverseStates.length < beamWidth) {
-                for (let i = 0; i < nextStates.length && diverseStates.length < beamWidth; i++) {
-                    if (!added.has(nextStates[i])) diverseStates.push(nextStates[i]);
+                let skipHash = getUsageHash(nUsageOffsetSkip);
+                let skipExistingEval = seenStates.get(skipHash);
+
+                if (skipExistingEval === undefined || skipEval > skipExistingEval) {
+                    seenStates.set(skipHash, skipEval);
+                    nextEvals[nextCount] = skipEval;
+                    nextScores[nextCount] = cScore;
+                    nextTeamCounts[nextCount] = cTeamCount;
+                    nextTeamId[nextCount] = -1; 
+                    nextParentId[nextCount] = i;
+                    nextCount++;
                 }
             }
-            states = diverseStates; 
+
+            if (nextCount > maxStatesReached) maxStatesReached = nextCount;
+
+            let indices = new Int32Array(nextCount);
+            for (let i = 0; i < nextCount; i++) indices[i] = i;
+            
+            indices.sort((a, b) => {
+                let diff = nextEvals[b] - nextEvals[a];
+                if (Math.abs(diff) > 0.00001) return diff;
+                return nextTeamCounts[b] - nextTeamCounts[a];
+            });
+
+            currentCount = Math.min(finalBeamWidth, nextCount);
+            
+            let hTeam = historyTeamIdx[candIdx];
+            let hParent = historyParentIdx[candIdx];
+
+            for (let i = 0; i < currentCount; i++) {
+                let idx = indices[i];
+                currentEvals[i] = nextEvals[idx];
+                currentScores[i] = nextScores[idx];
+                currentTeamCounts[i] = nextTeamCounts[idx];
+                
+                let nOffset = idx * charCount;
+                let cOffset = i * charCount;
+                for(let k=0; k<charCount; k++) currentUsages[cOffset + k] = nextUsages[nOffset + k];
+                
+                hTeam[i] = currentTeamIdx[i] = nextTeamId[idx];
+                hParent[i] = currentParentIdx[i] = nextParentId[idx];
+            }
         }
+        
+        let finalOptimizedTeams = [];
+        let traceIdx = 0; 
+        for (let step = totalSteps - 1; step >= 0; step--) {
+            let teamIndexInPool = historyTeamIdx[step][traceIdx];
+            if (teamIndexInPool !== -1) {
+                finalOptimizedTeams.unshift(teamsWithScore[teamIndexInPool].team);
+            }
+            traceIdx = historyParentIdx[step][traceIdx];
+        }
+        finalOptimizedTeams.reverse(); 
         
         updateProgress(100, t('自動編隊完成！'));
         setTimeout(() => document.getElementById('sim-progress-container').style.display='none', 800);
 
-        let finalOptimizedTeams = states[0].teams; finalOptimizedTeams.reverse(); 
         document.querySelectorAll('.char-select, .score-input, .end-boss-hp, .end-boss-r, .end-boss-idx').forEach(el => el.value=""); 
         
         let rows = document.querySelectorAll('#team-board tr');
@@ -1387,7 +1571,6 @@ async function autoBuildMaxDpsTeams() {
 
         let finalSimRes = runSimulations(getEnvSettings()); 
         
-        // 🚀 終極防護：確保最終輸出的總分不出現倒置
         let rawMin = Math.floor(finalSimRes.totalMatrixScoreMin);
         let rawMax = Math.floor(finalSimRes.totalMatrixScoreMax);
         let estMinScore = Math.min(rawMin, rawMax);
