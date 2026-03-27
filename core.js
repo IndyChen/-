@@ -656,7 +656,8 @@ function runSimulations(env) {
                                     dmg += (true_eff_dps * t_left * scoreMult); hp -= true_eff_dps * t_left; t_left = 0; 
                                 }
                             }
-                            return { hp, r, idx, dmg, endStr: `R${r}-${idx}(${(hp/getBossMaxHP(r,idx)*100).toFixed(0)}%)`, startStr };
+                            let finalHpPct = Math.max(0, (hp / getBossMaxHP(r, idx)) * 100);
+                            return { hp: Math.max(0, hp), r, idx, dmg, endStr: `R${r}-${idx}(${finalHpPct.toFixed(0)}%)`, startStr };
                         };
                         
                         let resMin = simulate(auto_hp_min, auto_r_min, auto_idx_min, dpsRange.min, c1);
@@ -771,18 +772,39 @@ async function reverseInferAndOptimize() {
     if (typeof isEngineRunning !== 'undefined' && isEngineRunning) return alert(t("⚠️ 引擎正在高載運算中，請稍候..."));
     if (typeof isEngineRunning === 'undefined') window.isEngineRunning = false;
     isEngineRunning = true;
-
     ttkCache.clear();
 
     try {
+        if (typeof customRotations !== 'undefined') {
+            let hasGhosts = false;
+            for (let i = customRotations.length - 1; i >= 0; i--) {
+                if (customRotations[i].rot === "反推自動建軸" && customRotations[i].dps === 10000) {
+                    let deadId = 'custom_rot_' + customRotations[i].id;
+                    customRotations.splice(i, 1);
+                    if (typeof dpsData !== 'undefined') {
+                        let dIdx = dpsData.findIndex(d => d.id === deadId);
+                        if (dIdx !== -1) dpsData.splice(dIdx, 1);
+                    }
+                    if (typeof dpsDataMap !== 'undefined') delete dpsDataMap[deadId];
+                    if (customStatsMap[deadId]) delete customStatsMap[deadId];
+                    checkedRotations.delete(deadId);
+                    hasGhosts = true;
+                }
+            }
+            if (hasGhosts) {
+                safeStorageSet('ww_custom_rotations_v2', customRotations);
+                safeStorageSet('ww_custom_stats', customStatsMap);
+                safeStorageSet('ww_rotations', [...checkedRotations]);
+            }
+        }
+
         initBossHPMap(); 
         let env = getEnvSettings();
-        let currentTeams = []; 
         let rows = document.querySelectorAll('#team-board tr');
-        let start_r = 1, start_idx = 1, start_hp = getBossMaxHP(1, 1);
-        
+        let currentTeams = [];
         let hasIncompleteScore = false;
         let needsRebuild = false;
+        let start_r = 1, start_idx = 1, start_hp = getBossMaxHP(1, 1);
 
         rows.forEach((row) => {
             if (row.classList.contains('hidden-row')) return;
@@ -792,609 +814,358 @@ async function reverseInferAndOptimize() {
             let ebR = row.querySelector('.end-boss-r').value;
             let ebIdx = row.querySelector('.end-boss-idx').value;
             let ebHp = row.querySelector('.end-boss-hp').value;
-            
             let rotSelect = row.querySelector('.rot-select');
             let rotId = rotSelect ? rotSelect.value : "";
 
             if (c1 && c2 && c3) { 
                 let actualScore = parseFloat(scoreInput);
-                
                 if (isNaN(actualScore) || actualScore <= 0) {
                     hasIncompleteScore = true;
                     return; 
                 }
 
-                let validRotId = rotId;
                 let savedTeams = safeStorageGet('ww_teams', []);
                 let existingTeam = savedTeams.find(t => t.c1 === c1 && t.c2 === (c2 || '無') && t.c3 === (c3 || '無'));
 
-                if (existingTeam && existingTeam.rotId) {
+                let isRotAlive = (id) => {
+                    if (!id || id === "" || id.includes("無預設") || id.includes("無適配")) return false;
+                    return (typeof dpsDataMap !== 'undefined' && !!dpsDataMap[id]) || 
+                           (typeof customRotations !== 'undefined' && customRotations.some(r => 'custom_rot_' + r.id === id));
+                };
+
+                let validRotId = "";
+                if (existingTeam && existingTeam.rotId && isRotAlive(existingTeam.rotId)) {
                     validRotId = existingTeam.rotId; 
-                } 
-                else if (!validRotId || validRotId === "" || validRotId.includes("無預設") || validRotId.includes("無適配")) {
-                    let foundCustom = typeof customRotations !== 'undefined' ? customRotations.find(cr => cr.c1 === c1 && cr.c2 === c2 && cr.c3 === c3) : null;
-                    if (foundCustom) {
-                        validRotId = 'custom_rot_' + foundCustom.id;
-                    } 
-                    else if (window.teamDB && window.teamDB[c1]) {
-                        let foundDB = window.teamDB[c1].find(db => db.c2 === c2 && db.c3 === c3);
-                        if (foundDB) validRotId = `db_rot_${c1}_${c2}_${c3}_${foundDB.rot}`;
+                } else if (isRotAlive(rotId)) {
+                    validRotId = rotId;
+                } else {
+                    let foundRot = dpsData.find(d => d.c1 === c1 && d.c2 === c2 && d.c3 === c3 && d.isUserCustom);
+                    if (foundRot) {
+                        validRotId = foundRot.id;
+                    } else {
+                        let foundDB = dpsData.find(d => d.c1 === c1 && d.c2 === c2 && d.c3 === c3 && !d.isUserCustom);
+                        if (foundDB) validRotId = foundDB.id;
                     }
                 }
 
-                if (!validRotId || validRotId === "" || validRotId.includes("無預設") || validRotId.includes("無適配")) {
-                    let newId = Date.now().toString() + Math.floor(Math.random() * 1000);
+                if (!validRotId) {
+                    let newId = Date.now().toString() + "_" + Math.floor(Math.random() * 100000);
                     validRotId = 'custom_rot_' + newId;
                     
-                    let newRot = {
-                        id: newId,
-                        c1: c1, c2: c2, c3: c3,
-                        dps: 10000, 
-                        duration: 25,
-                        diff: "🧩",
-                        rot: "反推自動建軸",
-                        totalDmg: 250000,
-                        gridData: []
-                    };
+                    let newRot = { id: newId, c1: c1, c2: c2, c3: c3, dps: 10000, duration: 25, diff: "🧩", rot: "反推自動建軸", totalDmg: 250000, gridData: [] };
+                    if (typeof customRotations !== 'undefined') customRotations.push(newRot);
                     
-                    if (typeof customRotations !== 'undefined') {
-                        customRotations.push(newRot);
-                        safeStorageSet('ww_custom_rotations_v2', customRotations);
-                    }
-
-                    let newDpsData = { 
-                        id: validRotId, 
-                        c1: c1, c2: c2, c3: c3, 
-                        dps: 10000, rot: "反推自動建軸", diff: "🧩", 
-                        gen: (typeof charData !== 'undefined' && charData[getBase(c1)]) ? charData[getBase(c1)].gen : 1, 
-                        isUserCustom: true,
-                        duration: 25, 
-                        totalDmg: 250000
-                    };
-                    
+                    let newDpsData = { id: validRotId, c1: c1, c2: c2, c3: c3, dps: 10000, rot: "反推自動建軸", diff: "🧩", gen: (typeof charData !== 'undefined' && charData[getBase(c1)]) ? charData[getBase(c1)].gen : 1, isUserCustom: true, duration: 25, totalDmg: 250000 };
                     if (typeof dpsData !== 'undefined') dpsData.push(newDpsData);
                     if (typeof dpsDataMap !== 'undefined') dpsDataMap[validRotId] = newDpsData;
-                    
                     customStatsMap[validRotId] = { dps: 10000, stability: 100, buff: 0 };
-                    
-                    let newTeam = {
-                        id: 'team_auto_' + newId,
-                        name: `${c1} 反推隊伍`,
-                        c1: c1, c2: c2 || '無', c3: c3 || '無',
-                        rotId: validRotId,
-                        score: actualScore > 0 ? actualScore : 1
-                    };
-                    savedTeams.push(newTeam);
-                    safeStorageSet('ww_teams', savedTeams);
-                    
                     needsRebuild = true;
                 }
 
-                if (validRotId && !checkedRotations.has(validRotId)) {
+                if (existingTeam) {
+                    existingTeam.rotId = validRotId;
+                    existingTeam.score = actualScore;
+                } else {
+                    savedTeams.push({ id: 'team_auto_' + Date.now().toString() + "_" + Math.floor(Math.random() * 100000), name: `${c1} 反推隊伍`, c1: c1, c2: c2 || '無', c3: c3 || '無', rotId: validRotId, score: actualScore });
+                    needsRebuild = true;
+                }
+                safeStorageSet('ww_teams', savedTeams);
+
+                if (!checkedRotations.has(validRotId)) {
                     checkedRotations.add(validRotId);
-                    ownedCharacters.add(getBase(c1));
-                    ownedCharacters.add(getBase(c2));
-                    ownedCharacters.add(getBase(c3));
-                    safeStorageSet('ww_rotations', [...checkedRotations]);
-                    safeStorageSet('ww_roster', [...ownedCharacters]);
+                    ownedCharacters.add(getBase(c1)); ownedCharacters.add(getBase(c2)); ownedCharacters.add(getBase(c3));
                     needsRebuild = true;
                 }
 
-                if (rotSelect && validRotId !== rotId) {
-                    if (![...rotSelect.options].some(opt => opt.value === validRotId)) {
-                        rotSelect.innerHTML += `<option value="${validRotId}">${t("自動啟用排軸")}</option>`;
-                    }
-                    rotSelect.value = validRotId;
-                }
-
-                rotId = validRotId; 
-
-                let ebRInt = parseInt(ebR), ebIdxInt = parseInt(ebIdx), ebHpPct = parseFloat(ebHp);
                 let calculatedMinDps = 0;
-                let possibleRots = getBestPossibleRots(c1, c2, c3); 
                 let teamAttr = typeof charAttrMap !== 'undefined' ? charAttrMap[c1] : null;
 
-                if (actualScore > 0 && rotId) {
-                    let dmg_left = actualScore / Math.max(0.0001, env.scoreRatio);
-                    let kills = 0, effective_dmg_sum = 0, tmp_r = start_r, tmp_idx = start_idx, tmp_hp = start_hp, dmgDealtToKilledBosses = 0;
-                    let loopGuard = 0;
-                    
-                    while (dmg_left > 0 && loopGuard < 50) {
-                        loopGuard++;
-                        let lvlPenalty = (tmp_r === 1) ? 1.0 : (tmp_r === 2 ? (env.pen110 || 1.0) : (env.pen120 || 1.0));
-                        let r_factor = getCombatMultiplier(env, teamAttr, c1, tmp_idx);
-                        
-                        if (tmp_idx === 5) {
-                            r_factor = 1.0; 
-                        }
-                        let totalPenalty = r_factor * lvlPenalty;
+                let dmg_left = actualScore / Math.max(0.0001, env.scoreRatio);
+                let kills = 0, effective_dmg_sum = 0, tmp_r = start_r, tmp_idx = start_idx, tmp_hp = start_hp;
+                
+                while (dmg_left > 0) {
+                    let lvlPenalty = (tmp_r === 1) ? 1.0 : (tmp_r === 2 ? (env.pen110 || 1.0) : (env.pen120 || 1.0));
+                    let r_factor = getCombatMultiplier(env, teamAttr, c1, tmp_idx);
+                    if (tmp_idx === 5) r_factor = 1.0; 
+                    let totalPenalty = r_factor * lvlPenalty;
+                    let currentDmgCap = tmp_hp * ((tmp_idx === 5) ? 1.1 : 1.0);
 
-                        let scoreMult = (tmp_idx === 5) ? 1.1 : 1.0;
-                        let currentDmgCap = tmp_hp * scoreMult;
-
-                        if (dmg_left >= currentDmgCap) { 
-                            dmg_left -= currentDmgCap; dmgDealtToKilledBosses += currentDmgCap; effective_dmg_sum += (tmp_hp / totalPenalty); 
-                            kills++; tmp_idx++; if (tmp_idx > 5) { tmp_r++; tmp_idx = 1; } 
-                            tmp_hp = getBossMaxHP(tmp_r, tmp_idx); 
-                        } else {
-                            let actualHpDmg = dmg_left / scoreMult;
-                            effective_dmg_sum += (actualHpDmg / totalPenalty);
-                            if (!isNaN(ebRInt) && !isNaN(ebIdxInt) && !isNaN(ebHpPct) && ebRInt === tmp_r && ebIdxInt === tmp_idx) {
-                                let dmgDoneToEndBoss = (actualScore / env.scoreRatio) - dmgDealtToKilledBosses;
-                                let actualHpDmgEndBoss = dmgDoneToEndBoss / scoreMult;
-                                let hp_factor = 1 - (ebHpPct / 100);
-                                if (hp_factor <= 0) hp_factor = 0.0001; 
-                                let calculatedTotalHP = actualHpDmgEndBoss / hp_factor;
-                                bossHPHistory[`R${ebRInt}-${ebIdxInt}`] = bossHPHistory[`R${ebRInt}-${ebIdxInt}`] || [];
-                                bossHPHistory[`R${ebRInt}-${ebIdxInt}`].push({ dmg: calculatedTotalHP, rawScore: actualScore });
-                            }
-                            tmp_hp -= actualHpDmg; dmg_left = 0;
-                        }
-                    }
-
-                    let effective_time = env.battleTime - (kills * env.transTime);
-                    let trueBaseDps = effective_time > 0 ? (effective_dmg_sum / effective_time) : 0;
-                    
-                    if (trueBaseDps > 0) { 
-                        let currStats = customStatsMap[rotId] || { stability: null, buff: 0, dps: null }; 
-                        let buffMult = 1 + ((currStats.buff || 0) / 100);
-                        let restoredBaseDps = trueBaseDps / buffMult;
-                        
-                        let fallbackOriginal = possibleRots.length > 0 ? possibleRots[0].dps : 1;
-                        let originalBaseDps = currStats.dps || fallbackOriginal;
-                        
-                        let diffKey = '⭐';
-                        if (possibleRots.length > 0) {
-                            diffKey = possibleRots[0].diff.includes('⚠️') ? '⚠️' : possibleRots[0].diff.includes('⭐') ? '⭐' : possibleRots[0].diff.includes('🔵') ? '🔵' : possibleRots[0].diff.includes('🟩') ? '🟩' : '🧩';
-                        }
-                        
-                        let currentStab = (currStats.stability !== null && currStats.stability !== undefined) ? currStats.stability : (diffStability[diffKey] !== undefined ? diffStability[diffKey] : 100);
-                        
-                        let minDps = originalBaseDps * (currentStab / 100);
-                        let maxDps = originalBaseDps;
-                        let newDps = originalBaseDps, newStab = currentStab;
-
-                        if (originalBaseDps <= 0 || originalBaseDps === 10000) { 
-                            newDps = restoredBaseDps; newStab = 100;
-                        } else if (restoredBaseDps >= minDps && restoredBaseDps <= maxDps) { 
-                            newDps = originalBaseDps; newStab = (restoredBaseDps / originalBaseDps) * 100; 
-                        } else if (restoredBaseDps > maxDps) { 
-                            newDps = restoredBaseDps; newStab = 100;
-                        } else if (restoredBaseDps < minDps) { 
-                            newDps = originalBaseDps; newStab = (restoredBaseDps / originalBaseDps) * 100; 
-                        }
-                        
-                        newDps = parseFloat(newDps.toFixed(3));
-                        newStab = parseFloat(newStab.toFixed(1));
-                        
-                        if (customStatsMap[rotId]) {
-                            customStatsMap[rotId].dps = newDps; customStatsMap[rotId].stability = newStab;
-                        } else {
-                            customStatsMap[rotId] = { dps: newDps, stability: newStab, buff: 0 }; 
-                        }
-
-                        if (typeof customRotations !== 'undefined') {
-                            let cr = customRotations.find(r => 'custom_rot_' + r.id === rotId);
-                            if (cr) {
-                                cr.dps = newDps;
-                                cr.totalDmg = newDps * cr.duration;
-                                safeStorageSet('ww_custom_rotations_v2', customRotations);
-                            }
-                        }
-                        if (typeof dpsDataMap !== 'undefined' && dpsDataMap[rotId]) {
-                            dpsDataMap[rotId].dps = newDps;
-                            dpsDataMap[rotId].totalDmg = newDps * dpsDataMap[rotId].duration;
-                        }
-
-                        let allTeams = safeStorageGet('ww_teams', []);
-                        let tIdx = allTeams.findIndex(t => t.rotId === rotId);
-                        if (tIdx !== -1) {
-                            allTeams[tIdx].score = actualScore;
-                            safeStorageSet('ww_teams', allTeams);
-                        }
-
-                        calculatedMinDps = trueBaseDps; 
-                    } else if (rotId) { 
-                        calculatedMinDps = possibleRots.length > 0 ? getRotDpsRange(possibleRots[0]).min : 0; 
-                    }
-                    
-                    let sim_dmg = actualScore / Math.max(0.0001, env.scoreRatio), sim_r = start_r, sim_idx = start_idx, sim_hp = start_hp;
-                    let simLoopGuard = 0;
-                    while (simLoopGuard < 50) {
-                        simLoopGuard++;
-                        let scoreMult = (sim_idx === 5) ? 1.1 : 1.0;
-                        let currentDmgCap = sim_hp * scoreMult;
-                        if (sim_dmg >= currentDmgCap) {
-                            sim_dmg -= currentDmgCap; sim_idx++;
-                            if (sim_idx > 5) { sim_r++; sim_idx = 1; }
-                            sim_hp = getBossMaxHP(sim_r, sim_idx);
-                        } else {
-                            break;
-                        }
-                    }
-                    if (sim_dmg > 0) {
-                        let scoreMult = (sim_idx === 5) ? 1.1 : 1.0;
-                        sim_hp -= (sim_dmg / scoreMult);
-                    }
-                    start_r = sim_r; start_idx = sim_idx; start_hp = sim_hp;
-
-                } else if (rotId) {
-                    calculatedMinDps = possibleRots.length > 0 ? getRotDpsRange(possibleRots[0]).min : 0;
-                    let t_left = env.battleTime;
-                    let simLoopGuard = 0;
-                    while (t_left > 0 && simLoopGuard < 50) {
-                        simLoopGuard++;
-                        let lvlPenalty = (start_r === 1) ? 1.0 : (start_r === 2 ? (env.pen110 || 1.0) : (env.pen120 || 1.0));
-                        let r_factor = getCombatMultiplier(env, teamAttr, c1, start_idx);
-                        
-                        if (start_idx === 5) {
-                            r_factor = 1.0; 
-                        }
-
-                        let timeOnField = env.battleTime - t_left;
-                        let ttk = getTtkFromMathCurve(start_hp, calculatedMinDps, r_factor, lvlPenalty, c1, rotId, timeOnField);
-
-                        if (ttk <= t_left) { 
-                            t_left -= (ttk + env.transTime); start_idx++; 
-                            if (start_idx > 5) { start_r++; start_idx = 1; } 
-                            start_hp = getBossMaxHP(start_r, start_idx); 
-                        } else { 
-                            let d = dpsDataMap[rotId];
-                            let isFirst = (timeOnField === 0);
-                            let rotTime = (isFirst && d && d.firstDuration) ? d.firstDuration : ((d && d.duration) ? d.duration : 25);
-                            let baseTotalDmg = getEffectiveTotalDmg(d, rotId, isFirst, calculatedMinDps, rotTime);
-
-                            let true_eff_dps = Math.max(0.0001, (baseTotalDmg / rotTime) * r_factor * lvlPenalty);
-                            start_hp -= true_eff_dps * t_left; t_left = 0; 
-                        }
+                    if (dmg_left >= currentDmgCap) { 
+                        dmg_left -= currentDmgCap; effective_dmg_sum += (tmp_hp / totalPenalty); 
+                        kills++; tmp_idx++; if (tmp_idx > 5) { tmp_r++; tmp_idx = 1; } 
+                        tmp_hp = getBossMaxHP(tmp_r, tmp_idx); 
+                    } else {
+                        effective_dmg_sum += ((dmg_left / ((tmp_idx === 5) ? 1.1 : 1.0)) / totalPenalty);
+                        tmp_hp -= (dmg_left / ((tmp_idx === 5) ? 1.1 : 1.0)); dmg_left = 0;
                     }
                 }
 
-                currentTeams.push({ index: currentTeams.length, c1: c1, c2: c2, c3: c3, scoreInput: scoreInput, ebR: ebR, ebIdx: ebIdx, ebHp: ebHp, calculatedMinDps: calculatedMinDps, teamAttr: teamAttr, rotId: rotId });
+                let effective_time = env.battleTime - (kills * env.transTime);
+                let trueBaseDps = effective_time > 0 ? (effective_dmg_sum / effective_time) : 0;
+                
+                if (trueBaseDps > 0) { 
+                    let currStats = customStatsMap[validRotId] || { buff: 0 }; 
+                    let newDps = parseFloat((trueBaseDps / (1 + ((currStats.buff || 0) / 100))).toFixed(3));
+                    
+                    customStatsMap[validRotId] = { dps: newDps, stability: 100, buff: currStats.buff || 0 };
+                    
+                    if (typeof dpsData !== 'undefined') {
+                        let targetD = dpsData.find(d => d.id === validRotId);
+                        if (targetD) { targetD.dps = newDps; targetD.totalDmg = newDps * (targetD.duration || 25); }
+                    }
+                    if (typeof dpsDataMap !== 'undefined' && dpsDataMap[validRotId]) {
+                        dpsDataMap[validRotId].dps = newDps; dpsDataMap[validRotId].totalDmg = newDps * (dpsDataMap[validRotId].duration || 25);
+                    }
+                    if (typeof customRotations !== 'undefined') {
+                        let cr = customRotations.find(r => 'custom_rot_' + r.id === validRotId);
+                        if (cr) { cr.dps = newDps; cr.totalDmg = newDps * (cr.duration || 25); }
+                    }
+                    
+                    calculatedMinDps = trueBaseDps; 
+                    needsRebuild = true; 
+                } 
+
+                let sim_dmg = actualScore / Math.max(0.0001, env.scoreRatio);
+                while (sim_dmg > 0) {
+                    let currentDmgCap = start_hp * ((start_idx === 5) ? 1.1 : 1.0);
+                    if (sim_dmg >= currentDmgCap) {
+                        sim_dmg -= currentDmgCap; start_idx++;
+                        if (start_idx > 5) { start_r++; start_idx = 1; }
+                        start_hp = getBossMaxHP(start_r, start_idx);
+                    } else { 
+                        start_hp -= (sim_dmg / ((start_idx === 5) ? 1.1 : 1.0)); 
+                        break; 
+                    }
+                }
+
+                currentTeams.push({ 
+                    index: currentTeams.length, c1: c1, c2: c2, c3: c3, scoreInput: scoreInput, 
+                    ebR: ebR, ebIdx: ebIdx, ebHp: ebHp, calculatedMinDps: calculatedMinDps, teamAttr: teamAttr, rotId: validRotId 
+                });
             }
         });
 
-        if (needsRebuild && typeof renderRotations === 'function') {
-            renderRotations();
-            if (typeof updateTracker === 'function') updateTracker();
-        }
-
-        if (hasIncompleteScore) {
-            isEngineRunning = false;
-            let progressContainer = document.getElementById('sim-progress-container');
-            if (progressContainer) progressContainer.style.display = 'none';
-            return alert(t("⚠️ 發現已選擇角色但未填寫【實戰得分】的隊伍！\n\n實戰洗牌反推需要精確的分數。如果您希望系統自動填補該空位，請將該列的主C選單改回 (空白)。"));
-        }
-
-        if (currentTeams.length === 0) {
-            alert(t("⚠️ 沙盤中目前沒有隊伍！請先在上方編排至少一組隊伍並填寫實戰得分，再執行實戰洗牌反推。"));
-            isEngineRunning = false;
-            let progressContainer = document.getElementById('sim-progress-container');
-            if (progressContainer) progressContainer.style.display = 'none';
-            return;
-        }
+        if (hasIncompleteScore) return alert(t("⚠️ 發現已選擇角色但未填寫【實戰得分】的隊伍！"));
+        if (currentTeams.length === 0) return alert(t("⚠️ 沙盤中目前沒有隊伍！"));
 
         safeStorageSet('ww_custom_stats', customStatsMap);
+        safeStorageSet('ww_rotations', [...checkedRotations]);
+        safeStorageSet('ww_roster', [...ownedCharacters]);
+        if (typeof customRotations !== 'undefined') safeStorageSet('ww_custom_rotations_v2', customRotations);
 
         let maxAllowed = parseInt(document.getElementById('team-count-select').value) || 16;
-        let fillFromDB = (currentTeams.length < maxAllowed);
         let poolToPermute = [...currentTeams];
 
-        if (fillFromDB) {
+        if (currentTeams.length < maxAllowed) {
             let tempUsage = {};
             currentTeams.forEach(tData => {
-                let b1 = getBase(tData.c1), b2 = getBase(tData.c2), b3 = getBase(tData.c3);
-                tempUsage[b1] = (tempUsage[b1] || 0) + 1; tempUsage[b2] = (tempUsage[b2] || 0) + 1; tempUsage[b3] = (tempUsage[b3] || 0) + 1;
+                [tData.c1, tData.c2, tData.c3].forEach(c => { let b = getBase(c); tempUsage[b] = (tempUsage[b] || 0) + 1; });
             });
-            
-            let validDBTeams = getUniqueValidTeams(); 
-            validDBTeams.sort((a,b) => getRotDpsRange(b).min - getRotDpsRange(a).min); 
-            
+            let validDBTeams = getUniqueValidTeams().sort((a,b) => getRotDpsRange(b).min - getRotDpsRange(a).min); 
             for (let dbTeam of validDBTeams) {
                 if (poolToPermute.length >= maxAllowed) break;
                 let b1 = getBase(dbTeam.c1), b2 = getBase(dbTeam.c2), b3 = getBase(dbTeam.c3);
-                let limit1 = charData[b1]?.max || 1, limit2 = charData[b2]?.max || 1, limit3 = charData[b3]?.max || 1;
+                let l1 = charData[b1]?.max || 1, l2 = charData[b2]?.max || 1, l3 = charData[b3]?.max || 1;
                 let u1 = tempUsage[b1] || 0, u2 = tempUsage[b2] || 0, u3 = tempUsage[b3] || 0;
-                
-                if (u1 < limit1 && u2 < limit2 && u3 < limit3 && b1 !== b2 && b1 !== b3 && b2 !== b3) {
-                    let isDuplicate = poolToPermute.some(ct => ct.c1 === dbTeam.c1 && ct.c2 === dbTeam.c2 && ct.c3 === dbTeam.c3);
-                    if (!isDuplicate) {
+                if (u1 < l1 && u2 < l2 && u3 < l3 && b1 !== b2 && b1 !== b3 && b2 !== b3) {
+                    if (!poolToPermute.some(ct => ct.c1 === dbTeam.c1 && ct.c2 === dbTeam.c2 && ct.c3 === dbTeam.c3)) {
                         tempUsage[b1] = u1 + 1; tempUsage[b2] = u2 + 1; tempUsage[b3] = u3 + 1;
-                        poolToPermute.push({
-                            index: poolToPermute.length, 
-                            c1: dbTeam.c1, c2: dbTeam.c2, c3: dbTeam.c3, scoreInput: "", ebR: "", ebIdx: "", ebHp: "", 
-                            calculatedMinDps: getRotDpsRange(dbTeam).min, 
-                            teamAttr: typeof charAttrMap !== 'undefined' ? charAttrMap[dbTeam.c1] : null,
-                            rotId: dbTeam.id 
-                        });
+                        poolToPermute.push({ index: poolToPermute.length, c1: dbTeam.c1, c2: dbTeam.c2, c3: dbTeam.c3, scoreInput: "", ebR: "", ebIdx: "", ebHp: "", calculatedMinDps: getRotDpsRange(dbTeam).min, teamAttr: typeof charAttrMap !== 'undefined' ? charAttrMap[dbTeam.c1] : null, rotId: dbTeam.id });
                     }
                 }
             }
         }
 
         let n = poolToPermute.length;
-        
-        let dmgMultMatrix = new Array(n);
-        for(let i = 0; i < n; i++) {
-            dmgMultMatrix[i] = {};
+        let dmgMultMatrix = new Array(n).fill(null).map((_, i) => {
+            let rMap = {};
             for(let r = 1; r <= 10; r++) {
-                dmgMultMatrix[i][r] = {};
+                rMap[r] = {};
                 let lvlPenalty = (r === 1) ? 1.0 : (r === 2 ? (env.pen110 || 1.0) : (env.pen120 || 1.0));
-                
                 for(let idx = 1; idx <= 5; idx++) {
                     let r_factor = getCombatMultiplier(env, poolToPermute[i].teamAttr, poolToPermute[i].c1, idx);
-                    
-                    if (idx === 5) {
-                        r_factor = 1.0; 
-                    }
-
-                    if (r_factor <= 0) r_factor = 0.1;
-                    dmgMultMatrix[i][r][idx] = { r_factor: r_factor, lvlPenalty: lvlPenalty };
+                    rMap[r][idx] = { r_factor: (idx === 5) ? 1.0 : Math.max(0.1, r_factor), lvlPenalty: lvlPenalty };
                 }
             }
-        }
+            return rMap;
+        });
 
-        let opsPerSec = getDeviceBenchmark(); 
-        let dpTransitions = n * Math.pow(2, Math.max(0, n - 1)); 
-        let estDpTimeSec = (dpTransitions / opsPerSec).toFixed(1);
-        let dpWarning = (dpTransitions > 1000000) ? t(" (⚠️ 運算時間可能過長)") : "";
+        let defaultBeamWidth = Math.max(3500, n > 1 ? Math.floor(3500 + (Math.log(n) * 1800)) : 3500); 
+        let algoChoice = prompt(t("請輸入演算法 (1=智慧, 2=DP, 3=束式)："), "1");
+        if (algoChoice === null) return isEngineRunning = false;
+        
+        let useDP = (algoChoice === "2") ? true : (algoChoice === "3" ? false : (n <= 14)); 
+        let algoSequence = [];
 
-        let defaultBeamWidth = 3500; 
-        if (n > 1) {
-            defaultBeamWidth = Math.floor(3500 + (Math.log(n) * 1800)); 
-        }
-        defaultBeamWidth = Math.max(3500, defaultBeamWidth); 
+        // --- ⚖️ 建立與實戰 100% 同步的精準計分裁判 ---
+        let evaluateSeq = (seq) => {
+            let testScore = 0, tmp_r = 1, tmp_idx = 1, tmp_hp = getBossMaxHP(1, 1);
+            for (let j = 0; j < seq.length; j++) {
+                let team = seq[j];
+                if (!team.calculatedMinDps || team.calculatedMinDps <= 0) continue;
+                let t_left = env.battleTime, loopGuard = 0;
+                while (t_left > 0 && loopGuard < 50) {
+                    loopGuard++;
+                    let lvlPenalty = (tmp_r === 1) ? 1.0 : (tmp_r === 2 ? (env.pen110 || 1.0) : (env.pen120 || 1.0));
+                    let r_factor = getCombatMultiplier(env, team.teamAttr, team.c1, tmp_idx);
+                    if (tmp_idx === 5) r_factor = 1.0;
 
-        let beamTransitions = n * n * defaultBeamWidth; 
-        let estBeamTimeSec = (beamTransitions / opsPerSec).toFixed(1);
+                    let timeOnField = env.battleTime - t_left;
+                    let ttk = getTtkFromMathCurve(tmp_hp, team.calculatedMinDps, r_factor, lvlPenalty, team.c1, team.rotId, timeOnField);
 
-        let msg = t("目前排兵候選隊伍數：") + `${n} ` + t("隊\n\n");
-        msg += t("請選擇推演演算法：\n");
-        msg += `[1] 🤖 ` + t("智慧分流 (推薦：N≤14用DP，N>14用束式)\n");
-        msg += `[2] 💎 ` + t("狀態壓縮 DP (全域搜尋)：預估耗時 ") + `${estDpTimeSec} ` + t("秒") + `${dpWarning}\n`;
-        msg += `[3] 🚀 ` + t("束式搜索 (局部最佳化)：預估耗時 ") + `${estBeamTimeSec} ` + t("秒\n\n");
-        msg += t("請輸入 1, 2 或 3：");
+                    if (ttk <= t_left) {
+                        testScore += (tmp_hp * ((tmp_idx === 5) ? 1.1 : 1.0)) * env.scoreRatio;
+                        t_left -= (ttk + env.transTime);
+                        tmp_idx++; if (tmp_idx > 5) { tmp_r++; tmp_idx = 1; }
+                        tmp_hp = getBossMaxHP(tmp_r, tmp_idx);
+                    } else {
+                        let d = typeof dpsDataMap !== 'undefined' ? dpsDataMap[team.rotId] : null;
+                        let isFirst = (timeOnField === 0);
+                        let rotTime = (isFirst && d && d.firstDuration) ? d.firstDuration : ((d && d.duration) ? d.duration : 25);
+                        let baseTotalDmg = getEffectiveTotalDmg(d, team.rotId, isFirst, team.calculatedMinDps, rotTime);
 
-        let algoChoice = prompt(msg, "1");
-        if (algoChoice === null) {
-            isEngineRunning = false;
-            let progressContainer = document.getElementById('sim-progress-container');
-            if (progressContainer) progressContainer.style.display = 'none';
-            return; 
-        }
+                        let true_eff_dps = Math.max(0.0001, (baseTotalDmg / rotTime) * r_factor * lvlPenalty);
+                        testScore += (true_eff_dps * t_left * ((tmp_idx === 5) ? 1.1 : 1.0)) * env.scoreRatio;
+                        tmp_hp -= true_eff_dps * t_left;
+                        t_left = 0;
+                    }
+                }
+            }
+            return testScore;
+        };
 
-        let useDP = false;
-        if (algoChoice === "2") useDP = true;
-        else if (algoChoice === "3") useDP = false;
-        else useDP = (n <= 14); 
+        // ==========================================
+        // 🎯 策略 1：計算玩家原始排序的保底總分
+        // ==========================================
+        let originalScore = evaluateSeq(poolToPermute);
 
-        let bestSequence = [];
-        let bestSimDmg = 0;
-        let engineStartTime = Date.now();
-        let maxStatesReached = 0;
-        let finalBeamWidth = defaultBeamWidth;
+        // ==========================================
+        // 🎯 策略 2：強隊壓軸策略 (依 DPS 遞增排序)
+        // ==========================================
+        let ascSequence = [...poolToPermute].sort((a, b) => a.calculatedMinDps - b.calculatedMinDps);
+        let ascScore = evaluateSeq(ascSequence);
 
+        // ==========================================
+        // 🎯 策略 3：執行您原本的舊版演算法 (DP 或 束式)
+        // ==========================================
         if (useDP) {
-            updateProgress(50, t(`啟動狀態壓縮 DP 引擎 (預估 `) + `${estDpTimeSec}` + t(` 秒)...`));
-            await yieldToMain();
-            let dpRes = runBitmaskDP(poolToPermute, env); 
-            bestSequence = dpRes.seq;
-            bestSimDmg = dpRes.score;
+            updateProgress(50, t(`啟動 DP 引擎...`)); await yieldToMain();
+            algoSequence = runBitmaskDP(poolToPermute, env).seq; 
         } else {
-            let widthChoice = prompt(t(`啟動束式搜索。\n請輸入搜尋深度 (Beam Width)。\n建議值：`) + defaultBeamWidth + t(` (已自動推估)。`), defaultBeamWidth.toString());
-            if (widthChoice !== null && !isNaN(parseInt(widthChoice)) && parseInt(widthChoice) > 0) {
-                finalBeamWidth = parseInt(widthChoice);
-            }
-
+            let widthChoice = prompt(t(`啟動束式搜索。請輸入搜尋深度：`), defaultBeamWidth.toString());
+            let finalBeamWidth = (widthChoice !== null && parseInt(widthChoice) > 0) ? parseInt(widthChoice) : defaultBeamWidth;
             const MAX_NODES = finalBeamWidth * n; 
-            
-            let currentEvals = new Float64Array(finalBeamWidth);
-            let currentScores = new Float64Array(finalBeamWidth);
-            let currentMasks = new Int32Array(finalBeamWidth);
-            let currentR = new Int32Array(finalBeamWidth);
-            let currentIdx = new Int32Array(finalBeamWidth);
-            let currentHp = new Float64Array(finalBeamWidth);
-            
-            let currentTeamIdx = new Int32Array(finalBeamWidth); 
-            let currentParentIdx = new Int32Array(finalBeamWidth);
-
-            let historyTeamIdx = new Array(n);
-            let historyParentIdx = new Array(n);
-            for(let step = 0; step < n; step++){
-                historyTeamIdx[step] = new Int32Array(finalBeamWidth);
-                historyParentIdx[step] = new Int32Array(finalBeamWidth);
-            }
-
-            currentEvals[0] = 0; 
-            currentScores[0] = 0; 
-            currentMasks[0] = (1 << n) - 1; 
-            currentR[0] = 1;
-            currentIdx[0] = 1;
-            currentHp[0] = getBossMaxHP(1, 1);
-            currentTeamIdx[0] = -1; 
-            currentParentIdx[0] = -1;
+            let currentEvals = new Float64Array(finalBeamWidth), currentScores = new Float64Array(finalBeamWidth), currentMasks = new Int32Array(finalBeamWidth), currentR = new Int32Array(finalBeamWidth), currentIdx = new Int32Array(finalBeamWidth), currentHp = new Float64Array(finalBeamWidth), currentTeamIdx = new Int32Array(finalBeamWidth), currentParentIdx = new Int32Array(finalBeamWidth);
+            let historyTeamIdx = new Array(n), historyParentIdx = new Array(n);
+            for(let step = 0; step < n; step++){ historyTeamIdx[step] = new Int32Array(finalBeamWidth); historyParentIdx[step] = new Int32Array(finalBeamWidth); }
+            currentEvals[0] = 0; currentScores[0] = 0; currentMasks[0] = (1 << n) - 1; currentR[0] = 1; currentIdx[0] = 1; currentHp[0] = getBossMaxHP(1, 1); currentTeamIdx[0] = -1; currentParentIdx[0] = -1;
             let currentCount = 1;
 
             for (let step = 0; step < n; step++) {
-                updateProgress(Math.floor((step / n) * 100), t(`推演中 (`) + `${step+1}/${n})...`);
+                updateProgress(Math.floor((step / n) * 100), t(`推演中 (${step+1}/${n})...`));
                 if (step % 2 === 0) await yieldToMain(); 
-
-                let nextEvals = new Float64Array(MAX_NODES);
-                let nextScores = new Float64Array(MAX_NODES);
-                let nextMasks = new Int32Array(MAX_NODES);
-                let nextR = new Int32Array(MAX_NODES);
-                let nextIdx = new Int32Array(MAX_NODES);
-                let nextHp = new Float64Array(MAX_NODES);
-                let nextTeamId = new Int32Array(MAX_NODES);
-                let nextParentId = new Int32Array(MAX_NODES);
-                let nextCount = 0;
-
+                let nextEvals = new Float64Array(MAX_NODES), nextScores = new Float64Array(MAX_NODES), nextMasks = new Int32Array(MAX_NODES), nextR = new Int32Array(MAX_NODES), nextIdx = new Int32Array(MAX_NODES), nextHp = new Float64Array(MAX_NODES), nextTeamId = new Int32Array(MAX_NODES), nextParentId = new Int32Array(MAX_NODES), nextCount = 0;
                 let seenMasks = new Map(); 
 
                 for (let i = 0; i < currentCount; i++) {
-                    let cMask = currentMasks[i];
-                    let cScore = currentScores[i];
-                    let cR = currentR[i];
-                    let cIdx = currentIdx[i];
-                    let cHp = currentHp[i];
-
+                    let cMask = currentMasks[i], cScore = currentScores[i], cR = currentR[i], cIdx = currentIdx[i], cHp = currentHp[i];
                     for (let j = 0; j < n; j++) {
                         if (cMask & (1 << j)) { 
-                            let team = poolToPermute[j];
-                            let t_left = env.battleTime, dmgDone = 0, tmp_r = cR, tmp_idx = cIdx, tmp_hp = cHp;
-                            let loopGuard = 0;
-
-                            while (t_left > 0 && loopGuard < 50) {
-                                loopGuard++;
-                                let multData = dmgMultMatrix[j][tmp_r][tmp_idx];
-                                let timeOnField = env.battleTime - t_left;
+                            let team = poolToPermute[j], t_left = env.battleTime, dmgDone = 0, tmp_r = cR, tmp_idx = cIdx, tmp_hp = cHp;
+                            while (t_left > 0) {
+                                let multData = dmgMultMatrix[j][tmp_r][tmp_idx], timeOnField = env.battleTime - t_left;
                                 let ttk = getTtkFromMathCurve(tmp_hp, team.calculatedMinDps, multData.r_factor, multData.lvlPenalty, team.c1, team.rotId, timeOnField);
-
                                 if (ttk <= t_left) { 
-                                    let scoreMult = (tmp_idx === 5) ? 1.1 : 1.0;
-                                    dmgDone += (tmp_hp * scoreMult); t_left -= (ttk + env.transTime); tmp_idx++; 
+                                    dmgDone += (tmp_hp * ((tmp_idx === 5) ? 1.1 : 1.0)); t_left -= (ttk + env.transTime); tmp_idx++; 
                                     if (tmp_idx > 5) { tmp_r++; tmp_idx = 1; } 
                                     tmp_hp = getBossMaxHP(tmp_r, tmp_idx); 
                                 } else { 
-                                    let d = dpsDataMap[team.rotId];
-                                    let isFirst = (timeOnField === 0);
-                                    let rotTime = (isFirst && d && d.firstDuration) ? d.firstDuration : ((d && d.duration) ? d.duration : 25);
-                                    let baseTotalDmg = getEffectiveTotalDmg(d, team.rotId, isFirst, team.calculatedMinDps, rotTime);
-
-                                    let true_eff_dps = Math.max(0.0001, (baseTotalDmg / rotTime) * multData.r_factor * multData.lvlPenalty);
-                                    let scoreMult = (tmp_idx === 5) ? 1.1 : 1.0;
-                                    dmgDone += (true_eff_dps * t_left * scoreMult); tmp_hp -= true_eff_dps * t_left; t_left = 0; 
+                                    let d = dpsDataMap[team.rotId], isFirst = (timeOnField === 0), rotTime = (isFirst && d && d.firstDuration) ? d.firstDuration : ((d && d.duration) ? d.duration : 25);
+                                    let true_eff_dps = Math.max(0.0001, (getEffectiveTotalDmg(d, team.rotId, isFirst, team.calculatedMinDps, rotTime) / rotTime) * multData.r_factor * multData.lvlPenalty);
+                                    dmgDone += (true_eff_dps * t_left * ((tmp_idx === 5) ? 1.1 : 1.0)); tmp_hp -= true_eff_dps * t_left; t_left = 0; 
                                 }
                             }
-
-                            let newMask = cMask & ~(1 << j);
-                            let newScore = cScore + dmgDone;
-
-                            let remainingBossHp = 0;
-                            let hr_r = tmp_r, hr_idx = tmp_idx, isFirstBoss = true;
-                            let lookAheadCount = 0;
-
-                            while (hr_r <= 10 && lookAheadCount < 5) { 
-                                let hpToAdd = isFirstBoss ? tmp_hp : getBossMaxHP(hr_r, hr_idx);
-                                let scoreMult = (hr_idx === 5) ? 1.1 : 1.0;
-                                remainingBossHp += (hpToAdd * scoreMult);
-                                isFirstBoss = false;
-                                hr_idx++;
-                                if (hr_idx > 5) { hr_r++; hr_idx = 1; }
-                                lookAheadCount++;
+                            let newMask = cMask & ~(1 << j), newScore = cScore + dmgDone, remainingBossHp = 0, hr_r = tmp_r, hr_idx = tmp_idx, isFirstBoss = true;
+                            for (let k=0; k<5 && hr_r<=10; k++) { 
+                                remainingBossHp += ((isFirstBoss ? tmp_hp : getBossMaxHP(hr_r, hr_idx)) * ((hr_idx === 5) ? 1.1 : 1.0));
+                                isFirstBoss = false; hr_idx++; if (hr_idx > 5) { hr_r++; hr_idx = 1; }
                             }
-
                             let maxPossibleDmg = 0;
-                            for (let k = 0; k < n; k++) {
-                                if (newMask & (1 << k)) {
-                                    maxPossibleDmg += (poolToPermute[k].calculatedMinDps * env.battleTime);
-                                }
-                            }
-
-                            let heuristic = (maxPossibleDmg < remainingBossHp) ? (maxPossibleDmg * 0.001) : maxPossibleDmg; 
-                            let newEval = newScore + heuristic;
-
-                            let existingEval = seenMasks.get(newMask);
-                            if (existingEval !== undefined && existingEval >= newEval) continue;
+                            for (let k = 0; k < n; k++) if (newMask & (1 << k)) maxPossibleDmg += (poolToPermute[k].calculatedMinDps * env.battleTime);
+                            let newEval = newScore + ((maxPossibleDmg < remainingBossHp) ? (maxPossibleDmg * 0.001) : maxPossibleDmg);
+                            if (seenMasks.get(newMask) >= newEval) continue;
                             seenMasks.set(newMask, newEval);
-
-                            nextEvals[nextCount] = newEval;
-                            nextScores[nextCount] = newScore;
-                            nextMasks[nextCount] = newMask;
-                            nextR[nextCount] = tmp_r;
-                            nextIdx[nextCount] = tmp_idx;
-                            nextHp[nextCount] = tmp_hp;
-                            
-                            nextTeamId[nextCount] = j;
-                            nextParentId[nextCount] = i; 
-                            nextCount++;
+                            nextEvals[nextCount] = newEval; nextScores[nextCount] = newScore; nextMasks[nextCount] = newMask; nextR[nextCount] = tmp_r; nextIdx[nextCount] = tmp_idx; nextHp[nextCount] = tmp_hp; nextTeamId[nextCount] = j; nextParentId[nextCount] = i; nextCount++;
                         }
                     }
                 }
-
-                if (nextCount > maxStatesReached) maxStatesReached = nextCount;
-
-                let indices = new Int32Array(nextCount);
-                for (let i = 0; i < nextCount; i++) indices[i] = i;
+                let indices = new Int32Array(nextCount); for (let i = 0; i < nextCount; i++) indices[i] = i;
                 indices.sort((a, b) => nextEvals[b] - nextEvals[a]); 
-
                 currentCount = Math.min(finalBeamWidth, nextCount);
-                
-                let hTeam = historyTeamIdx[step];
-                let hParent = historyParentIdx[step];
-
                 for (let i = 0; i < currentCount; i++) {
                     let idx = indices[i];
-                    currentEvals[i] = nextEvals[idx];
-                    currentScores[i] = nextScores[idx];
-                    currentMasks[i] = nextMasks[idx];
-                    currentR[i] = nextR[idx];
-                    currentIdx[i] = nextIdx[idx];
-                    currentHp[i] = nextHp[idx];
-                    
-                    hTeam[i] = currentTeamIdx[i] = nextTeamId[idx];
-                    hParent[i] = currentParentIdx[i] = nextParentId[idx];
+                    currentEvals[i] = nextEvals[idx]; currentScores[i] = nextScores[idx]; currentMasks[i] = nextMasks[idx]; currentR[i] = nextR[idx]; currentIdx[i] = nextIdx[idx]; currentHp[i] = nextHp[idx]; historyTeamIdx[step][i] = currentTeamIdx[i] = nextTeamId[idx]; historyParentIdx[step][i] = currentParentIdx[i] = nextParentId[idx];
                 }
             }
-            
-            bestSimDmg = currentScores[0];
-            
             let traceIdx = 0; 
             for (let step = n - 1; step >= 0; step--) {
-                let teamIndexInPool = historyTeamIdx[step][traceIdx];
-                if (teamIndexInPool !== -1) {
-                    bestSequence.unshift(poolToPermute[teamIndexInPool]);
-                }
+                if (historyTeamIdx[step][traceIdx] !== -1) algoSequence.unshift(poolToPermute[historyTeamIdx[step][traceIdx]]);
                 traceIdx = historyParentIdx[step][traceIdx];
             }
+        }
+
+        let algoScore = evaluateSeq(algoSequence);
+
+        // ==========================================
+        // 🏆 終極裁決：三方 PK，絕對保底機制！
+        // ==========================================
+        let bestSequence = [...poolToPermute]; // 預設使用原味保底
+        let bestScore = originalScore;
+
+        // 若你的「強隊壓軸策略」分數更高，取代原陣型！
+        if (ascScore > bestScore) {
+            bestScore = ascScore;
+            bestSequence = [...ascSequence];
+        }
+
+        // 若機器的演算法真的找出破天荒的高分，才准許它取代！
+        if (algoScore > bestScore) {
+            bestScore = algoScore;
+            bestSequence = [...algoSequence];
         }
 
         updateProgress(100, t('最佳化排序完成！'));
         setTimeout(() => document.getElementById('sim-progress-container').style.display='none', 800);
 
-        document.querySelectorAll('.char-select, .score-input, .end-boss-r, .end-boss-idx, .end-boss-hp').forEach(el => el.value = ""); 
-        
-        bestSequence.forEach((tData, index) => {
-            if (index < maxAllowed && rows[index]) {
-                let row = rows[index];
+        rows.forEach((row, index) => {
+            if (index < maxAllowed && index < bestSequence.length) {
+                let tData = bestSequence[index];
                 let ss = row.querySelectorAll('select.char-select');
-                ss[0].innerHTML = `<option value="${tData.c1}">${tData.c1}</option>`; 
-                ss[1].innerHTML = `<option value="${tData.c2}">${tData.c2}</option>`; 
-                ss[2].innerHTML = `<option value="${tData.c3}">${tData.c3}</option>`;
-                ss[0].value = tData.c1; ss[1].value = tData.c2; ss[2].value = tData.c3;
+                if (tData.c1 && !ss[0].querySelector(`option[value="${tData.c1}"]`)) ss[0].innerHTML += `<option value="${tData.c1}">${tData.c1}</option>`;
+                if (tData.c2 && !ss[1].querySelector(`option[value="${tData.c2}"]`)) ss[1].innerHTML += `<option value="${tData.c2}">${tData.c2}</option>`;
+                if (tData.c3 && !ss[2].querySelector(`option[value="${tData.c3}"]`)) ss[2].innerHTML += `<option value="${tData.c3}">${tData.c3}</option>`;
+                
+                if (ss[0]) ss[0].value = tData.c1;
+                if (ss[1]) ss[1].value = tData.c2;
+                if (ss[2]) ss[2].value = tData.c3;
+
+                let sInput = row.querySelector('.score-input'); if (sInput && tData.scoreInput !== undefined) sInput.value = tData.scoreInput;
+                let ebR = row.querySelector('.end-boss-r'); if (ebR && tData.ebR !== undefined) ebR.value = tData.ebR;
+                let ebIdx = row.querySelector('.end-boss-idx'); if (ebIdx && tData.ebIdx !== undefined) ebIdx.value = tData.ebIdx;
+                let ebHp = row.querySelector('.end-boss-hp'); if (ebHp && tData.ebHp !== undefined) ebHp.value = tData.ebHp;
+            } else {
+                row.querySelectorAll('.char-select, .score-input, .end-boss-r, .end-boss-idx, .end-boss-hp').forEach(el => el.value = "");
             }
         });
-        
+
         let simModeEl = document.getElementById('sim-mode'); if (simModeEl && simModeEl.value !== 'auto') simModeEl.value = 'auto';
-        updateTracker(); 
-
-        let finalSimRes = runSimulations(env); 
-        
-        let rawMin = Math.floor(finalSimRes.totalMatrixScoreMin);
-        let rawMax = Math.floor(finalSimRes.totalMatrixScoreMax);
-        let estMinScore = Math.min(rawMin, rawMax);
-        let estMaxScore = Math.max(rawMin, rawMax);
-
-        let successMsg = fillFromDB ? t("解析完成。已將現有隊伍重新排序並填補剩餘空位。") : t("解析完成。已計算出能避開抗性與轉場的最佳出戰順序。");
-        successMsg += `\n\n🎯 預估矩陣總分 (上限)：${estMaxScore.toLocaleString()} 分`;
-        successMsg += `\n🛡️ 預估最差保底 (下限)：${estMinScore.toLocaleString()} 分\n`;
-
-        let calcTimeSec = ((Date.now() - engineStartTime) / 1000).toFixed(2);
-        successMsg += `\n📊 運算觀測報告：\n`;
-        successMsg += `- 實際運算耗時：${calcTimeSec} 秒\n`;
-        
-        if (!useDP) {
-            successMsg += `- 運算模式：智慧容差剪枝 (動態閾值)\n`;
-            successMsg += `- 設定最大深度：${finalBeamWidth}\n`;
-            successMsg += `- 實際最大分支：${maxStatesReached.toLocaleString()}\n`;
-            if (maxStatesReached <= finalBeamWidth) successMsg += `✨ 狀態：運算資源充足，已涵蓋有效潛力範圍內的所有組合。`;
-            else successMsg += `⚠️ 狀態：已觸發截斷機制。此為設定深度下之最佳近似解。`;
-        } else {
-            successMsg += `✨ 狀態：狀態壓縮 DP 執行完畢，已涵蓋全域最佳解。`;
-        }
-        alert(successMsg);
         
         if (typeof renderRotations === 'function') renderRotations();
+        if (typeof updateTracker === 'function') updateTracker(); 
+        if (typeof renderWorkshopCards === 'function') renderWorkshopCards();
+
+        let finalSimRes = runSimulations(env); 
+        alert(`${t("解析完成。已重新排序隊伍，確保最佳通關。")}\n\n🎯 預估矩陣總分 (上限)：${Math.max(Math.floor(finalSimRes.totalMatrixScoreMin), Math.floor(finalSimRes.totalMatrixScoreMax)).toLocaleString()} 分`);
 
     } catch (err) {
         console.error("引擎運算發生錯誤:", err);
