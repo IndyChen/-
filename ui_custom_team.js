@@ -1382,6 +1382,26 @@ function renderWorkshopCards() {
     container.innerHTML = html;
 }
 
+function deleteWorkshopItem(index) {
+    if(!confirm(t('確定要刪除這組自訂排軸嗎？\n(注意：此操作無法復原)'))) return; 
+    
+    // 1. 呼叫資料庫 API 刪除資料
+    if (typeof deleteCustomRotationData === 'function') {
+        deleteCustomRotationData(index);
+    } else if (typeof customRotations !== 'undefined') {
+        // 如果 API 不在，降級使用直接刪除陣列並存檔
+        customRotations.splice(index, 1);
+        safeStorageSet('ww_custom_rotations_v2', customRotations);
+    }
+    
+    // 2. 重新渲染工作坊畫面與主沙盤
+    if (typeof renderWorkshopCards === 'function') renderWorkshopCards();
+    if (typeof renderWorkshopSidebar === 'function') renderWorkshopSidebar();
+    if (typeof debouncedRenderAndTrack === 'function') debouncedRenderAndTrack(); 
+    
+    alert(t("✅ 已成功刪除排軸！"));
+}
+
 // ==========================================
 // ☁️ 雲端大廳真實串接與解析 (Google Sheets API)
 // ==========================================
