@@ -772,7 +772,6 @@ async function reverseInferAndOptimize() {
     if (typeof isEngineRunning === 'undefined') window.isEngineRunning = false;
     isEngineRunning = true;
 
-    // 🌟 AOT 優化 1：清空上一輪的快取
     ttkCache.clear();
 
     try {
@@ -806,8 +805,13 @@ async function reverseInferAndOptimize() {
                 }
 
                 let validRotId = rotId;
+                let savedTeams = safeStorageGet('ww_teams', []);
+                let existingTeam = savedTeams.find(t => t.c1 === c1 && t.c2 === (c2 || '無') && t.c3 === (c3 || '無'));
 
-                if (!validRotId || validRotId === "" || validRotId.includes("無預設") || validRotId.includes("無適配")) {
+                if (existingTeam && existingTeam.rotId) {
+                    validRotId = existingTeam.rotId; 
+                } 
+                else if (!validRotId || validRotId === "" || validRotId.includes("無預設") || validRotId.includes("無適配")) {
                     let foundCustom = typeof customRotations !== 'undefined' ? customRotations.find(cr => cr.c1 === c1 && cr.c2 === c2 && cr.c3 === c3) : null;
                     if (foundCustom) {
                         validRotId = 'custom_rot_' + foundCustom.id;
@@ -816,64 +820,64 @@ async function reverseInferAndOptimize() {
                         let foundDB = window.teamDB[c1].find(db => db.c2 === c2 && db.c3 === c3);
                         if (foundDB) validRotId = `db_rot_${c1}_${c2}_${c3}_${foundDB.rot}`;
                     }
+                }
 
-                    // 🚨 真正的修正點：必須再次檢查是否依然是 "無適配"，不能只用 !validRotId
-                    if (!validRotId || validRotId === "" || validRotId.includes("無預設") || validRotId.includes("無適配")) {
-                        
-                        let newId = Date.now().toString() + Math.floor(Math.random() * 1000);
-                        validRotId = 'custom_rot_' + newId; // 這裡強制把 "無適配" 覆寫為真實合法的 ID
-                        
-                        // 1. 建立空殼自訂排軸
-                        let newRot = {
-                            id: newId,
-                            c1: c1, c2: c2, c3: c3,
-                            dps: 10000, 
-                            duration: 25,
-                            diff: "🧩",
-                            rot: "反推自動建軸",
-                            totalDmg: 250000,
-                            gridData: []
-                        };
-                        
-                        if (typeof customRotations !== 'undefined') {
-                            customRotations.push(newRot);
-                            safeStorageSet('ww_custom_rotations_v2', customRotations);
-                        }
-
-                        // 2. 註冊到引擎記憶體中
-                        let newDpsData = { 
-                            id: validRotId, 
-                            c1: c1, c2: c2, c3: c3, 
-                            dps: 10000, rot: "反推自動建軸", diff: "🧩", 
-                            gen: (typeof charData !== 'undefined' && charData[getBase(c1)]) ? charData[getBase(c1)].gen : 1, 
-                            isUserCustom: true,
-                            duration: 25, 
-                            totalDmg: 250000
-                        };
-                        
-                        if (typeof dpsData !== 'undefined') dpsData.push(newDpsData);
-                        if (typeof dpsDataMap !== 'undefined') dpsDataMap[validRotId] = newDpsData;
-
-                        // 3. 預先建立防呆空殼，讓後續反推的真實 DPS 可以順利寫入
-                        customStatsMap[validRotId] = { dps: 10000, stability: 100, buff: 0 };
-                        
-                        // 4. 建立實體隊伍並存入資料庫
-                        let savedTeams = safeStorageGet('ww_teams', []);
-                        let newTeamId = 'team_auto_' + Date.now().toString();
-                        let newTeam = {
-                            id: newTeamId,
-                            name: `${c1} 反推隊伍`,
-                            c1: c1, 
-                            c2: c2 || '無', 
-                            c3: c3 || '無',
-                            rotId: validRotId,
-                            score: actualScore > 0 ? actualScore : 1
-                        };
-                        savedTeams.push(newTeam);
-                        safeStorageSet('ww_teams', savedTeams);
-                        
-                        needsRebuild = true;
+                if (!validRotId || validRotId === "" || validRotId.includes("無預設") || validRotId.includes("無適配")) {
+                    let newId = Date.now().toString() + Math.floor(Math.random() * 1000);
+                    validRotId = 'custom_rot_' + newId;
+                    
+                    let newRot = {
+                        id: newId,
+                        c1: c1, c2: c2, c3: c3,
+                        dps: 10000, 
+                        duration: 25,
+                        diff: "🧩",
+                        rot: "反推自動建軸",
+                        totalDmg: 250000,
+                        gridData: []
+                    };
+                    
+                    if (typeof customRotations !== 'undefined') {
+                        customRotations.push(newRot);
+                        safeStorageSet('ww_custom_rotations_v2', customRotations);
                     }
+
+                    let newDpsData = { 
+                        id: validRotId, 
+                        c1: c1, c2: c2, c3: c3, 
+                        dps: 10000, rot: "反推自動建軸", diff: "🧩", 
+                        gen: (typeof charData !== 'undefined' && charData[getBase(c1)]) ? charData[getBase(c1)].gen : 1, 
+                        isUserCustom: true,
+                        duration: 25, 
+                        totalDmg: 250000
+                    };
+                    
+                    if (typeof dpsData !== 'undefined') dpsData.push(newDpsData);
+                    if (typeof dpsDataMap !== 'undefined') dpsDataMap[validRotId] = newDpsData;
+                    
+                    customStatsMap[validRotId] = { dps: 10000, stability: 100, buff: 0 };
+                    
+                    let newTeam = {
+                        id: 'team_auto_' + newId,
+                        name: `${c1} 反推隊伍`,
+                        c1: c1, c2: c2 || '無', c3: c3 || '無',
+                        rotId: validRotId,
+                        score: actualScore > 0 ? actualScore : 1
+                    };
+                    savedTeams.push(newTeam);
+                    safeStorageSet('ww_teams', savedTeams);
+                    
+                    needsRebuild = true;
+                }
+
+                if (validRotId && !checkedRotations.has(validRotId)) {
+                    checkedRotations.add(validRotId);
+                    ownedCharacters.add(getBase(c1));
+                    ownedCharacters.add(getBase(c2));
+                    ownedCharacters.add(getBase(c3));
+                    safeStorageSet('ww_rotations', [...checkedRotations]);
+                    safeStorageSet('ww_roster', [...ownedCharacters]);
+                    needsRebuild = true;
                 }
 
                 if (rotSelect && validRotId !== rotId) {
@@ -963,24 +967,30 @@ async function reverseInferAndOptimize() {
                         newDps = parseFloat(newDps.toFixed(3));
                         newStab = parseFloat(newStab.toFixed(1));
                         
-                        if(customStatsMap[rotId]) {
+                        if (customStatsMap[rotId]) {
                             customStatsMap[rotId].dps = newDps; customStatsMap[rotId].stability = newStab;
                         } else {
                             customStatsMap[rotId] = { dps: newDps, stability: newStab, buff: 0 }; 
                         }
-                        
-                        let targetRot = typeof dpsDataMap !== 'undefined' ? dpsDataMap[rotId] : null;
-                        if (targetRot) {
-                            targetRot.dps = newDps;
-                            if (targetRot.isUserCustom) {
-                                let customId = rotId.replace('custom_rot_', '');
-                                let customTarget = typeof customRotations !== 'undefined' ? customRotations.find(cr => cr.id == customId) : null;
-                                if (customTarget) {
-                                    customTarget.dps = newDps;
-                                    if (customTarget.duration) customTarget.totalDmg = newDps * customTarget.duration;
-                                    safeStorageSet('ww_custom_rotations_v2', customRotations);
-                                }
+
+                        if (typeof customRotations !== 'undefined') {
+                            let cr = customRotations.find(r => 'custom_rot_' + r.id === rotId);
+                            if (cr) {
+                                cr.dps = newDps;
+                                cr.totalDmg = newDps * cr.duration;
+                                safeStorageSet('ww_custom_rotations_v2', customRotations);
                             }
+                        }
+                        if (typeof dpsDataMap !== 'undefined' && dpsDataMap[rotId]) {
+                            dpsDataMap[rotId].dps = newDps;
+                            dpsDataMap[rotId].totalDmg = newDps * dpsDataMap[rotId].duration;
+                        }
+
+                        let allTeams = safeStorageGet('ww_teams', []);
+                        let tIdx = allTeams.findIndex(t => t.rotId === rotId);
+                        if (tIdx !== -1) {
+                            allTeams[tIdx].score = actualScore;
+                            safeStorageSet('ww_teams', allTeams);
                         }
 
                         calculatedMinDps = trueBaseDps; 
@@ -1040,7 +1050,6 @@ async function reverseInferAndOptimize() {
                     }
                 }
 
-                // 🌟 AOT 優化 2：為每個隊伍加上 index，方便後續 Bitmask 運算
                 currentTeams.push({ index: currentTeams.length, c1: c1, c2: c2, c3: c3, scoreInput: scoreInput, ebR: ebR, ebIdx: ebIdx, ebHp: ebHp, calculatedMinDps: calculatedMinDps, teamAttr: teamAttr, rotId: rotId });
             }
         });
@@ -1130,12 +1139,11 @@ async function reverseInferAndOptimize() {
         let estDpTimeSec = (dpTransitions / opsPerSec).toFixed(1);
         let dpWarning = (dpTransitions > 1000000) ? t(" (⚠️ 運算時間可能過長)") : "";
 
-        // 🚀 4.8.6 動態對數深度估算 (因應奇藏加分機制，微調上修容錯深度)
-        let defaultBeamWidth = 3500; // 基礎值由 2500 -> 3500
+        let defaultBeamWidth = 3500; 
         if (n > 1) {
-            defaultBeamWidth = Math.floor(3500 + (Math.log(n) * 1800)); // 乘數由 1500 -> 1800
+            defaultBeamWidth = Math.floor(3500 + (Math.log(n) * 1800)); 
         }
-        defaultBeamWidth = Math.max(3500, defaultBeamWidth); // 下限由 3000 -> 3500
+        defaultBeamWidth = Math.max(3500, defaultBeamWidth); 
 
         let beamTransitions = n * n * defaultBeamWidth; 
         let estBeamTimeSec = (beamTransitions / opsPerSec).toFixed(1);
@@ -1178,12 +1186,8 @@ async function reverseInferAndOptimize() {
                 finalBeamWidth = parseInt(widthChoice);
             }
 
-            // ==========================================
-            // 4.8.5 效能優化：TypedArray 與攤平樹狀結構 (Flat Tree)
-            // ==========================================
             const MAX_NODES = finalBeamWidth * n; 
             
-            // 建立連續記憶體池，避免迴圈內產生物件
             let currentEvals = new Float64Array(finalBeamWidth);
             let currentScores = new Float64Array(finalBeamWidth);
             let currentMasks = new Int32Array(finalBeamWidth);
@@ -1191,11 +1195,9 @@ async function reverseInferAndOptimize() {
             let currentIdx = new Int32Array(finalBeamWidth);
             let currentHp = new Float64Array(finalBeamWidth);
             
-            // 攤平樹狀結構：紀錄當前選擇的隊伍索引與父節點索引
             let currentTeamIdx = new Int32Array(finalBeamWidth); 
             let currentParentIdx = new Int32Array(finalBeamWidth);
 
-            // 二維陣列保存歷史軌跡供溯源使用
             let historyTeamIdx = new Array(n);
             let historyParentIdx = new Array(n);
             for(let step = 0; step < n; step++){
@@ -1203,7 +1205,6 @@ async function reverseInferAndOptimize() {
                 historyParentIdx[step] = new Int32Array(finalBeamWidth);
             }
 
-            // 初始化起點
             currentEvals[0] = 0; 
             currentScores[0] = 0; 
             currentMasks[0] = (1 << n) - 1; 
@@ -1228,7 +1229,6 @@ async function reverseInferAndOptimize() {
                 let nextParentId = new Int32Array(MAX_NODES);
                 let nextCount = 0;
 
-                // 狀態去重 Hash Map
                 let seenMasks = new Map(); 
 
                 for (let i = 0; i < currentCount; i++) {
@@ -1270,7 +1270,6 @@ async function reverseInferAndOptimize() {
                             let newMask = cMask & ~(1 << j);
                             let newScore = cScore + dmgDone;
 
-                            // --- A* 啟發式估價 (統一使用純傷害計算) ---
                             let remainingBossHp = 0;
                             let hr_r = tmp_r, hr_idx = tmp_idx, isFirstBoss = true;
                             let lookAheadCount = 0;
@@ -1292,16 +1291,13 @@ async function reverseInferAndOptimize() {
                                 }
                             }
 
-                            // 如果剩餘理論傷害連血量都打不完，給予 0.1% 懲罰使其墊底被淘汰
                             let heuristic = (maxPossibleDmg < remainingBossHp) ? (maxPossibleDmg * 0.001) : maxPossibleDmg; 
                             let newEval = newScore + heuristic;
 
-                            // 狀態比對與去重
                             let existingEval = seenMasks.get(newMask);
                             if (existingEval !== undefined && existingEval >= newEval) continue;
                             seenMasks.set(newMask, newEval);
 
-                            // 寫入 TypedArray 記憶體池
                             nextEvals[nextCount] = newEval;
                             nextScores[nextCount] = newScore;
                             nextMasks[nextCount] = newMask;
@@ -1318,7 +1314,6 @@ async function reverseInferAndOptimize() {
 
                 if (nextCount > maxStatesReached) maxStatesReached = nextCount;
 
-                // 指標排序
                 let indices = new Int32Array(nextCount);
                 for (let i = 0; i < nextCount; i++) indices[i] = i;
                 indices.sort((a, b) => nextEvals[b] - nextEvals[a]); 
@@ -1344,7 +1339,6 @@ async function reverseInferAndOptimize() {
             
             bestSimDmg = currentScores[0];
             
-            // 從 history 陣列回推最佳路徑
             let traceIdx = 0; 
             for (let step = n - 1; step >= 0; step--) {
                 let teamIndexInPool = historyTeamIdx[step][traceIdx];
