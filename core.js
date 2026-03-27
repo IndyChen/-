@@ -811,7 +811,6 @@ async function reverseInferAndOptimize() {
                         let newId = Date.now().toString() + Math.floor(Math.random() * 1000);
                         validRotId = 'custom_rot_' + newId;
                         
-                        // 1. 建立空殼自訂排軸 (賦予初始 DPS 10000 讓後續反推邏輯有基準點可以校正)
                         let newRot = {
                             id: newId,
                             c1: c1, c2: c2, c3: c3,
@@ -828,7 +827,6 @@ async function reverseInferAndOptimize() {
                             safeStorageSet('ww_custom_rotations_v2', customRotations);
                         }
 
-                        // 2. 註冊到 dpsData 記憶體中，這是引擎能算到分數的關鍵
                         let newDpsData = { 
                             id: validRotId, 
                             c1: c1, c2: c2, c3: c3, 
@@ -841,8 +839,10 @@ async function reverseInferAndOptimize() {
                         
                         if (typeof dpsData !== 'undefined') dpsData.push(newDpsData);
                         if (typeof dpsDataMap !== 'undefined') dpsDataMap[validRotId] = newDpsData;
+
+                        // 🚨 關鍵修復：必須在出生的當下，先給 customStatsMap 一個空殼，否則後面算完 DPS 會存不進去！
+                        customStatsMap[validRotId] = { dps: 10000, stability: 100, buff: 0 };
                         
-                        // 3. 建立實體隊伍並存入資料庫
                         let savedTeams = safeStorageGet('ww_teams', []);
                         let newTeamId = 'team_auto_' + Date.now().toString();
                         let newTeam = {
