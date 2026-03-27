@@ -807,10 +807,23 @@ async function reverseInferAndOptimize() {
 
                 let validRotId = rotId;
 
-                if (!validRotId) {
-                        let newId = Date.now().toString() + Math.floor(Math.random() * 1000);
-                        validRotId = 'custom_rot_' + newId;
+                if (!validRotId || validRotId === "" || validRotId.includes("無預設") || validRotId.includes("無適配")) {
+                    let foundCustom = typeof customRotations !== 'undefined' ? customRotations.find(cr => cr.c1 === c1 && cr.c2 === c2 && cr.c3 === c3) : null;
+                    if (foundCustom) {
+                        validRotId = 'custom_rot_' + foundCustom.id;
+                    } 
+                    else if (window.teamDB && window.teamDB[c1]) {
+                        let foundDB = window.teamDB[c1].find(db => db.c2 === c2 && db.c3 === c3);
+                        if (foundDB) validRotId = `db_rot_${c1}_${c2}_${c3}_${foundDB.rot}`;
+                    }
+
+                    // 🚨 真正的修正點：必須再次檢查是否依然是 "無適配"，不能只用 !validRotId
+                    if (!validRotId || validRotId === "" || validRotId.includes("無預設") || validRotId.includes("無適配")) {
                         
+                        let newId = Date.now().toString() + Math.floor(Math.random() * 1000);
+                        validRotId = 'custom_rot_' + newId; // 這裡強制把 "無適配" 覆寫為真實合法的 ID
+                        
+                        // 1. 建立空殼自訂排軸
                         let newRot = {
                             id: newId,
                             c1: c1, c2: c2, c3: c3,
@@ -827,6 +840,7 @@ async function reverseInferAndOptimize() {
                             safeStorageSet('ww_custom_rotations_v2', customRotations);
                         }
 
+                        // 2. 註冊到引擎記憶體中
                         let newDpsData = { 
                             id: validRotId, 
                             c1: c1, c2: c2, c3: c3, 
@@ -840,9 +854,10 @@ async function reverseInferAndOptimize() {
                         if (typeof dpsData !== 'undefined') dpsData.push(newDpsData);
                         if (typeof dpsDataMap !== 'undefined') dpsDataMap[validRotId] = newDpsData;
 
-                        // 🚨 關鍵修復：必須在出生的當下，先給 customStatsMap 一個空殼，否則後面算完 DPS 會存不進去！
+                        // 3. 預先建立防呆空殼，讓後續反推的真實 DPS 可以順利寫入
                         customStatsMap[validRotId] = { dps: 10000, stability: 100, buff: 0 };
                         
+                        // 4. 建立實體隊伍並存入資料庫
                         let savedTeams = safeStorageGet('ww_teams', []);
                         let newTeamId = 'team_auto_' + Date.now().toString();
                         let newTeam = {
@@ -859,6 +874,7 @@ async function reverseInferAndOptimize() {
                         
                         needsRebuild = true;
                     }
+                }
 
                 if (rotSelect && validRotId !== rotId) {
                     if (![...rotSelect.options].some(opt => opt.value === validRotId)) {
