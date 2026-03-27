@@ -807,22 +807,42 @@ async function reverseInferAndOptimize() {
 
                 let validRotId = rotId;
 
-                if (!validRotId || validRotId === "" || validRotId.includes("無預設") || validRotId.includes("無適配")) {
-                    let foundCustom = typeof customRotations !== 'undefined' ? customRotations.find(cr => cr.c1 === c1 && cr.c2 === c2 && cr.c3 === c3) : null;
-                    if (foundCustom) {
-                        validRotId = 'custom_rot_' + foundCustom.id;
-                    } 
-                    else if (window.teamDB && window.teamDB[c1]) {
-                        let foundDB = window.teamDB[c1].find(db => db.c2 === c2 && db.c3 === c3);
-                        if (foundDB) validRotId = `db_rot_${c1}_${c2}_${c3}_${foundDB.rot}`;
-                    }
-
-                    // 修改這裡：不僅建軸，連隊伍一起建！
-                    if (!validRotId && typeof addCustomRotation === 'function') {
-                        // 1. 建立排軸
-                        validRotId = addCustomRotation(c1, c2, c3, 0, "🧩");
+                if (!validRotId) {
+                        let newId = Date.now().toString() + Math.floor(Math.random() * 1000);
+                        validRotId = 'custom_rot_' + newId;
                         
-                        // 2. 建立實體隊伍並存入資料庫
+                        // 1. 建立空殼自訂排軸 (賦予初始 DPS 10000 讓後續反推邏輯有基準點可以校正)
+                        let newRot = {
+                            id: newId,
+                            c1: c1, c2: c2, c3: c3,
+                            dps: 10000, 
+                            duration: 25,
+                            diff: "🧩",
+                            rot: "反推自動建軸",
+                            totalDmg: 250000,
+                            gridData: []
+                        };
+                        
+                        if (typeof customRotations !== 'undefined') {
+                            customRotations.push(newRot);
+                            safeStorageSet('ww_custom_rotations_v2', customRotations);
+                        }
+
+                        // 2. 註冊到 dpsData 記憶體中，這是引擎能算到分數的關鍵
+                        let newDpsData = { 
+                            id: validRotId, 
+                            c1: c1, c2: c2, c3: c3, 
+                            dps: 10000, rot: "反推自動建軸", diff: "🧩", 
+                            gen: (typeof charData !== 'undefined' && charData[getBase(c1)]) ? charData[getBase(c1)].gen : 1, 
+                            isUserCustom: true,
+                            duration: 25, 
+                            totalDmg: 250000
+                        };
+                        
+                        if (typeof dpsData !== 'undefined') dpsData.push(newDpsData);
+                        if (typeof dpsDataMap !== 'undefined') dpsDataMap[validRotId] = newDpsData;
+                        
+                        // 3. 建立實體隊伍並存入資料庫
                         let savedTeams = safeStorageGet('ww_teams', []);
                         let newTeamId = 'team_auto_' + Date.now().toString();
                         let newTeam = {
@@ -839,17 +859,6 @@ async function reverseInferAndOptimize() {
                         
                         needsRebuild = true;
                     }
-                }
-
-                if (validRotId && !checkedRotations.has(validRotId)) {
-                    checkedRotations.add(validRotId);
-                    ownedCharacters.add(getBase(c1));
-                    ownedCharacters.add(getBase(c2));
-                    ownedCharacters.add(getBase(c3));
-                    safeStorageSet('ww_rotations', [...checkedRotations]);
-                    safeStorageSet('ww_roster', [...ownedCharacters]);
-                    needsRebuild = true;
-                }
 
                 if (rotSelect && validRotId !== rotId) {
                     if (![...rotSelect.options].some(opt => opt.value === validRotId)) {
