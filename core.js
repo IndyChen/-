@@ -561,7 +561,16 @@ function runSimulations(env) {
     let auto_r_min = 1, auto_idx_min = 1, auto_hp_min = getBossMaxHP(1, 1);
     let auto_r_max = 1, auto_idx_max = 1, auto_hp_max = getBossMaxHP(1, 1);
     let man_start_r = 1, man_start_idx = 1, man_start_hp_pct = 100;
-
+    let savedTeams = safeStorageGet('ww_teams', []);
+    if (simMode === 'manual' && savedTeams.length === 0) {
+        savedTeams = [{
+            id: 'dummy_manual_team',
+            name: '反推虛擬隊伍',
+            c1: '無', c2: '無', c3: '無',
+            rotId: 'dummy_rot',
+            score: 1
+        }];
+    }
    let getCumDmg = (r, idx, hpPct) => {
         let dmg = 0;
         for (let i = 1; i <= r; i++) {
@@ -1400,7 +1409,7 @@ async function autoBuildMaxDpsTeams() {
         let totalCandidates = teamsWithScore.length;
         let opsPerSec = getDeviceBenchmark() * 0.4;
         
-        // 🚀 4.8.6 動態對數深度估算 (因應奇藏加分機制，微調上修容錯深度)
+        // 🚀 4.8.5 動態對數深度估算 (因應奇藏加分機制，微調上修容錯深度)
         let defaultBeamWidth = 3500; // 基礎值由 2500 -> 3500
         if (totalCandidates > 1) {
             defaultBeamWidth = Math.floor(3500 + (Math.log(totalCandidates) * 1800)); // 乘數由 1500 -> 1800
