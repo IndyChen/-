@@ -194,19 +194,21 @@ function getTtkFromMathCurve(hpToKill, baseDps, r_factor, lvlPenalty, mainC, rot
     let cacheKey = `${rotId}_${Math.round(hpToKill)}_${Math.round(r_factor*100)}_${Math.round(lvlPenalty*100)}_${Math.round(timeSpentOnField*10)}`;
     if (ttkCache.has(cacheKey)) return ttkCache.get(cacheKey);
 
-    let d = dpsDataMap[rotId];
+    // 🛡️ 修復 0 血不死Bug：如果王已經沒血了，瞬間秒殺，耗時 0 秒！
+    if (hpToKill <= 0) return 0; 
+
+    let d = typeof dpsDataMap !== 'undefined' ? dpsDataMap[rotId] : null;
     let isFirstRotation = (timeSpentOnField === 0);
     
     let rotTime = (isFirstRotation && d && d.firstDuration) ? d.firstDuration : ((d && d.duration) ? d.duration : 25);
     let baseTotalDmg = getEffectiveTotalDmg(d, rotId, isFirstRotation, baseDps, rotTime);
     let totalDmgPerRot = baseTotalDmg * r_factor * lvlPenalty;
     
-    if (isNaN(totalDmgPerRot) || totalDmgPerRot <= 0 || isNaN(hpToKill) || hpToKill <= 0) return 9999;
+    if (isNaN(totalDmgPerRot) || totalDmgPerRot <= 0 || isNaN(hpToKill)) return 9999;
 
     let fullRots = Math.floor(hpToKill / totalDmgPerRot);
     let remainderHp = hpToKill % totalDmgPerRot;
     
-    // 如果剛好整除，直接回傳總時間
     if (remainderHp === 0) {
         let result = fullRots * rotTime;
         ttkCache.set(cacheKey, result);
@@ -222,42 +224,28 @@ function getTtkFromMathCurve(hpToKill, baseDps, r_factor, lvlPenalty, mainC, rot
 
     let remainderTimePct = 0;
 
-    // 🌟 實戰模擬 2.0：二元搜尋階梯判定 (Binary Search on Step Function)
-    if (customStatsMap && customStatsMap[rotId] && customStatsMap[rotId].curvePoints && customStatsMap[rotId].curvePoints.length >= 2) {
+    if (typeof customStatsMap !== 'undefined' && customStatsMap[rotId] && customStatsMap[rotId].curvePoints && customStatsMap[rotId].curvePoints.length >= 2) {
         let pts = customStatsMap[rotId].curvePoints;
-        
-        let left = 0;
-        let right = pts.length - 1;
-        let bestIdx = right;
-
-        // 利用二分搜快速找到第一個「累積傷害 >= 目標傷害比例」的節點
+        let left = 0, right = pts.length - 1, bestIdx = right;
         while (left <= right) {
             let mid = Math.floor((left + right) / 2);
-            if (pts[mid].d >= targetDmgPct) {
-                bestIdx = mid;
-                right = mid - 1; // 繼續往左找，確保是「第一個」達標的點
-            } else {
-                left = mid + 1;
-            }
+            if (pts[mid].d >= targetDmgPct) { bestIdx = mid; right = mid - 1; } 
+            else { left = mid + 1; }
         }
-        
-        // 找到擊殺點後，直接取其時間
         remainderTimePct = pts[bestIdx].t;
-
     } else {
-        // 退回舊版預設的平滑曲線推估
         let k = 1.0;
-        if (customStatsMap && customStatsMap[rotId] && customStatsMap[rotId].curveK !== undefined && customStatsMap[rotId].curveK !== null) {
+        if (typeof customStatsMap !== 'undefined' && customStatsMap[rotId] && customStatsMap[rotId].curveK !== undefined && customStatsMap[rotId].curveK !== null) {
             let parsedK = parseFloat(customStatsMap[rotId].curveK);
             if (!isNaN(parsedK)) k = (parsedK > 0) ? parsedK : 1.0; 
-        } else if (DEFAULT_CURVE_K[mainC]) {
+        } else if (typeof DEFAULT_CURVE_K !== 'undefined' && DEFAULT_CURVE_K[mainC]) {
             k = DEFAULT_CURVE_K[mainC];
         }
         remainderTimePct = Math.pow(targetDmgPct, 1 / k);
     }
 
     let finalTtk = (fullRots * rotTime) + (remainderTimePct * rotTime);
-    ttkCache.set(cacheKey, finalTtk); // 寫入快取
+    ttkCache.set(cacheKey, finalTtk); 
     return finalTtk;
 }
 
