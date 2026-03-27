@@ -238,7 +238,7 @@
     </div>
 </div>
     
-    <h2>鳴潮矩陣編隊工具 <span style="font-size: 0.5em; color: var(--neon-purple); vertical-align: middle;">v4.8.4</span></h2>
+    <h2>鳴潮矩陣編隊工具 <span style="font-size: 0.5em; color: var(--neon-purple); vertical-align: middle;">v4.8.5</span></h2>
     
     <div class="data-source">
         <span>📊 數據庫設計與邏輯：AI架構 / 數據提供：QuichilOvO、南邊 / 整理：Kolton</span>
@@ -302,17 +302,13 @@
                 </details>
 
                 <div style="background: rgba(30, 30, 36, 0.7); border: 1px solid #9c9c26; border-left: 4px solid #9c9c26; padding: 20px 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.3); flex: 1; min-width: 300px;">
-                    <strong style="color: #d4af37; font-size: 1.1em; display: block; margin-bottom: 15px; border-bottom: 1px dashed #555; padding-bottom: 10px;">🛠️ 主持人備註 (3/25 v4.8.4)：</strong>
+                    <strong style="color: #d4af37; font-size: 1.1em; display: block; margin-bottom: 15px; border-bottom: 1px dashed #555; padding-bottom: 10px;">🛠️ 來遲的公告 (3/27 v4.8.5)：</strong>
                     
                     <div style="color: #ddd; font-size: 0.95em; line-height: 1.8;">
                         <p style="margin-top: 0; color: #fff;">致各位使用者：</p>
                         
                         <p style="margin-bottom: 12px; text-align: justify;">
-                            1. 本次更新主要新增了排軸工作坊，讓大老們可以分享自己的排軸，因工作坊後端採用google試算表api，可能會需要跨區。
-                        </p>
-
-                        <p style="margin-bottom: 12px; text-align: justify;">
-                            2. 明日就是「終焉矩陣」的第一期更新，不會是第一時間更新參數，但明日我會找時間進行調整，歡迎提供相關反饋。
+                            1. 抱歉今日才更新，主要是驗證血量至r5要凹一下，本人手法仍有不足，一定會再精進自我。
                         </p>
                     </div>
                 </div>
@@ -320,35 +316,34 @@
             </div>
 
             <details style="flex: 1; min-width: 300px; background: rgba(30, 30, 36, 0.7); padding: 15px; border-radius: 12px; border: 1px solid var(--border-glass); cursor: pointer;">
-        <summary style="color: var(--gold); font-weight: bold; outline: none; font-size: 1.1em;">📜 點此查看版本更新說明 (當前: v4.8.4)</summary>
+        <summary style="color: var(--gold); font-weight: bold; outline: none; font-size: 1.1em;">📜 點此查看版本更新說明 (當前: v4.8.5)</summary>
         <div style="margin-top: 15px; font-size: 0.95em; color: #ccc; line-height: 1.6; border-top: 1px dashed var(--border-glass); padding-top: 15px; cursor: default;" onclick="event.stopPropagation();">
             
-            <strong style="color: #00ffaa; font-size: 1.05em;">✨ v4.8.4 【排軸工作坊與核心架構升級】</strong>
-            <ul style="margin: 5px 0 15px 20px; padding: 0; color: #ccc;">
-                <li><strong>排軸雲端工作坊：</strong>新增雲端大廳，支援本機排軸一鍵發布、社群排軸下載套用，並提供雙向自訂命名功能。</li>
-                <li><strong>多維度檢索與排序：</strong>實裝條件疊加過濾器（高輸出、輪椅軸等）與多重條件排序佇列（支援 DPS、動作密度、吻合度之同鍵雙向反轉）。</li>
-                <li><strong>曲線吻合度與防呆查重：</strong>導入餘弦相似度演算法比對打法，上傳時若吻合度 ≥ 85% 將提示覆蓋舊版，避免大廳充斥重複排軸。</li>
-                <li><strong>動作密度解析引擎：</strong>自動解析並於面板顯示排軸的「總動作數」、「平均排軸密度」以及「5 秒最高爆發密度」。</li>
-                <li><strong>階梯推演與二元搜尋：</strong>捨棄線性平滑推估，改用階梯判定與二元搜尋法，大幅提升殘血推演的擊殺時間精準度。</li>
-                <li><strong>效能降載與高密度壓縮：</strong>實裝 TTK 記憶化快取與 AOT 預處理矩陣降低運算負載；導入 Base85 壓縮技術，分享碼體積無損縮減並向下相容舊版。</li>
-            </ul>
+            <strong style="color: #00ffaa; font-size: 1.05em;">🚀 v4.8.5 【運算減耗與矩陣參數更新】</strong>
+        <ul style="margin: 5px 0 15px 20px; padding: 0; color: #ccc;">
+            <li><strong>更新預設矩陣環境參數為終焉矩陣 S1 版。</strong></li>
+            <li><strong>記憶體佔用優化：</strong>束式搜索導入 BigInt 多維狀態雜湊，取代字串拼接以消除 GC (記憶體回收) 卡頓。</li>
+            <li><strong>運算效能提升：</strong>實裝全域排軸字典快取；重構抽樣演算法為數學期望值推導。</li>
+        </ul>
 
-            <strong style="color: var(--gold); font-size: 1.05em;">✨ v4.8.0 ~ 4.8.3 【排軸編輯與系統適配更新】</strong>
-            <ul style="margin: 5px 0 15px 20px; padding: 0; color: #ccc;">
-                <li><strong>資料庫同步與排軸編輯升級 (4.8.3)：</strong>更新主流配隊數據，實裝「首輪暖機」與「平穩期」精確分軸；自訂面板新增「傷害曲線預覽圖」與雙層暴擊率設定；數據總管改版並支援專屬分享碼。</li>
-                <li><strong>防呆機制與邏輯修復 (4.8.2~4.8.3)：</strong>實戰反推未選排軸時將自動配對，修復存檔失憶與覆寫問題；新增完整度檢查並修正轉場預估分數倒置問題。</li>
-                <li><strong>潛力評估與運算最佳化 (4.8.1~4.8.2)：</strong>依可用排軸數量動態推估搜尋深度以保留潛力組合；改用雜湊集合 (Set) 演算法降低推演耗時，支援多點動態斜率偵測 (LUT)。</li>
-                <li><strong>雙演算法調度與首輪特化 (4.8.0~4.8.1)：</strong>實裝狀態壓縮 DP 並依隊伍數自動切換演算法；支援讀取排軸真實循環秒數與首輪暖機特化時間。</li>
-                <li><strong>蒙地卡羅運算與減傷校正 (4.8.0)：</strong>新增亂數抽樣計算單發高傷未暴擊期望值；新增實測傷害輸入自動計算減傷係數。</li>
-            </ul>
+        <strong style="color: var(--gold); font-size: 1.05em;">✨ v4.8.0 ~ 4.8.4 【排軸工作坊與系統升級】</strong>
+        <ul style="margin: 5px 0 15px 20px; padding: 0; color: #ccc;">
+            <li><strong>雲端大廳與排軸共創 (4.8.4)：</strong>新增排軸工作坊，支援發布與下載；導入相似度演算法防呆查重。</li>
+            <li><strong>多維檢索與動作解析 (4.8.4)：</strong>新增多重條件過濾與排序；自動解析排軸動作數與密度。</li>
+            <li><strong>資料庫同步與排軸升級 (4.8.3)：</strong>更新配隊數據，區分首輪與平穩期；新增傷害曲線圖與暴擊率設定；數據總管支援分享碼。</li>
+            <li><strong>推演與效能優化 (4.8.2~4.8.4)：</strong>改用階梯判定與二元搜尋提升推演準確度；實裝快取與預處理矩陣；導入 Base85 縮減分享碼。</li>
+            <li><strong>防呆機制與潛力評估 (4.8.1~4.8.3)：</strong>實戰反推自動配對排軸；修正分數倒置問題；動態調整搜尋深度。</li>
+            <li><strong>雙演算法與時間特化 (4.8.0~4.8.1)：</strong>實裝狀態壓縮 DP；支援讀取排軸循環秒數與首輪暖機時間。</li>
+            <li><strong>期望值與減傷校正 (4.8.0)：</strong>計算單發未暴擊期望值；支援輸入實測傷害自動計算減傷係數。</li>
+        </ul>
 
-            <strong style="color: #888; font-size: 1.05em;">✨ v4.7.0 ~ 4.7.6 【近期版本回顧】</strong>
-            <ul style="margin: 5px 0 0 20px; padding: 0; color: #888;">
-                <li><strong>核心機制與反推升級 (4.7.3~4.7.6)：</strong>實裝 Beam Search 升級、全局環境抗性、實戰洗牌反推與序列王血量代數反解引擎。</li>
-                <li><strong>操作體驗與系統擴充 (4.7.0~4.7.5)：</strong>實裝動態壓軸、內建軸穩定性計算器、手法折損系統，並新增編隊拖曳互動、雙檔分離 UI 與 10 套記憶擴充。</li>
-            </ul>
+        <strong style="color: #888; font-size: 1.05em;">✨ v4.7.0 ~ 4.7.6 【近期版本回顧】</strong>
+        <ul style="margin: 5px 0 0 20px; padding: 0; color: #888;">
+            <li><strong>核心機制與反推升級 (4.7.3~4.7.6)：</strong>實裝 Beam Search 升級、全局環境抗性、實戰洗牌反推與序列王血量代數反解引擎。</li>
+            <li><strong>操作體驗與系統擴充 (4.7.0~4.7.5)：</strong>實裝動態壓軸、內建軸穩定性計算器、手法折損系統，並新增編隊拖曳互動、雙檔分離 UI 與 10 套記憶擴充。</li>
+        </ul>
 
-        </div>
+    </div>
     </details>
         </div>
 
