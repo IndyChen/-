@@ -954,7 +954,7 @@ async function reverseInferAndOptimize() {
                         let maxDps = originalBaseDps;
                         let newDps = originalBaseDps, newStab = currentStab;
 
-                        if (originalBaseDps <= 0) { 
+                        if (originalBaseDps <= 0 || originalBaseDps === 10000) { 
                             newDps = restoredBaseDps; newStab = 100;
                         } else if (restoredBaseDps >= minDps && restoredBaseDps <= maxDps) { 
                             newDps = originalBaseDps; newStab = (restoredBaseDps / originalBaseDps) * 100; 
