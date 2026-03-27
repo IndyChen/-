@@ -1,5 +1,5 @@
 // ==========================================
-// 鳴潮矩陣編隊工具 v4.8.4版 [畫面渲染與互動模組]
+// 鳴潮矩陣編隊工具 v4.8.5版 [畫面渲染與互動模組]
 // 檔案：ui.js
 // 職責：DOM 操作、畫布互動 Tooltip
 // ==========================================
@@ -174,7 +174,7 @@ function fallbackCopySampleCode(text) {
         }
     } catch (err) {
         console.error('Fallback 複製發生異常', err);
-        alert(t ? t("❌ 瀏覽器不支援自動複製，請手動選取複製。") : "❌ 瀏覽器不支援自動複製，請手动選取複製。");
+        alert(t ? t("❌ 瀏覽器不支援自動複製，請手動選取複製。") : "❌ 瀏覽器不支援自動複製，请手动选取复制。");
     }
     
     // 4. 清理戰場
@@ -338,8 +338,8 @@ function buildOptionsHTML(slotType, v1, v2, v3, curRaw, used, teamBases) {
 
 function renderIndividualHPPanel() {
     let container = document.getElementById('individual-hp-container'); if (!container) return; let html = '';
-    for (let r = 1; r <= 10; r++) {
-        for (let i = 1; i <= 4; i++) {
+    for (let r = 1; r <= 8; r++) {
+        for (let i = 1; i <= 5; i++) {
             let key = `R${r}-${i}`, data = bossHPMap[key], btnHtml = '', estHtml = '';
             if (bossHPHistory[key] && bossHPHistory[key].length >= 1) {
                 let validHistory = bossHPHistory[key].filter(h => !isNaN(h.dmg) && h.dmg > 0);
@@ -360,7 +360,7 @@ function renderIndividualHPPanel() {
 function initBoard() {
     const b = document.getElementById('team-board');
     let rOpts = `<option value="">R?</option>` + Array.from({length:10}, (_,i)=>`<option value="${i+1}">R${i+1}</option>`).join('');
-    let idxOpts = `<option value="">${t("號?")}</option>` + [1,2,3,4].map(idx=>`<option value="${idx}">${idx}</option>`).join('');
+    let idxOpts = `<option value="">${t("號?")}</option>` + [1,2,3,4,5].map(idx=>`<option value="${idx}">${idx}</option>`).join('');
     
     for(let i=1; i<=16; i++) {
         let tr = document.createElement('tr'); tr.className = 'draggable-row'; tr.draggable = true; 
@@ -970,7 +970,7 @@ function submitToGoogleForm() {
                 let calculatedTotalHP = 0, loopGuard = 0;
                 while (dmg_left > 0 && loopGuard < 50) { 
                     loopGuard++; let isResisted = teamAttr && teamAttr === env.resTags[tmp_idx - 1]; let r_factor = isResisted ? (1 - env.resPenalty / 100) : 1; if (r_factor <= 0) r_factor = 0.1; 
-                    if (dmg_left >= tmp_hp) { dmg_left -= tmp_hp; dmgDealtToKilledBosses += tmp_hp; effective_dmg_sum += (tmp_hp / r_factor); kills++; tmp_idx++; if (tmp_idx > 4) { tmp_r++; tmp_idx = 1; } tmp_hp = getBossMaxHP(tmp_r, tmp_idx); } 
+                    if (dmg_left >= tmp_hp) { dmg_left -= tmp_hp; dmgDealtToKilledBosses += tmp_hp; effective_dmg_sum += (tmp_hp / r_factor); kills++; tmp_idx++; if (tmp_idx > 5) { tmp_r++; tmp_idx = 1; } tmp_hp = getBossMaxHP(tmp_r, tmp_idx); } 
                     else { effective_dmg_sum += (dmg_left / r_factor); if (!isNaN(ebR) && !isNaN(ebIdx) && !isNaN(ebHp) && ebR === tmp_r && ebIdx === tmp_idx) { let dmgDoneToEndBoss = (score / env.scoreRatio) - dmgDealtToKilledBosses; let hp_factor = 1 - (ebHp / 100); if (hp_factor <= 0) hp_factor = 0.0001; calculatedTotalHP = dmgDoneToEndBoss / hp_factor; } dmg_left = 0; }
                 }
                 let effective_time = env.battleTime - (kills * env.transTime), trueBaseDps = effective_time > 0 ? (effective_dmg_sum / effective_time) : 0;
