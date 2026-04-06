@@ -1,0 +1,37 @@
+<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="130%">
+      <feDropShadow dx="0" dy="3" stdDeviation="2" flood-color="#000000" flood-opacity="0.5"/>
+    </filter>
+
+    <linearGradient id="cyberCyan" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#00F2FE" />
+      <stop offset="100%" stop-color="#4FACFE" />
+    </linearGradient>
+
+    <linearGradient id="cyberMagenta" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#FA709A" />
+      <stop offset="100%" stop-color="#FEE140" />
+    </linearGradient>
+    
+    <linearGradient id="darkMetal" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#2C3E50" />
+      <stop offset="100%" stop-color="#000000" />
+    </linearGradient>
+  </defs>
+
+  <path d="M 50 50 L 96 50 A 46 46 0 0 0 50 4 Z" fill="url(#darkMetal)" filter="url(#shadow)"/>
+  <path d="M 50 50 L 4 50 A 46 46 0 0 0 50 96 Z" fill="url(#darkMetal)" filter="url(#shadow)"/>
+
+  <circle cx="50" cy="50" r="41" fill="#121619"/>
+
+  <circle cx="50" cy="50" r="32" fill="none" stroke="#34495E" stroke-width="1.5" stroke-dasharray="4 2"/>
+
+  <path d="M 41 50 L 16 45 C 8 70, 20 86, 45 86 C 30 80, 24 62, 41 50 Z" fill="url(#cyberMagenta)" filter="url(#shadow)"/>
+
+  <path d="M 59 50 L 84 55 C 92 30, 80 14, 55 14 C 70 20, 76 38, 59 50 Z" fill="url(#cyberCyan)" filter="url(#shadow)"/>
+
+  <polygon points="41,50 45.5,42.206 54.5,42.206 59,50 54.5,57.794 45.5,57.794" fill="#0A0F14" stroke="#00F2FE" stroke-width="1"/>
+
+  <polygon points="50,47 53,50 50,53 47,50" fill="#00F2FE"/>
+</svg>
